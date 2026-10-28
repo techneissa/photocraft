@@ -63,6 +63,11 @@ pub(crate) fn with_missing_fonts_of(doc: &photocraft_doc::Document, mut warnings
     warnings
 }
 
+/// Files a canvas drop opens rather than places: preset files and Open as Layers manifests.
+fn opens_in_place(name: &str) -> bool {
+    crate::preset_files_ui::is_preset_file(name) || crate::open_as_layers::is_manifest(name)
+}
+
 /// A dropped file's name ("dropped" when it has none).
 fn dropped_name(f: &egui::DroppedFileHandle) -> String {
     f.path().file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "dropped".into())
@@ -232,12 +237,12 @@ impl PhotocraftApp {
         // A box still open from an earlier drop (or any Free Transform) is applied first (#4833):
         // the queue below places the next file only once no box is open, so a separate drop
         // would otherwise wait unseen for ↩. Files dropped together still go one by one.
-        if target == DropTarget::Canvas && self.ui.transform.is_some() && files.iter().any(|f| !crate::preset_files_ui::is_preset_file(&dropped_name(f))) {
+        if target == DropTarget::Canvas && self.ui.transform.is_some() && files.iter().any(|f| !opens_in_place(&dropped_name(f))) {
             crate::transform_tool::commit(self);
         }
         for f in files {
             let name = dropped_name(&f);
-            if target == DropTarget::Canvas && !crate::preset_files_ui::is_preset_file(&name) {
+            if target == DropTarget::Canvas && !opens_in_place(&name) {
                 self.drop_places.push_back(DropPlace::File(f));
                 continue;
             }
@@ -260,7 +265,7 @@ impl PhotocraftApp {
     pub fn dropped_on_canvas(&mut self, ctx: &egui::Context, names: &[String]) -> Vec<bool> {
         let at = self.services.cursor_pos.as_mut().and_then(|f| f(ctx));
         let canvas = self.drop_target(ctx, at) == DropTarget::Canvas;
-        let places: Vec<bool> = names.iter().map(|n| canvas && !crate::preset_files_ui::is_preset_file(n)).collect();
+        let places: Vec<bool> = names.iter().map(|n| canvas && !opens_in_place(n)).collect();
         if places.contains(&true) && self.ui.transform.is_some() {
             crate::transform_tool::commit(self);
         }
