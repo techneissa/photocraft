@@ -509,6 +509,12 @@ fn on_event(app: &mut PhotocraftApp, ctx: &egui::Context, e: JobEvent) {
         end_batch(&mut app.jobs);
         return;
     }
+    if e.command == crate::open_as_layers::COMMAND
+        && let JobOutcome::Done(v) = &e.outcome
+    {
+        crate::open_as_layers::finished(app, v);
+        return;
+    }
     match e.outcome {
         JobOutcome::Done(v) if e.command == "brush.presets.importAbr" => {
             let n = v.get("count").and_then(Value::as_u64).unwrap_or(0);

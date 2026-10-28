@@ -131,6 +131,9 @@ impl PhotocraftApp {
     /// Read and open the file at `path` (see [`open_file`](Self::open_file)).
     #[cfg(not(target_arch = "wasm32"))]
     pub fn open_path(&mut self, path: &str) -> Result<Vec<String>, String> {
+        if let Some(opened) = crate::open_as_layers::open_path(self, path) {
+            return opened;
+        }
         if self.show_if_open(path) {
             return Ok(Vec::new());
         }
