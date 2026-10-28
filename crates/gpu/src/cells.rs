@@ -225,7 +225,7 @@ impl Compositor {
                     Kernel::Mesh => {
                         // The moving pixels through the mesh, over transparency.
                         self.recorded += 1;
-                        let target = &self.pool[p.dst as usize].1;
+                        let Some((_, target)) = self.pool.get(p.dst as usize) else { continue };
                         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                             label: Some("pc_live_mesh"),
                             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
