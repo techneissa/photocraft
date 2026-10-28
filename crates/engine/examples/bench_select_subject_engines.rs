@@ -1,0 +1,40 @@
+//! Select Subject with each engine (`tools.selectSubjectEngine`) on pictures you name: the time of
+//! the command (sampling, the cutout or Classic, storing the selection) and how much of the picture
+//! it selected.
+//! `cargo run --release -p photocraft-engine --example bench_select_subject_engines -- photo.jpg [more.jpg]`
+use std::time::Instant;
+
+use photocraft_engine::Session;
+use photocraft_geom::Rect;
+use serde_json::json;
+
+fn main() {
+    let files: Vec<String> = std::env::args().skip(1).collect();
+    if files.is_empty() {
+        eprintln!("usage: bench_select_subject_engines <image>...");
+        return;
+    }
+    for file in &files {
+        let bytes = std::fs::read(file).unwrap_or_else(|e| panic!("{file}: {e}"));
+        let name = std::path::Path::new(file).file_name().and_then(|n| n.to_str()).unwrap_or("image");
+        let imported = photocraft_io::import(name, &bytes).unwrap_or_else(|e| panic!("{file}: {e}"));
+        for engine in ["classic", "macos"] {
+            let mut s = Session::new();
+            s.add_document(imported.document.clone(), None);
+            s.execute("prefs.set", json!({"path": "tools.selectSubjectEngine", "value": engine})).unwrap();
+            let bounds = s.active().map(|d| d.doc.bounds()).unwrap_or(Rect::EMPTY);
+            let t = Instant::now();
+            let r = s.execute("select.subject", json!({})).unwrap();
+            let took = t.elapsed();
+            let mut covered = 0.0f64;
+            if let Some(sel) = s.active().and_then(|d| d.doc.selection.as_ref()) {
+                let mut v = Vec::new();
+                sel.read_region_into(bounds, &mut v);
+                covered = v.iter().map(|x| f64::from(*x)).sum::<f64>() / (f64::from(bounds.width()) * f64::from(bounds.height()));
+            }
+            let mp = f64::from(bounds.width()) * f64::from(bounds.height()) / 1e6;
+            let note = r.get("note").and_then(|n| n.as_str()).unwrap_or("");
+            println!("{name} {}×{} ({mp:.1} MP)  {engine:>7}: {took:.2?}  selected {:.1} %  {note}", bounds.width(), bounds.height(), covered * 100.0);
+        }
+    }
+}
