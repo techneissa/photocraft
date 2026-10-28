@@ -126,8 +126,8 @@ Checked 2026-10-28 on official `main` (b8c3f3aa8) as well: the same failures, no
 
 - `clippy -D warnings`: this Mac's clippy (1.96) is newer than upstream's and flags official code:
   `nonminimal_bool` (`codecs/src/codecs/via_image.rs`), `overly_complex_bool_expr` (`text/src/psd_path.rs`),
-  `drop_non_drop` (`io/src/psd_export/document.rs`), cognitive complexity (`apps/tests/mac_menu_appkit.rs`).
+  `drop_non_drop` (`io/src/psd_export/document.rs`), cognitive complexity (`apps/tests/mac_menu_appkit.rs`), `manual_range_contains` (`engine/src/canvas_geom/tests.rs`).
 - 28 `photocraft-ui-egui` tests (`i18n::live_tests`, `camera_raw_localization`, `type_tool`, `layer_row_ui`,
-  `brush_panel`, `vector_ui`): `No glyph for "文"`; this Mac has no CJK font installed.
-- `cargo xtask scorecard --check`: "settings that do nothing: 12 of 182" vs the committed 181. The fork's Double Exposure setting adds one; `docs/scorecard.md` is left as upstream's so updates don't clash on it.
+  `brush_panel`, `vector_ui`, `input::hold_keys`): `No glyph for …`; this Mac has no CJK font installed.
+- `cargo xtask scorecard --check`: "settings that do nothing: 12 of 182" vs the committed 181. The fork's Double Exposure setting adds one; `docs/scorecard.md` is left as upstream's so updates don't clash on it. For the same reason the xtask test `scorecard::tests::staleness_check_and_determinism` fails ("docs/scorecard.md is stale").
 - `cargo xtask ci` stops at its first failing step; run the rest by hand (`cmd_ci` in `xtask/src/main.rs` lists them).
