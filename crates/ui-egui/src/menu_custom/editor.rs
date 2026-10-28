@@ -98,9 +98,11 @@ pub fn available(key: &str, shown: &[Slot], query: &str) -> Vec<Available> {
         .filter_map(|id| Some(Available { id, label: menus::label(key, id)?, path: tl!("Menu row").to_string() }))
         .collect();
     if menus::can_add(key) {
-        out.extend(
-            catalog::all().iter().filter(|c| !in_menu.contains(c.id) && !own.contains(&c.id)).map(|c| Available { id: c.id, label: c.label, path: c.path.clone() }),
-        );
+        out.extend(catalog::all().iter().filter(|c| !in_menu.contains(c.id) && !own.contains(&c.id)).map(|c| Available {
+            id: c.id,
+            label: c.label,
+            path: c.path.clone(),
+        }));
     }
     let words: Vec<String> = query.to_lowercase().split_whitespace().map(str::to_string).collect();
     if !words.is_empty() {
@@ -333,7 +335,13 @@ fn shown_list(ui: &mut egui::Ui, t: &Tokens, key: &str, menu: &mut Vec<Slot>, vi
                             Slot::Cmd(id) if !known(key, id) => t.text_faint,
                             _ => t.text,
                         };
-                        let g = truncated(ui, row_label(key, slot), egui::FontId::proportional(12.5), color.gamma_multiply(dim), (text_right - rect.left() - 22.0).max(10.0));
+                        let g = truncated(
+                            ui,
+                            row_label(key, slot),
+                            egui::FontId::proportional(12.5),
+                            color.gamma_multiply(dim),
+                            (text_right - rect.left() - 22.0).max(10.0),
+                        );
                         ui.painter().galley(pos2(rect.left() + 22.0, rect.center().y - g.size().y / 2.0), g, color);
                     }
                     if buttons {

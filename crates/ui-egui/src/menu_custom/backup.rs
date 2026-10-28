@@ -65,7 +65,9 @@ pub fn parse(text: &str) -> Result<Parsed, String> {
     match obj.get("version").and_then(Value::as_u64) {
         Some(VERSION) => {}
         Some(v) if v > VERSION => {
-            return Err(format!("This backup was made by a newer PhotoCraft (file version {v}; this one reads up to {VERSION}). Update PhotoCraft to import it."));
+            return Err(format!(
+                "This backup was made by a newer PhotoCraft (file version {v}; this one reads up to {VERSION}). Update PhotoCraft to import it."
+            ));
         }
         _ => return Err("This context menu backup has no valid version.".into()),
     }

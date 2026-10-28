@@ -82,7 +82,9 @@ fn presets_persist_in_the_preferences_and_a_broken_value_loads_as_none() {
     assert_eq!(Custom::from_value(&v), c);
     let json_text = serde_json::to_string(&v).unwrap();
     assert_eq!(Custom::from_value(&serde_json::from_str(&json_text).unwrap()), c);
-    for junk in [json!({"presets": {"slots": [5, "x", []], "active": 9}}), json!({"presets": {"slots": [null, null, null], "active": 0}}), json!({"presets": 3})] {
+    for junk in
+        [json!({"presets": {"slots": [5, "x", []], "active": 9}}), json!({"presets": {"slots": [null, null, null], "active": 0}}), json!({"presets": 3})]
+    {
         let p = Custom::from_value(&junk).presets;
         assert!(p.is_empty(), "{junk}");
     }

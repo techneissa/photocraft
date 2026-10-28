@@ -91,7 +91,9 @@ fn an_unknown_or_removed_command_is_skipped() {
 #[test]
 fn a_command_of_the_menu_bar_is_not_added_to_the_tab_menu() {
     let items: Vec<TabItem> = vec![("Close", "file.close", Value::Null, true), ("Close All", "file.closeAll", Value::Null, true)];
-    let saved = Custom { menus: [(TAB.to_string(), arrangement(&["cmd:edit.copy", "cmd:file.closeAll", "---", "cmd:file.close"], &[]))].into(), ..Default::default() }.to_value();
+    let saved =
+        Custom { menus: [(TAB.to_string(), arrangement(&["cmd:edit.copy", "cmd:file.closeAll", "---", "cmd:file.close"], &[]))].into(), ..Default::default() }
+            .to_value();
     assert_eq!(tab_rows(&saved, &items), vec![Some(1), None, Some(0)]);
 }
 
@@ -254,7 +256,14 @@ fn old_preferences_load_with_nothing_arranged() {
 
 #[test]
 fn a_broken_saved_value_loads_as_far_as_it_reads() {
-    for junk in [json!(5), json!("x"), json!([1, 2]), json!({"menus": 4}), json!({"menus": {"layers.row": 3, "nope": {"items": ["cmd:a"]}}}), json!({"presets": {"slots": "x"}})] {
+    for junk in [
+        json!(5),
+        json!("x"),
+        json!([1, 2]),
+        json!({"menus": 4}),
+        json!({"menus": {"layers.row": 3, "nope": {"items": ["cmd:a"]}}}),
+        json!({"presets": {"slots": "x"}}),
+    ] {
         let c = Custom::from_value(&junk);
         assert!(c.menus.is_empty() && c.presets.is_empty(), "{junk}");
     }

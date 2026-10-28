@@ -87,7 +87,8 @@ impl Presets {
     pub fn from_value(v: &Value) -> Presets {
         let mut out = Presets::default();
         let Some(obj) = v.as_object() else { return out };
-        out.slots = (0..COUNT).map(|i| obj.get("slots").and_then(Value::as_array).and_then(|a| a.get(i)).filter(|s| s.is_object()).map(menus_from_value)).collect();
+        out.slots =
+            (0..COUNT).map(|i| obj.get("slots").and_then(Value::as_array).and_then(|a| a.get(i)).filter(|s| s.is_object()).map(menus_from_value)).collect();
         out.active = slot_index(obj.get("active")).filter(|i| out.get(*i).is_some());
         out.undo = obj.get("undo").and_then(Value::as_object).map(|u| Undo {
             menus: u.get("menus").map(menus_from_value).unwrap_or_default(),
