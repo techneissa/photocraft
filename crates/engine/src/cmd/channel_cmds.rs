@@ -129,6 +129,7 @@ pub(crate) use targeting::{
     targeted_color,
 };
 pub use targeting::{follows_filter_mask, follows_target};
+pub(crate) use targeting::target;
 pub(crate) use view::fix_view;
 pub use view::{ChannelTarget, ChannelView, QuickMaskOptions, color_names, composite_name};
 

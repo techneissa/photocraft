@@ -70,7 +70,7 @@ pub mod contour_lib_cmds;
 pub mod cutout_cmds;
 pub mod distort_cmds;
 pub mod document_preset_cmds;
-mod double_exposure;
+pub(crate) mod double_exposure;
 pub mod edit_cmds;
 pub mod edit_menu_cmds;
 mod enabled;

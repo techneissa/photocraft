@@ -368,7 +368,7 @@ pub(crate) fn edits_channel(s: &Session) -> bool {
 }
 
 /// Make `t` the edit target and show it the way Photoshop does when its row is clicked.
-pub(super) fn target(s: &mut Session, t: ChannelTarget) {
+pub(crate) fn target(s: &mut Session, t: ChannelTarget) {
     if let Some(st) = s.active_mut() {
         let colors = color_count(&st.doc);
         let n = st.doc.channels.len();
