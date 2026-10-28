@@ -322,3 +322,103 @@ fn the_catalog_has_the_menu_bars_live_commands() {
     assert_eq!(ids.len(), all.len(), "each command once");
     assert!(all.iter().all(|c| crate::menus::is_live(c.id) && !c.label.is_empty()));
 }
+
+mod page {
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    use super::*;
+
+    fn harness(app: PhotocraftApp, height: f32) -> Harness<'static, PhotocraftApp> {
+        let mut h = Harness::builder().with_size(egui::vec2(900.0, height + 40.0)).build_ui_state(
+            move |ui, app: &mut PhotocraftApp| {
+                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    return;
+                }
+                egui::CentralPanel::default().show(ui, |ui| editor::page(app, ui, height));
+            },
+            app,
+        );
+        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+        h.run_steps(4);
+        h
+    }
+
+    fn click(h: &mut Harness<'static, PhotocraftApp>, label: &str) {
+        h.get_by_label(label).click();
+        h.run_steps(3);
+    }
+
+    #[test]
+    fn the_page_takes_a_row_out_adds_a_command_and_resets() {
+        let mut h = harness(app(), 520.0);
+        click(&mut h, "Deselect");
+        click(&mut h, "Take out of the menu");
+        let custom = load(h.state());
+        let a = &custom.menus[CANVAS_SELECTION];
+        assert_eq!(a.hidden, ["select.deselect"]);
+        assert!(!a.items.contains(&"cmd:select.deselect".to_string()) && a.items.contains(&"cmd:select.inverse".to_string()));
+        // the right-click menu follows at once
+        let menu = selection_menu(h.state_mut());
+        assert!(!canvas_has(h.state(), &menu, "select.deselect") && canvas_has(h.state(), &menu, "select.inverse"));
+        // + on the first offer (the row taken out) puts it back, below the picked row ...
+        h.get_all_by_label("Add to the menu").next().unwrap().click();
+        h.run_steps(3);
+        assert!(load(h.state()).menus[CANVAS_SELECTION].items.contains(&"cmd:select.deselect".to_string()));
+        // ... and the next offer is a command of the menu bar, the first of its File menu
+        h.get_all_by_label("Add to the menu").next().unwrap().click();
+        h.run_steps(3);
+        assert!(load(h.state()).menus[CANVAS_SELECTION].items.contains(&"cmd:file.new".to_string()));
+        click(&mut h, "Add Separator");
+        assert!(load(h.state()).menus[CANVAS_SELECTION].items.iter().any(|i| i == "---"));
+        // Reset puts the menu back as it came
+        click(&mut h, "Reset");
+        assert!(load(h.state()).menus.is_empty());
+    }
+
+    #[test]
+    fn the_preset_dropdown_saves_switches_clears_and_undoes() {
+        let mut h = harness(app(), 520.0);
+        click(&mut h, "Deselect");
+        click(&mut h, "Take out of the menu");
+        let arranged = load(h.state()).menus;
+        assert!(!arranged.is_empty());
+        click(&mut h, "Presets");
+        click(&mut h, "Save to Preset");
+        click(&mut h, "1");
+        assert!(load(h.state()).presets.get(0).is_some());
+        assert_eq!(load(h.state()).menus, arranged, "saving changes no menu");
+        // the label names the active preset
+        h.get_by_label("Preset 1");
+        // back to the default menus, then switch to Preset 1 and undo the switch
+        click(&mut h, "Reset");
+        assert!(load(h.state()).menus.is_empty());
+        click(&mut h, "Preset 1 •");
+        click(&mut h, "Preset 1");
+        assert_eq!(load(h.state()).menus, arranged);
+        click(&mut h, "Preset 1");
+        click(&mut h, "Undo");
+        assert!(load(h.state()).menus.is_empty());
+        // clear the slot
+        click(&mut h, "Preset 1 •");
+        click(&mut h, "Clear Preset");
+        // the switch entry and the submenu's entry are both called Preset 1: the submenu's is last
+        h.get_all_by_label("Preset 1").last().unwrap().click();
+        h.run_steps(3);
+        assert!(load(h.state()).presets.is_empty());
+    }
+
+    #[test]
+    fn the_presets_control_is_one_line_with_the_heading_and_the_lists_fill_the_height() {
+        let tall = harness(app(), 700.0);
+        let title = tall.get_by_label("Context Menus").rect();
+        let presets = tall.get_by_label("Presets").rect();
+        let export = tall.get_by_label("Export Context Menus…").rect();
+        let import = tall.get_by_label("Import Context Menus…").rect();
+        assert!((title.center().y - presets.center().y).abs() < 6.0, "{title:?} {presets:?}");
+        assert!((export.center().y - presets.center().y).abs() < 6.0 && (import.center().y - presets.center().y).abs() < 6.0);
+        assert!(presets.left() < export.left() && export.left() < import.left(), "dropdown, export, import from the left");
+        // the lists grow with the room the page has
+        assert!(editor::list_height(700.0, 80.0) > editor::list_height(400.0, 80.0));
+        assert_eq!(editor::list_height(100.0, 80.0), 160.0, "never under the least height");
+    }
+}

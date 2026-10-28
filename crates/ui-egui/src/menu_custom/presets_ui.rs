@@ -52,7 +52,7 @@ fn label(custom: &Custom) -> (String, bool) {
 
 /// A menu entry; a check mark at its right end when `checked`. True when clicked.
 fn entry(ui: &mut egui::Ui, text: &str, checked: bool) -> bool {
-    let r = ui.add(egui::Button::new(text).right_text("    "));
+    let r = ui.button(text);
     if checked {
         let t = Tokens::get(ui.ctx());
         crate::icons::paint(ui, Rect::from_center_size(pos2(r.rect.right() - 12.0, r.rect.center().y), vec2(13.0, 13.0)), "check", 13.0, t.text);
@@ -111,6 +111,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, custom: &mut Custom, t: 
     let r = if edited { r.on_hover_text(tl!("Changed since saved")) } else { r };
     egui::Popup::menu(&r).show(|ui| {
         crate::widgets::style_spectrum_popup_menu(ui);
+        ui.set_min_width(150.0);
         let states = custom.states();
         for n in 1..=COUNT {
             let s = states[n - 1];
