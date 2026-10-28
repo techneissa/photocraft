@@ -350,10 +350,11 @@ pub(super) fn editor(ui: &mut egui::Ui, t: &Tokens, name: &str, whens: &mut BTre
     let sug = suggest::suggest(&edit.text, cursor_byte(&ctx, field, &edit.text));
     let count = sug.items.len().min(MAX_ITEMS);
     edit.selected = edit.selected.min(count.saturating_sub(1));
-    if ui.memory(|m| m.has_focus(field)) && count > 0 {
-        if let Some(i) = list_keys(&ctx, &mut edit, count) {
-            take_suggestion(&ctx, &mut edit, &sug, i);
-        }
+    if ui.memory(|m| m.has_focus(field))
+        && count > 0
+        && let Some(i) = list_keys(&ctx, &mut edit, count)
+    {
+        take_suggestion(&ctx, &mut edit, &sug, i);
     }
     let before = edit.text.clone();
     let mut text = std::mem::take(&mut edit.text);
