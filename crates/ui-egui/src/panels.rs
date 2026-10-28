@@ -58,6 +58,7 @@ mod status_bar;
 pub mod swatches_ui;
 pub(super) mod timeline_ui;
 mod title_bar;
+pub(crate) mod title_bar_items;
 pub(super) mod titlebar;
 mod toolbar;
 pub mod type_panels_ui;

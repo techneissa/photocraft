@@ -41,6 +41,9 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 let max = ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false));
                 ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!max));
             }
+            // Right-click on the free gap: show or hide the bar's items (`title_bar_items`).
+            super::title_bar_items::bar_menu(app, &drag);
+            let items = super::title_bar_items::current(app);
             // Preferences › Interface › Show File Name In Title: with it off the bar keeps the
             // app name and the unsaved dot, since the tabs already name the file (#5037).
             let show_name = app.session.prefs().interface.show_file_name_in_title;
@@ -61,7 +64,7 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 if lead > 0.0 {
                     ui.add_space(lead + 4.0);
                 }
-                if !system {
+                if !system && items.brand {
                     let side = if t.pro { 18.0 } else { 20.0 };
                     let (mark, _) = ui.allocate_exact_size(vec2(side, side), Sense::hover());
                     crate::brand::paint_mark(ui, mark);
@@ -93,20 +96,14 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     // A narrow bar drops what is also in a menu, the theme toggle first
                     // (Preferences), then search (Edit › Search), and narrows the switcher
                     // (Window › Workspace) before anything runs over.
-                    let room = ui.available_width();
-                    let icons_shown: u8 = if room >= WORKSPACE_MIN + 2.0 * ICON_SLOT {
-                        2
-                    } else if room >= WORKSPACE_MIN + ICON_SLOT {
-                        1
-                    } else {
-                        0
-                    };
-                    let ws_width = (room - f32::from(icons_shown) * ICON_SLOT - 6.0).clamp(WORKSPACE_MIN, 130.0);
-                    if room >= WORKSPACE_MIN && widgets::dropdown(ui, "workspace", tl!("Workspace"), &mut ws, &opts, ws_width) {
+                    let fit = super::title_bar_items::fit(ui.available_width(), &items, WORKSPACE_MIN, ICON_SLOT);
+                    if let Some(ws_width) = fit.workspace
+                        && widgets::dropdown(ui, "workspace", tl!("Workspace"), &mut ws, &opts, ws_width)
+                    {
                         app.ui.workspace = ws;
                         crate::menus::apply_workspace(app);
                     }
-                    if icons_shown >= 1
+                    if fit.search
                         && icons::button(ui, "search", 28.0, app.ui.palette_open, &crate::shortcuts::tip_label(app, "Search commands", "edit.search")).clicked()
                     {
                         app.ui.palette_open = !app.ui.palette_open;
@@ -117,19 +114,25 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         photocraft_engine::prefs::AppearanceMode::Light => ("sun", tl!("Light")),
                     };
                     let appearance_tip = format!("{}: {}", tl!("Appearance Mode"), appearance_label);
-                    if icons_shown >= 2 {
+                    if fit.appearance {
                         let button = icons::button(ui, theme_icon, 28.0, false, &appearance_tip);
                         if button.clicked() {
                             crate::prefs_ui::cycle_appearance(app, ui.ctx());
                         }
                         button.context_menu(|ui| crate::prefs_ui::appearance_context_menu(app, ui));
                     }
-                    if rtl { ui.min_rect().right() } else { ui.min_rect().left() }
+                    // With every item hidden the group draws nothing, and its empty rect is no edge.
+                    match (fit.any(), rtl) {
+                        (false, true) => group.left(),
+                        (false, false) => group.right(),
+                        (true, true) => ui.min_rect().right(),
+                        (true, false) => ui.min_rect().left(),
+                    }
                 };
                 free = if rtl { (controls_end, menus_end) } else { (menus_end, controls_end) };
             });
             ui.ctx().data_mut(|d| d.insert_temp(span_id, free));
-            if system {
+            if system || !items.title {
                 return;
             }
             // A right-to-left document name in display order (the OS title keeps the logical text),

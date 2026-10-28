@@ -42,6 +42,20 @@ impl TopBar {
             _ => return None,
         })
     }
+
+    /// Show or hide item `id`; false for an id that is not an item.
+    pub fn set(&mut self, id: &str, on: bool) -> bool {
+        let slot = match id {
+            "brand" => &mut self.brand,
+            "title" => &mut self.title,
+            "workspace" => &mut self.workspace,
+            "search" => &mut self.search,
+            "appearance" => &mut self.appearance,
+            _ => return false,
+        };
+        *slot = on;
+        true
+    }
 }
 
 #[cfg(test)]
