@@ -200,16 +200,18 @@ pub fn page(app: &mut PhotocraftApp, ui: &mut egui::Ui, height: f32) {
     let width = ui.available_width() - 2.0;
     let left_w = ((width - GAP) * LEFT_SHARE).floor();
     let right_w = (width - GAP - left_w).max(120.0);
+    let mut left_top = 0.0;
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = GAP;
         ui.vertical(|ui| {
             ui.set_width(left_w);
             ui.label(egui::RichText::new(tl!("Shown")).color(t.text_dim));
+            left_top = ui.cursor().top();
             shown_list(ui, &t, key, &mut menu, &mut view, left_w);
         });
         ui.vertical(|ui| {
             ui.set_width(right_w);
-            add_list(ui, &t, key, &mut menu, &mut view, right_w);
+            add_list(ui, &t, key, &mut menu, &mut view, (right_w, left_top));
         });
     });
     keys(ui, &mut menu, &mut view);
@@ -461,16 +463,18 @@ fn drop_into(ui: &mut egui::Ui, t: &Tokens, key: &str, menu: &mut Vec<Slot>, vie
     }
 }
 
-fn add_list(ui: &mut egui::Ui, t: &Tokens, key: &str, menu: &mut Vec<Slot>, view: &mut View, width: f32) {
+/// The list to add from, `width` wide, ending where the shown list (which starts at `left_top`) ends.
+fn add_list(ui: &mut egui::Ui, t: &Tokens, key: &str, menu: &mut Vec<Slot>, view: &mut View, (width, left_top): (f32, f32)) {
     crate::widgets::text_field(ui, egui::Id::unique("context-menus-search"), &mut view.query, tl!("Search commands"), width, false);
     let mut offered = available(key, menu, &view.query);
     offered.truncate(MAX_AVAILABLE);
     let mut add: Option<Slot> = None;
+    let right_top = ui.cursor().top();
     frame(t).show(ui, |ui| {
         ui.set_width(width - 10.0);
         // (before the scroll area: show_rows spaces its rows by the spacing it is given)
         ui.spacing_mut().item_spacing.y = 0.0;
-        let h = view.list_h - ROW_H - 2.0;
+        let h = (view.list_h - (right_top - left_top)).max(60.0);
         egui::ScrollArea::vertical().id_salt("context-menu-add").max_height(h).min_scrolled_height(h).auto_shrink([false, false]).show_rows(
             ui,
             ROW_H + 8.0,
