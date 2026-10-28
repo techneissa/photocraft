@@ -117,23 +117,8 @@ fn bad_input_never_panics() {
     assert!(e(&nested).message.contains("Too many"));
     assert!(e(&"(".repeat(5000)).message.contains("too long"));
     assert!(e(&format!("{}textFocus", "!".repeat(100))).message.contains("Too many"));
-    for junk in [
-        "é",
-        "日本語 == 語",
-        "tool ==\u{0}",
-        "&&",
-        "||",
-        "==",
-        "!=",
-        "!=!=",
-        "()",
-        "(!)",
-        "!(",
-        "'",
-        "\"",
-        "tool == \u{1F600}",
-        "tool\u{301} == brush",
-    ] {
+    for junk in ["é", "日本語 == 語", "tool ==\u{0}", "&&", "||", "==", "!=", "!=!=", "()", "(!)", "!(", "'", "\"", "tool == \u{1F600}", "tool\u{301} == brush"]
+    {
         let _ = parse(junk);
         let _ = suggest::suggest(junk, junk.len());
         for i in 0..=junk.len() {

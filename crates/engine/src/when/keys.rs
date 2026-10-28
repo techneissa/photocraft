@@ -169,24 +169,14 @@ pub const KEYS: &[KeyDef] = &[
             ("fill", "Fill Layer", "A solid colour, gradient or pattern fill layer"),
         ]),
     },
-    KeyDef {
-        name: "textFocus",
-        title: "Typing",
-        desc: "A text box has the keyboard (shortcuts normally wait for it)",
-        kind: Kind::Bool { chip: "Typing" },
-    },
+    KeyDef { name: "textFocus", title: "Typing", desc: "A text box has the keyboard (shortcuts normally wait for it)", kind: Kind::Bool { chip: "Typing" } },
     KeyDef {
         name: "widgetFocus",
         title: "Control Focused",
         desc: "A slider, button or list has the keyboard (arrows and Space belong to it)",
         kind: Kind::Bool { chip: "Control Focused" },
     },
-    KeyDef {
-        name: "dialogOpen",
-        title: "Dialog",
-        desc: "A dialog is open (shortcuts normally wait for it)",
-        kind: Kind::Bool { chip: "Dialog Open" },
-    },
+    KeyDef { name: "dialogOpen", title: "Dialog", desc: "A dialog is open (shortcuts normally wait for it)", kind: Kind::Bool { chip: "Dialog Open" } },
     KeyDef {
         name: "paletteOpen",
         title: "Command Palette",
