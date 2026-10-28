@@ -324,6 +324,7 @@ pub(super) fn draw_beyond_canvas(app: &mut PhotocraftApp, painter: &egui::Painte
         return false;
     };
     let (doc, preview_key) = display_doc(app, idx);
+    let doc = crate::transform_live::cpu_doc(app, doc, preview_key);
     if doc.has_artboards() {
         return false;
     }

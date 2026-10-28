@@ -10,6 +10,9 @@ pub(crate) struct Kit {
     pub(crate) bgl0: wgpu::BindGroupLayout,
     pub(crate) bgl1: wgpu::BindGroupLayout,
     pub(crate) dummy: wgpu::TextureView,
+    /// The mesh pass of a live transform; `None` when the driver couldn't build it (a live
+    /// transform is then composited on the CPU).
+    pub(crate) mesh: Option<super::live::MeshKit>,
 }
 
 /// One draw of an effect-map kernel (outside the chunk loop).
@@ -118,7 +121,8 @@ pub(crate) fn tex_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 pub(crate) fn uniform_entry(binding: u32, size: u64) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
+        // The vertex stage too: the live transform's mesh pass places its vertices in the chunk.
+        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
         ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: NonZeroU64::new(size) },
         count: None,
     }

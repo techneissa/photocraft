@@ -1938,20 +1938,18 @@ fn free_transform_keeps_the_layer_under_the_layers_over_it() {
     app.session.execute("layer.select", json!({"layer": red.0})).unwrap();
     let ctx = gpu_ctx();
     begin(&mut app, &ctx).unwrap();
-    let pv = app.transform_preview.as_ref().unwrap();
-    assert!(pv.doc.layer(bg).unwrap().visible, "the layers below show under the box");
-    assert!(!pv.doc.layer(blue).unwrap().visible, "the layer over it is drawn over the box instead");
-    let (texture, rect) = pv.above.as_ref().and_then(|a| a.shown.as_ref()).expect("something covers the layer");
-    assert_eq!(*rect, photocraft_geom::Rect::new(16, 16, 40, 40));
-    assert_eq!(texture.size(), [24, 24]);
-    cancel(&mut app);
-
-    // The top layer: nothing to draw over it.
-    app.session.execute("layer.select", json!({"layer": blue.0})).unwrap();
-    begin(&mut app, &ctx).unwrap();
-    let pv = app.transform_preview.as_ref().unwrap();
-    assert!(pv.above.as_ref().is_some_and(|a| a.shown.is_none()));
-    assert!(pv.doc.layer(red).unwrap().visible && pv.doc.layer(bg).unwrap().visible);
+    // Moved right by 8 px: under the blue layer from x = 16.
+    let t = app.ui.transform.as_mut().unwrap();
+    t.quad = t.quad.map(|q| [q[0] + 8.0, q[1]]);
+    let (shown, key) = crate::canvas::display_doc(&mut app, 0);
+    assert!(app.transform_preview.as_ref().unwrap().above.is_none(), "nothing is drawn over the canvas");
+    assert!(shown.layers.iter().all(|l| l.visible), "every layer stays in the stack");
+    assert_eq!(shown.layers.iter().map(|l| l.id).collect::<Vec<_>>(), vec![bg, red, blue], "in its order");
+    let moved = crate::transform_live::cpu_doc(&mut app, shown, key);
+    let px = |x: i32, y: i32| photocraft_compose::render(&moved, photocraft_geom::Rect::new(x, y, x + 1, y + 1)).px[0];
+    assert!(px(20, 20)[2] > 0.99 && px(20, 20)[0] < 0.01, "the blue layer covers the moved red one: {:?}", px(20, 20));
+    assert!(px(18, 10)[0] > 0.99 && px(18, 10)[2] < 0.01, "the moved red shows where nothing covers it: {:?}", px(18, 10));
+    assert!(px(10, 10)[1] > 0.99, "it left its old place: {:?}", px(10, 10));
     cancel(&mut app);
 }
 
@@ -2020,11 +2018,15 @@ fn preview_texture_is_full_resolution() {
     let mut app = app_with_square(3000, photocraft_geom::Rect::new(10, 20, 2810, 2420));
     let ctx = gpu_ctx();
     begin(&mut app, &ctx).unwrap();
-    let pv = app.transform_preview.as_ref().unwrap();
-    assert_eq!(pv.texture.size(), [2800, 2400], "one texel per layer pixel");
-    // At 100% the texture has at least as many texels as the box covers screen pixels.
-    let t = app.ui.transform.as_ref().unwrap();
-    assert!(pv.texture.size()[0] as f64 >= t.rect[2] - t.rect[0]);
+    // The canvas composites the layer's own pixels through the mesh: every layer pixel.
+    let doc = app.session.active().unwrap().doc.id;
+    let (_, live) = crate::transform_live::current(&app, doc).unwrap_or_else(|| {
+        crate::canvas::display_doc(&mut app, 0);
+        crate::transform_live::current(&app, doc).unwrap()
+    });
+    assert_eq!(live.source.content_bounds(), photocraft_geom::Rect::new(10, 20, 2810, 2420), "one texel per layer pixel");
+    // No overlay texture is built for it.
+    assert_eq!(app.transform_preview.as_ref().unwrap().texture.size(), [1, 1]);
 }
 
 #[test]
@@ -2073,12 +2075,15 @@ fn artboard_transform_overlay_does_not_cover_moving_pixels_with_the_board_backgr
         let (mut app, board_id, red_id) = artboard_preview_app(background);
         let original = app.session.active().unwrap().doc.clone();
         begin(&mut app, &gpu_ctx()).unwrap();
+        // The canvas composites the moving layer in its place (transform_live.rs): nothing is
+        // drawn over it, the board background stays under it and the covering sibling over it.
+        let (shown, key) = crate::canvas::display_doc(&mut app, 0);
+        let moving = crate::transform_live::cpu_doc(&mut app, shown, key);
+        let at = |x: i32, y: i32| photocraft_compose::render(&moving, photocraft_geom::Rect::new(x, y, x + 1, y + 1)).px[0];
+        assert_eq!(at(12, 12), [1.0, 0.0, 0.0, 1.0], "the board background belongs under the moving layer");
+        assert_eq!(at(20, 20), [0.0, 0.0, 1.0, 1.0], "covering siblings must still cover the moving layer");
         let pv = app.transform_preview.as_ref().unwrap();
-        let (texture, rect) = pv.above.as_ref().unwrap().shown.as_ref().unwrap();
-        let (image, _) = texture.level_image(0).unwrap();
-        let at = |x: i32, y: i32| image.pixels[(y - rect.y0) as usize * image.size[0] + (x - rect.x0) as usize];
-        assert_eq!(at(12, 12), Color32::TRANSPARENT, "the board background belongs under the moving layer");
-        assert_eq!(at(20, 20), Color32::BLUE, "covering siblings must still cover the moving layer");
+        assert!(pv.above.is_none(), "nothing is drawn over the canvas");
         let under = photocraft_compose::render(&pv.doc, photocraft_geom::Rect::new(0, 0, 64, 64));
         assert_eq!(under.px[12 * 64 + 12], background.rgba().unwrap(), "the board background remains on the base canvas");
         assert!(!pv.doc.layer(red_id).unwrap().visible);
@@ -2176,34 +2181,20 @@ fn preview_pixels_past_the_canvas_are_hidden() {
     scale_about_pivot(&mut app, 2.0, 2.0);
     let q = app.ui.transform.as_ref().unwrap().quad;
     assert!(q[0][0] < -10.0 && q[2][1] > 74.0, "the box reaches past the canvas: {q:?}");
-    let tol = 1e-3;
     for (rotation, flip) in [(0.0, false), (30.0, false), (-75.0, true)] {
         let xf =
             ViewXform { rect: egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(400.0, 400.0)), zoom: 2.0, center: [32.0, 32.0], flip, rotation, aspect: 1.0 };
-        let meshes = preview_meshes(&app, &xf);
-        let verts: Vec<[f64; 2]> = meshes.iter().flat_map(|m| m.vertices.iter().map(|v| xf.to_doc(v.pos))).collect();
-        assert!(!verts.is_empty(), "the preview still draws (rotation {rotation})");
-        for d in &verts {
-            assert!(d[0] >= -tol && d[1] >= -tol && d[0] <= 64.0 + tol && d[1] <= 64.0 + tol, "vertex {d:?} off the canvas (rotation {rotation})");
-        }
-        // The clipped mesh still covers the whole canvas: the corners lie on it.
-        for corner in [[0.0, 0.0], [64.0, 0.0], [64.0, 64.0], [0.0, 64.0]] {
-            assert!(verts.iter().any(|d| (d[0] - corner[0]).abs() < 1e-2 && (d[1] - corner[1]).abs() < 1e-2), "corner {corner:?} (rotation {rotation})");
-        }
+        // The layer is composited on the canvas, which ends at its edge: no pixels are drawn
+        // over the view, so none over the pasteboard.
+        assert!(preview_meshes(&app, &xf).is_empty(), "nothing drawn over the view (rotation {rotation})");
     }
-    // Inside the canvas the mesh is drawn unchanged (24×24 grid).
+    let (shown, key) = crate::canvas::display_doc(&mut app, 0);
+    let moved = crate::transform_live::cpu_doc(&mut app, shown, key);
+    let id = app.session.active().unwrap().active_layer.unwrap();
+    let s = moved.layer(id).unwrap().surface().unwrap();
+    // Scaled 2× about its centre, the square covers the whole canvas.
+    assert!(s.rgba(0, 0)[3] > 0.99 && s.rgba(63, 63)[3] > 0.99);
     cancel(&mut app);
-    begin(&mut app, &gpu_ctx()).unwrap();
-    let xf = ViewXform {
-        rect: egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(200.0, 200.0)),
-        zoom: 1.0,
-        center: [32.0, 32.0],
-        flip: false,
-        rotation: 0.0,
-        aspect: 1.0,
-    };
-    let meshes = preview_meshes(&app, &xf);
-    assert_eq!(meshes.iter().map(|m| m.vertices.len()).sum::<usize>(), 25 * 25);
 }
 
 #[test]
@@ -2252,42 +2243,42 @@ fn transform_preview_bench() {
     app.sync_views();
     app.session.execute("layer.new.layer", json!({})).unwrap();
     app.session.execute("filter.render.clouds", json!({})).unwrap();
+    app.session.execute("layer.setProps", json!({"blend": "Difference"})).unwrap();
     let ctx = gpu_ctx();
     let t0 = std::time::Instant::now();
     begin(&mut app, &ctx).unwrap();
     let begin_ms = t0.elapsed().as_secs_f64() * 1e3;
-    // The same with a linked layer mask applied to the texels (#205).
+    // The same with a linked layer mask applied to the moving pixels (#205).
     cancel(&mut app);
     app.session.execute("layer.layerMask.revealAll", json!({})).unwrap();
     app.session.execute("paint.gradient", json!({"from": [0, 0], "to": [w, 0], "colors": ["#000000", "#ffffff"], "target": "mask"})).unwrap();
     let t0 = std::time::Instant::now();
     begin(&mut app, &ctx).unwrap();
     let masked_ms = t0.elapsed().as_secs_f64() * 1e3;
-    eprintln!("transform preview begin {w}x{h}: {begin_ms:.1} ms, with a linked mask {masked_ms:.1} ms");
-    let size = app.transform_preview.as_ref().unwrap().texture.size();
-    rotate_about_pivot(&mut app, 0.05);
-    let frame = |zoom: f32| {
+    // A frame of a drag: the box turns a little, the mesh and the document to show follow.
+    let view = photocraft_geom::Rect::new(2200, 1500, 3800, 2500);
+    let n = 20;
+    let mut mesh_ms = 0.0;
+    let mut cpu_ms = 0.0;
+    let mut frames = Vec::new();
+    for _ in 0..n {
+        rotate_about_pivot(&mut app, 0.01);
         let t0 = std::time::Instant::now();
-        let _ = ctx.run_ui(egui::RawInput { max_texture_side: Some(16384), ..Default::default() }, |ui| {
-            let painter = ui.ctx().layer_painter(egui::LayerId::background());
-            let xf = ViewXform {
-                rect: egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1600.0, 1000.0)),
-                zoom,
-                center: [3000.0, 2000.0],
-                flip: false,
-                rotation: 0.0,
-                aspect: 1.0,
-            };
-            draw_content(&app, &painter, &xf);
-            draw_overlay(&app, &painter, &xf);
-        });
-        t0.elapsed().as_secs_f64() * 1e3
-    };
-    let first: Vec<f64> = [1.0, 0.25, 3.0].iter().map(|z| frame(*z)).collect();
-    let n = 50;
-    let steady = (0..n).map(|i| frame([1.0, 0.25, 3.0][i % 3])).sum::<f64>() / n as f64;
+        let (shown, key) = crate::canvas::display_doc(&mut app, 0);
+        mesh_ms += t0.elapsed().as_secs_f64() * 1e3;
+        let doc = shown.id;
+        let t0 = std::time::Instant::now();
+        let applied = crate::transform_live::cpu_doc(&mut app, shown.clone(), key);
+        let _ = photocraft_compose::render(&applied, view);
+        cpu_ms += t0.elapsed().as_secs_f64() * 1e3;
+        frames.push((shown, crate::transform_live::current(&app, doc).unwrap()));
+    }
+    // The GPU composite: `cargo test --release -p photocraft-gpu --test live_transform live_bench -- --ignored --nocapture`.
+    drop(frames);
     eprintln!(
-        "transform preview {w}x{h}: texture {size:?}, begin {begin_ms:.1} ms, first frame per level (1x, 0.25x, 3x) {first:.1?} ms, steady frame {steady:.3} ms"
+        "transform preview {w}x{h}: begin {begin_ms:.1} ms, with a linked mask {masked_ms:.1} ms; per frame: mesh {:.2} ms, CPU fallback {:.1} ms (1600x1000 view)",
+        mesh_ms / n as f64,
+        cpu_ms / n as f64,
     );
 }
 
@@ -2624,18 +2615,13 @@ fn transform_preview_preserves_displayed_profile_colors() {
         let mut out = ctx.run_ui(egui::RawInput { max_texture_side: Some(16384), ..Default::default() }, |ui| {
             draw_content(&app, &ui.ctx().layer_painter(egui::LayerId::background()), &xf);
         });
-        let texture = out
-            .shapes
-            .iter()
-            .find_map(|s| match &s.shape {
-                egui::Shape::Mesh(mesh) if mesh.texture_id != egui::TextureId::default() => Some(mesh.texture_id),
-                _ => None,
-            })
-            .expect("transform draws a textured mesh");
-        let upload = out.textures_delta.set.get(&texture).and_then(|updates| updates.last()).expect("drawn texture was uploaded");
-        let egui::ImageData::Color(image) = &upload.image;
-        let shown = image.pixels[0];
+        // The canvas composites the moving pixels itself (transform_live.rs) and converts the
+        // whole image for the display; nothing is drawn over it.
+        assert!(!out.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::Mesh(mesh) if mesh.texture_id != egui::TextureId::default())), "no overlay texture");
         out.textures_delta.clear();
+        let (shown_doc, key) = crate::canvas::display_doc(&mut app, 0);
+        let moving = crate::transform_live::cpu_doc(&mut app, shown_doc, key);
+        let shown = crate::canvas::display_image(Some(&display), &photocraft_compose::render(&moving, bounds)).pixels[0];
         assert_eq!(shown, expected.pixels[0], "transform changed displayed color; wide_gamut={wide_gamut}, monitor={monitor}, warp={warp}");
     }
 }
@@ -2737,19 +2723,14 @@ fn transform_covering_layer_uses_the_same_monitor_profile() {
     let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
         draw_content(&app, &ui.ctx().layer_painter(egui::LayerId::background()), &xf);
     });
-    let shown: Vec<_> = out
-        .shapes
-        .iter()
-        .filter_map(|s| match &s.shape {
-            egui::Shape::Mesh(m) if m.texture_id != egui::TextureId::default() => {
-                let egui::ImageData::Color(image) = &out.textures_delta.set.get(&m.texture_id).unwrap().last().unwrap().image;
-                Some(image.pixels[0])
-            }
-            _ => None,
-        })
-        .collect();
+    assert!(!out.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::Mesh(m) if m.texture_id != egui::TextureId::default())), "no overlay texture");
     out.textures_delta.clear();
-    assert_eq!(shown, expected, "moving pixels and covering pixels use the same display conversion");
+    // The canvas composites the moving layer under the covering one (transform_live.rs) and
+    // converts the one image for the display: the covering layer's colour shows.
+    let (shown_doc, key) = crate::canvas::display_doc(&mut app, 0);
+    let moving = crate::transform_live::cpu_doc(&mut app, shown_doc, key);
+    let shown = crate::canvas::display_image(Some(&display), &photocraft_compose::render(&moving, bounds)).pixels[0];
+    assert_eq!(shown, expected[1], "the covering pixels use the display conversion over the moving ones");
 }
 
 #[test]

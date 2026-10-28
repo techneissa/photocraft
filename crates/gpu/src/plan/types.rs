@@ -5,6 +5,9 @@ use super::{BlendMode, Document, GlobalLight, Layer, LayerId, Pattern, Rect, Slo
 pub enum Kernel {
     /// Transparent fill (no draw).
     Clear,
+    /// The live transform's mesh drawn over transparency (`live.wgsl`): the moving layer's pixels
+    /// while a transform box is open. Its own pipeline, outside [`Kernel::DRAWN`].
+    Mesh,
     Content,
     Mask,
     Blend,
@@ -51,7 +54,7 @@ impl Kernel {
     /// Fragment entry point in `compose.wgsl` (`None` for copies and clears).
     pub fn entry(self) -> Option<&'static str> {
         Some(match self {
-            Kernel::Clear | Kernel::CopyRect | Kernel::CopyFull => return None,
+            Kernel::Clear | Kernel::CopyRect | Kernel::CopyFull | Kernel::Mesh => return None,
             Kernel::Content => "fs_content",
             Kernel::Mask => "fs_mask",
             Kernel::Blend => "fs_blend",

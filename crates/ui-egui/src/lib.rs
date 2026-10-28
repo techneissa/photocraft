@@ -284,7 +284,7 @@ pub use tools::stroke_trace;
 pub use tools::stroke_trail;
 pub use tools::symmetry_ui;
 use tools::tool_reset;
-pub use tools::transform_fx;
+pub(crate) use tools::transform_live;
 pub use tools::transform_tex;
 pub use tools::transform_tool;
 use tools::type_font_preview;
@@ -725,9 +725,6 @@ mod tool_shortcut_tests;
 
 #[cfg(test)]
 mod pixel_aspect_tests;
-
-#[cfg(test)]
-mod transform_fx_tests;
 
 #[cfg(test)]
 mod layer_props_ui_tests;

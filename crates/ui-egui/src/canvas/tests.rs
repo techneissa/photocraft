@@ -2460,8 +2460,8 @@ fn letting_go_of_alt_during_a_mixer_brush_sample_press_does_not_paint() {
 #[test]
 fn guides_draw_over_the_transform_preview_and_under_its_box() {
     // #5086: a guide crossing a layer under Free Transform was hidden behind the preview of
-    // the moving pixels. The preview is image content, drawn before the grid and guides like
-    // the document is; the box and handles still go over them, as in Photoshop.
+    // the moving pixels. The preview is image content, part of the document's own image, drawn
+    // before the grid and guides; the box and handles still go over them, as in Photoshop.
     let ctx = egui::Context::default();
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
@@ -2489,8 +2489,9 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     let layer = Rect::from_min_max(pos2(100.0, 100.0), pos2(200.0, 160.0));
     let near = |r: Rect| (r.min - layer.min).length() < 1.0 && (r.max - layer.max).length() < 1.0;
     let position = |pred: &dyn Fn(&egui::Shape) -> bool| out.shapes.iter().position(|s| pred(&s.shape));
-    // The moving pixels: the mesh that spans the layer's box.
-    let preview = position(&|s| matches!(s, egui::Shape::Mesh(m) if near(m.calc_bounds())));
+    // The moving pixels are composited into the canvas image (`transform_live`): the mesh that
+    // covers the layer's box.
+    let preview = position(&|s| matches!(s, egui::Shape::Mesh(m) if m.calc_bounds().contains_rect(layer)));
     // The guide: a vertical line at x = 150.
     let guide = position(&|s| matches!(s, egui::Shape::LineSegment { points, .. } if points.iter().all(|p| (p.x - 150.0).abs() < 0.01)));
     // The box: the closed four-point outline round the layer.
@@ -2553,12 +2554,17 @@ fn guides_draw_over_the_puppet_perspective_and_vanishing_point_previews() {
         // Puppet Warp's mesh reaches its Expansion (2 px) past the pixels.
         let near = |r: Rect| (r.min - layer.min).length() < 4.0 && (r.max - layer.max).length() < 4.0;
         let shapes: Vec<&egui::Shape> = out.shapes.iter().map(|s| &s.shape).collect();
-        // The warped pixels (or the paste): a textured mesh over the layer (or on the plane,
-        // well inside the document, unlike the checkerboard and document image).
+        // The warped pixels: the canvas image, which composites the layer in its place
+        // (`transform_live`). The paste: a textured mesh on the plane, well inside the document,
+        // unlike the checkerboard and document image.
         let preview = shapes.iter().position(|s| match s {
             egui::Shape::Mesh(m) if m.texture_id != egui::TextureId::default() => {
                 let r = m.calc_bounds();
-                if command == photocraft_engine::vp_cmds::VP { r.width() > 10.0 && r.width() < 300.0 && r.min.x < 150.0 && r.max.x > 150.0 } else { near(r) }
+                if command == photocraft_engine::vp_cmds::VP {
+                    r.width() > 10.0 && r.width() < 300.0 && r.min.x < 150.0 && r.max.x > 150.0
+                } else {
+                    r.contains_rect(layer)
+                }
             }
             _ => false,
         });

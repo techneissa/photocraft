@@ -4,8 +4,8 @@ use super::options_bar::{quad_scale, readout};
 use super::pointer::{Hit, handle_at, rotate_dir, rotation_degrees};
 use super::warp::{on_section_edge, quick_split_kind, single_patch};
 use super::{
-    BezierMesh, Color32, DocId, HANDLE_PX, Homography, LayerId, PhotocraftApp, Pos2, SplitTool, Stroke, TransformPreview, TransformSession, ViewXform, Warp,
-    WarpDrag, WarpStyle, corners, pos2, vec2,
+    BezierMesh, Color32, DocId, HANDLE_PX, Homography, PhotocraftApp, Pos2, SplitTool, Stroke, TransformPreview, TransformSession, ViewXform, Warp, WarpDrag,
+    WarpStyle, corners, pos2, vec2,
 };
 
 /// The distort or skew pointer at screen point `at`, where [`super::cursor`] hid the system
@@ -99,17 +99,9 @@ pub fn draw_content(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
         draw_warp_content(painter, xf, t, w, pv, display);
         return;
     }
-    let ctx = painter.ctx();
-    let styled =
-        styled_frame(app, xf.zoom * ctx.pixels_per_point(), ctx.input(|i| i.pointer.any_down())).and_then(|(s, frame)| s.texture(ctx, &frame, display));
-    if let Some((tex, r)) = styled {
-        let mut mesh = egui::Mesh::with_texture(tex);
-        for (x, y, u, v) in [(r[0], r[1], 0.0, 0.0), (r[2], r[1], 1.0, 0.0), (r[2], r[3], 1.0, 1.0), (r[0], r[3], 0.0, 1.0)] {
-            mesh.vertices.push(egui::epaint::Vertex { pos: pos2(x, y), uv: pos2(u, v), color: Color32::WHITE });
-        }
-        mesh.add_triangle(0, 1, 2);
-        mesh.add_triangle(0, 2, 3);
-        painter.add(clip_to_canvas(mesh, canvas_size(pv), |p| xf.to_screen(p.x, p.y)));
+    if pv.live.is_some() && pv.content_aware.is_none() {
+        // The canvas composites the moving layer itself, in its place in the stack with its
+        // blend mode and style (transform_live.rs): only the box is drawn here.
     } else if let Some(h) = Homography::rect_to_quad([0.0, 0.0, 1.0, 1.0], t.quad) {
         // A 24×24 grid keeps perspective previews straight.
         let n = 24;
@@ -142,7 +134,7 @@ pub fn draw_content(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
         }
         painter.add(clip_to_canvas(mesh, canvas_size(pv), |p| xf.to_screen(p.x, p.y)));
     }
-    if let Some(a) = &pv.above {
+    if let Some(a) = pv.above.as_ref().filter(|_| pv.live.is_none()) {
         a.draw(painter, xf, display);
     }
 }
@@ -279,29 +271,6 @@ pub(crate) fn draw_selection(
         crate::canvas::marching_ants_lines(painter, lines, time);
     }
     true
-}
-
-/// What the styled preview of the moving layer is drawn from (transform_fx.rs), at `zoom` screen
-/// pixels per document pixel. `None` for a layer without a style (also once it is switched off
-/// while the box is open) or a hidden one: the bare pixels are drawn instead. The style, opacity
-/// and fill are the layer's as they are now, so edits made while the box is open show.
-pub(crate) fn styled_frame(app: &PhotocraftApp, zoom: f32, dragging: bool) -> Option<(&crate::transform_fx::StyledPreview, crate::transform_fx::Frame<'_>)> {
-    let (t, pv) = (app.ui.transform.as_ref()?, app.transform_preview.as_ref()?);
-    let styled = pv.styled.as_ref().filter(|_| t.warp.is_none())?;
-    let st = app.session.active().filter(|st| st.doc.id == pv.doc.id)?;
-    let layer = st.doc.layer(LayerId(t.layer)).filter(|l| l.visible && photocraft_compose::effects::has_effects(l))?;
-    let frame = crate::transform_fx::Frame {
-        doc: &st.doc,
-        layer,
-        revision: st.revision,
-        texels: &pv.texture,
-        quad: t.quad,
-        quad_scale: quad_scale(t),
-        nearest: t.interpolation == "nearest",
-        zoom,
-        dragging,
-    };
-    Some((styled, frame))
 }
 
 /// The value shown beside the pointer while the box is dragged, like Photoshop's Show
@@ -493,22 +462,27 @@ fn draw_warp_content(
 ) {
     let r = t.rect;
     let m = w.to_mesh(1, 1);
-    let (us, vs) = crate::warp_preview::samples(&m, xf.zoom as f64);
-    let (tex, uv) = pv.texture.pick_display(painter.ctx(), xf.zoom * painter.ctx().pixels_per_point(), 1.0, t.interpolation == "nearest", display);
-    let mut mesh = egui::Mesh::with_texture(tex);
-    let tint = Color32::from_white_alpha((pv.opacity.clamp(0.0, 1.0) * 255.0) as u8);
-    for v in &vs {
-        for u in &us {
-            let (x, y) = w.map(r[0] + u * (r[2] - r[0]), r[1] + v * (r[3] - r[1]));
-            mesh.vertices.push(egui::epaint::Vertex { pos: pos2(x as f32, y as f32), uv: pos2(*u as f32 * uv[0], *v as f32 * uv[1]), color: tint });
+    // A layer's live preview is composited on the canvas (transform_live.rs): nothing is drawn
+    // here for it. Lone masks and channels still preview over it.
+    if pv.live.is_none() {
+        let (us, vs) = crate::warp_preview::samples(&m, xf.zoom as f64);
+        let (tex, uv) = pv.texture.pick_display(painter.ctx(), xf.zoom * painter.ctx().pixels_per_point(), 1.0, t.interpolation == "nearest", display);
+        let mut mesh = egui::Mesh::with_texture(tex);
+        let tint = Color32::from_white_alpha((pv.opacity.clamp(0.0, 1.0) * 255.0) as u8);
+        for v in &vs {
+            for u in &us {
+                let (x, y) = w.map(r[0] + u * (r[2] - r[0]), r[1] + v * (r[3] - r[1]));
+                mesh.vertices.push(egui::epaint::Vertex { pos: pos2(x as f32, y as f32), uv: pos2(*u as f32 * uv[0], *v as f32 * uv[1]), color: tint });
+            }
         }
-    }
-    let pos: Vec<[f32; 2]> = mesh.vertices.iter().map(|v| [v.pos.x, v.pos.y]).collect();
-    let rest: Vec<[f32; 2]> = vs.iter().flat_map(|v| us.iter().map(move |u| [(r[0] + u * (r[2] - r[0])) as f32, (r[1] + v * (r[3] - r[1])) as f32])).collect();
-    mesh.indices = crate::warp_preview::triangle_order(&pos, &rest, us.len());
-    painter.add(clip_to_canvas(mesh, canvas_size(pv), |p| xf.to_screen(p.x, p.y)));
-    if let Some(a) = &pv.above {
-        a.draw(painter, xf, display);
+        let pos: Vec<[f32; 2]> = mesh.vertices.iter().map(|v| [v.pos.x, v.pos.y]).collect();
+        let rest: Vec<[f32; 2]> =
+            vs.iter().flat_map(|v| us.iter().map(move |u| [(r[0] + u * (r[2] - r[0])) as f32, (r[1] + v * (r[3] - r[1])) as f32])).collect();
+        mesh.indices = crate::warp_preview::triangle_order(&pos, &rest, us.len());
+        painter.add(clip_to_canvas(mesh, canvas_size(pv), |p| xf.to_screen(p.x, p.y)));
+        if let Some(a) = &pv.above {
+            a.draw(painter, xf, display);
+        }
     }
 }
 

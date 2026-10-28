@@ -117,8 +117,12 @@ impl Compositor {
             pipelines.extend(maps);
         }
         let dummy = Tex::new(device, "pc_compose_dummy", 1, 1, wgpu::TextureFormat::Rgba8Unorm, wgpu::TextureUsages::TEXTURE_BINDING).view;
+        let (mesh, mesh_error) = first_error(device, || super::live::mesh_kit(device, &bgl0, acc_format));
+        if let Some(e) = &mesh_error {
+            log::info!("GPU compositor: no live transform pipeline ({e}); transforms preview on the CPU");
+        }
         let comp = Self {
-            kit: Kit { pipelines, bgl0, bgl1, dummy },
+            kit: Kit { pipelines, bgl0, bgl1, dummy, mesh: mesh.filter(|_| mesh_error.is_none()) },
             pool: Vec::new(),
             residents: HashMap::new(),
             fx: HashMap::new(),
@@ -150,6 +154,8 @@ impl Compositor {
             cmyk: 0,
             health: None,
             timer: None,
+            live: None,
+            live_gpu: None,
         }
         .with_texture_limit(device.limits().max_texture_dimension_2d);
         (comp, error)
@@ -173,6 +179,8 @@ impl Compositor {
         self.page = page;
         self.chunk = CHUNK.min(page);
         self.prefix.set_step(self.chunk);
+        // Its uniform holds the chunk side.
+        self.live_gpu = None;
         self.pool.clear();
         self.residents.clear();
         self.fx.clear();

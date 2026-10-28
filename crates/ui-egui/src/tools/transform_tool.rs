@@ -44,7 +44,7 @@ pub(crate) use draw::draw_handle_cursor;
 #[cfg(test)]
 use draw::scale_values;
 #[cfg(test)]
-pub(crate) use draw::{Readout, live_readout, styled_frame};
+pub(crate) use draw::{Readout, live_readout};
 pub(crate) use draw::{carries_selection_of, draw_selection};
 pub use draw::{draw_content, draw_overlay};
 #[cfg(test)]
@@ -111,9 +111,6 @@ pub struct TransformPreview {
     pub opacity: f32,
     /// The layers stacked over the moving one, drawn over its pixels ([`Above`]).
     above: Option<Above>,
-    /// A layer with a style: its pixels composited with the style as the box has them now,
-    /// drawn instead of the bare pixels (transform_fx.rs, #3653).
-    styled: Option<crate::transform_fx::StyledPreview>,
     gesture: Option<Gesture>,
     /// Warp-mode drag in progress.
     warp_drag: Option<WarpDrag>,
@@ -137,6 +134,9 @@ pub struct TransformPreview {
     committing: Option<JobId>,
     /// Content-Aware Scale's live preview (cas_transform.rs).
     pub(crate) content_aware: Option<crate::cas_transform::Live>,
+    /// A layer's live preview, composited in its place (transform_live.rs). While it is set the
+    /// canvas shows the moving pixels and nothing is drawn over it but the box.
+    pub(crate) live: Option<crate::transform_live::LiveSession>,
 }
 
 /// What [`follow_edits`] needs to rebuild the preview document.

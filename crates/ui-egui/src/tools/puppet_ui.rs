@@ -41,6 +41,8 @@ pub struct PuppetSession {
     texture: TextureHandle,
     opacity: f32,
     pub preview_doc: Arc<Document>,
+    /// The layer composited in its place through the deformed mesh (transform_live.rs).
+    pub(crate) live: Option<crate::transform_live::LiveSession>,
     /// Pins before each edit of this session, newest last (⌘Z), and the edits undone (⌘⇧Z).
     undo: Vec<Vec<PuppetPin>>,
     redo: Vec<Vec<PuppetPin>>,
@@ -200,6 +202,7 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context, command: &str) -> Res
     }
     let opacity = l.opacity * l.fill_opacity;
     let preview_doc = crate::distort_ui::without_layer(&st.doc, layer);
+    let live = crate::transform_live::LiveSession::start(&st.doc, st.revision, layer, Some(&surface), None);
     let img = crate::distort_ui::surface_image(&surface, bounds, 2048);
     let key = app.ui.alloc_id();
     let texture = ctx.load_texture(format!("puppet-{key}"), img, egui::TextureOptions::LINEAR);
@@ -221,6 +224,7 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context, command: &str) -> Res
         texture,
         opacity,
         preview_doc,
+        live,
         undo: Vec::new(),
         redo: Vec::new(),
         drag_from: None,
@@ -343,6 +347,29 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) {
     }
 }
 
+impl PuppetSession {
+    /// What the deformed mesh is now, for the live preview.
+    pub(crate) fn live_key(&self) -> String {
+        crate::transform_live::points_key(&self.deformed)
+    }
+
+    /// The deformed mesh carrying the layer's pixels (transform_live.rs): each vertex where the
+    /// pins put it, showing the pixel it started on, triangles in the solver's drawing order.
+    pub(crate) fn live_mesh(&self) -> photocraft_compose::live::LiveMesh {
+        let mut m = photocraft_compose::live::LiveMesh::default();
+        for (d, r) in self.deformed.iter().zip(&self.mesh.verts) {
+            m.pos.push([d[0] as f32, d[1] as f32]);
+            m.uv.push([r[0] as f32, r[1] as f32]);
+        }
+        for &t in &self.order {
+            if let Some(tri) = self.mesh.tris.get(t) {
+                m.indices.extend(tri.iter().map(|&i| i as u32));
+            }
+        }
+        m
+    }
+}
+
 /// The warped pixels: image content, drawn under the grid and guides like the document so a
 /// guide stays visible across the layer being warped (#7781). The mesh lines and pins are [`draw`].
 pub fn draw_content(s: &PuppetSession, painter: &egui::Painter, xf: &ViewXform) {
@@ -358,7 +385,11 @@ pub fn draw_content(s: &PuppetSession, painter: &egui::Painter, xf: &ViewXform) 
         let [a, bb, c] = s.mesh.tris[t];
         mesh.add_triangle(a as u32, bb as u32, c as u32);
     }
-    painter.add(mesh);
+    // A live preview is composited on the canvas in the layer's place: only the mesh and pins
+    // are drawn over it.
+    if s.live.is_none() {
+        painter.add(mesh);
+    }
 }
 
 /// The mesh lines and pins over the warped pixels ([`draw_content`]) and the guides.
