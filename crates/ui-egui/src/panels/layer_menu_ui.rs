@@ -148,7 +148,7 @@ pub fn show(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, on_set: bo
         ui.set_min_width(220.0);
         let mut rename = false;
         let has_selection = app.session.active().is_some_and(|s| s.doc.selection.is_some());
-        items(app, ui, l, on_set, entries(l, on_set, has_selection), actions);
+        items(app, ui, l, on_set, crate::menu_custom::layer_rows(app, entries(l, on_set, has_selection)), actions);
         ui.separator();
         if ui.button(tl!("Rename Layer…")).clicked() {
             rename = true;

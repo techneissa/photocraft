@@ -15,7 +15,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             f.insert("__gpuInfo".into(), json!(info));
             f.insert("__gpuAdapters".into(), json!(app.perf.gpu_info.adapters));
             let system = system_theme(app, ui.ctx());
-            prefs_body(ui, f, system);
+            prefs_body(app, ui, f, system);
         }
         "shortcuts" => shortcuts_body(app, ui, f),
         "presets" => presets_body(app, ui, f),
@@ -162,7 +162,7 @@ pub(super) fn preference_sections(values: &Value, search: &str) -> Vec<(&'static
 }
 
 /// Preferences: section list on the left, the section's settings on the right.
-fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui::Theme>) {
+fn prefs_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui::Theme>) {
     let t = Tokens::get(ui.ctx());
     let mut section = f.get("section").and_then(Value::as_str).unwrap_or("general").to_string();
     let mut values = f.get("values").cloned().unwrap_or(Value::Null);
@@ -170,7 +170,11 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
     let lang = crate::i18n::Lang::from_pref(values.pointer("/interface/language").and_then(Value::as_str).unwrap_or("auto"));
     let mut search = f.get("__search").and_then(Value::as_str).unwrap_or("").to_string();
     crate::widgets::text_field(ui, ui.scope_id().with("prefs-search"), &mut search, tl!("Search settings…"), ui.available_width(), false);
-    let found = preference_sections(&values, &search);
+    let mut found = preference_sections(&values, &search);
+    let q = search.trim().to_lowercase();
+    if q.is_empty() || crate::menu_custom::PAGE_TITLE.to_lowercase().contains(&q) || tl!(crate::menu_custom::PAGE_TITLE).to_lowercase().contains(&q) {
+        found.push((crate::menu_custom::PAGE, crate::menu_custom::PAGE_TITLE));
+    }
     if !found.iter().any(|(id, _)| *id == section)
         && let Some((first, _)) = found.first()
     {
@@ -186,7 +190,7 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
             }
             for &(id, title) in &found {
                 let sel = section == id;
-                let empty = !has_visible_fields(&values, id);
+                let empty = id != crate::menu_custom::PAGE && !has_visible_fields(&values, id);
                 let (rect, resp) = ui.allocate_exact_size(vec2(170.0, 22.0), Sense::click());
                 if sel {
                     ui.painter().rect_filled(rect, t.radius_sm, t.row_selected);
@@ -220,6 +224,11 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
         crate::widgets::vline(ui, content_height);
         ui.vertical(|ui| {
             ui.set_width((ui.available_width() - 12.0).max(340.0));
+            // Context Menus is not a settings section: its page arranges the right-click menus.
+            if section == crate::menu_custom::PAGE {
+                crate::menu_custom::editor::page(app, ui, content_height);
+                return;
+            }
             let title = SECTIONS.iter().find(|(id, _)| *id == section).map_or("General", |(_, t)| *t);
             ui.label(RichText::new(tl!(&title)).font(crate::theme::semibold(14.0)).color(t.text));
             let show_all = search.trim().is_empty()

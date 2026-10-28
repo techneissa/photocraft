@@ -28,6 +28,7 @@ pub mod jobs_ui;
 pub(crate) mod last_brush;
 pub mod links;
 pub mod menu_catalog;
+pub mod menu_custom;
 pub mod menus;
 pub mod monitor_status;
 pub mod notices;

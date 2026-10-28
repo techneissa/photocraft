@@ -911,6 +911,8 @@ fn navigator_damage_updates_match_a_full_thumbnail() {
 fn tab_context_uses_clicked_document_and_existing_close_commands() {
     let items = tab_context_items(2, 3, true);
     assert_eq!(items.iter().map(|(_, id, _, _)| *id).collect::<Vec<_>>(), ["file.close", "file.closeOthers", "file.closeAll", "file.revealInFinder"]);
+    // the context menu editor (Preferences) knows every row; add a new one to menu_custom::menus::TAB_ROWS
+    assert_eq!(items.iter().map(|(_, id, _, _)| *id).collect::<Vec<_>>(), crate::menu_custom::menus::universe(crate::menu_custom::menus::TAB));
     assert_eq!(items[0].2, json!({"document": 2}));
     assert_eq!(items[1].2, json!({"document": 2}));
     assert_eq!(items[2].2, json!({}));
