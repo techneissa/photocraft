@@ -2490,8 +2490,10 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     let near = |r: Rect| (r.min - layer.min).length() < 1.0 && (r.max - layer.max).length() < 1.0;
     let position = |pred: &dyn Fn(&egui::Shape) -> bool| out.shapes.iter().position(|s| pred(&s.shape));
     // The moving pixels are composited into the canvas image (`transform_live`): the mesh that
-    // covers the layer's box.
-    let preview = position(&|s| matches!(s, egui::Shape::Mesh(m) if m.calc_bounds().contains_rect(layer)));
+    // draws the document's own texture, not the checkerboard or another image over the layer.
+    let (canvas, _) = ensure_texture(&mut app, &ctx, 0, None).expect("the canvas texture");
+    ctx.tex_manager().write().take_delta().clear();
+    let preview = position(&|s| matches!(s, egui::Shape::Mesh(m) if m.texture_id == canvas && m.calc_bounds().contains_rect(layer)));
     // The guide: a vertical line at x = 150.
     let guide = position(&|s| matches!(s, egui::Shape::LineSegment { points, .. } if points.iter().all(|p| (p.x - 150.0).abs() < 0.01)));
     // The box: the closed four-point outline round the layer.
@@ -2553,15 +2555,17 @@ fn guides_draw_over_the_puppet_perspective_and_vanishing_point_previews() {
         let layer = Rect::from_min_max(pos2(100.0, 100.0), pos2(200.0, 160.0));
         let shapes: Vec<&egui::Shape> = out.shapes.iter().map(|s| &s.shape).collect();
         // The warped pixels: the canvas image, which composites the layer in its place
-        // (`transform_live`). The paste: a textured mesh on the plane, well inside the document,
-        // unlike the checkerboard and document image.
+        // (`transform_live`), found by its own texture. The paste: a textured mesh on the plane,
+        // well inside the document, unlike the checkerboard and document image.
+        let (canvas, _) = ensure_texture(&mut app, &ctx, 0, None).expect("the canvas texture");
+        ctx.tex_manager().write().take_delta().clear();
         let preview = shapes.iter().position(|s| match s {
             egui::Shape::Mesh(m) if m.texture_id != egui::TextureId::default() => {
                 let r = m.calc_bounds();
                 if command == photocraft_engine::vp_cmds::VP {
                     r.width() > 10.0 && r.width() < 300.0 && r.min.x < 150.0 && r.max.x > 150.0
                 } else {
-                    r.contains_rect(layer)
+                    m.texture_id == canvas && r.contains_rect(layer)
                 }
             }
             _ => false,
