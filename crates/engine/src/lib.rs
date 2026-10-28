@@ -57,6 +57,7 @@ pub mod cmd;
 mod doc_state;
 mod error;
 mod session;
+pub mod when;
 
 pub use cmd as commands;
 pub use cmd::actions_cmds;
