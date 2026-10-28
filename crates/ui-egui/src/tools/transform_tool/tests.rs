@@ -2578,6 +2578,17 @@ fn texel_alpha(img: &egui::ColorImage, x: usize, y: usize) -> u8 {
     img.pixels[y * img.size[0] + x].a()
 }
 
+/// The pixels the CPU canvas uploaded for document 0 (`canvas::ensure_texture`): what the screen
+/// shows, converted for the monitor.
+fn canvas_pixels(app: &mut PhotocraftApp, ctx: &egui::Context) -> (egui::TextureId, egui::ColorImage) {
+    let (id, _) = crate::canvas::ensure_texture(app, ctx, 0, None).expect("the canvas texture");
+    let mut delta = ctx.tex_manager().write().take_delta();
+    let egui::ImageData::Color(image) = &delta.set.get(&id).and_then(|d| d.last()).expect("the canvas texture was written").image;
+    let image = (**image).clone();
+    delta.clear();
+    (id, image)
+}
+
 #[test]
 fn transform_preview_preserves_displayed_profile_colors() {
     let bounds = photocraft_geom::Rect::new(0, 0, 8, 8);
@@ -2619,10 +2630,8 @@ fn transform_preview_preserves_displayed_profile_colors() {
         // whole image for the display; nothing is drawn over it.
         assert!(!out.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::Mesh(mesh) if mesh.texture_id != egui::TextureId::default())), "no overlay texture");
         out.textures_delta.clear();
-        let (shown_doc, key) = crate::canvas::display_doc(&mut app, 0);
-        let moving = crate::transform_live::cpu_doc(&mut app, shown_doc, key);
-        let shown = crate::canvas::display_image(Some(&display), &photocraft_compose::render(&moving, bounds)).pixels[0];
-        assert_eq!(shown, expected.pixels[0], "transform changed displayed color; wide_gamut={wide_gamut}, monitor={monitor}, warp={warp}");
+        let (_, canvas) = canvas_pixels(&mut app, &ctx);
+        assert_eq!(canvas.pixels[0], expected.pixels[0], "transform changed displayed color; wide_gamut={wide_gamut}, monitor={monitor}, warp={warp}");
     }
 }
 
@@ -2692,45 +2701,71 @@ fn transform_covering_layer_uses_the_same_monitor_profile() {
     let lower = app.session.active().unwrap().active_layer.unwrap();
     app.session.execute("layer.new.layer", json!({})).unwrap();
     let upper = app.session.active().unwrap().active_layer.unwrap();
+    // The covering layer hides the left half of the moving one.
     app.session
         .edit("original color samples", |doc, _| {
             doc.layer_mut(lower).unwrap().surface_mut().unwrap().fill_rect(bounds, &[0.55, 0.35, 0.2, 1.0]);
-            doc.layer_mut(upper).unwrap().surface_mut().unwrap().fill_rect(bounds, &[0.2, 0.5, 0.7, 1.0]);
+            doc.layer_mut(upper).unwrap().surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(0, 0, 4, 8), &[0.2, 0.5, 0.7, 1.0]);
             Ok(())
         })
         .unwrap();
     app.session.color.settings.monitor_profile = "display-p3".into();
     let doc = app.session.active().unwrap().doc.clone();
     let display = app.session.color.canvas_display(&doc).unwrap();
-    let expected = [lower, upper].map(|id| {
+    assert!(!display.is_identity());
+    // Where each layer shows: the moving one on the right, the covering one on the left.
+    let shown_at = |id: LayerId, x: usize| {
         let mut solo = (*doc).clone();
         for layer in &mut solo.layers {
             layer.visible = layer.id == id;
         }
-        crate::canvas::display_image(Some(&display), &photocraft_compose::render(&solo, bounds)).pixels[0]
-    });
+        crate::canvas::display_image(Some(&display), &photocraft_compose::render(&solo, bounds)).pixels[4 * 8 + x]
+    };
+    let expected = [shown_at(lower, 6), shown_at(upper, 1)];
     app.session.execute("layer.select", json!({"layer": lower.0})).unwrap();
     let ctx = gpu_ctx();
     begin(&mut app, &ctx).unwrap();
-    let xf = ViewXform {
-        rect: egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(80.0, 80.0)),
-        zoom: 1.0,
-        center: [4.0, 4.0],
-        flip: false,
-        rotation: 0.0,
-        aspect: 1.0,
-    };
-    let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
-        draw_content(&app, &ui.ctx().layer_painter(egui::LayerId::background()), &xf);
-    });
-    assert!(!out.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::Mesh(m) if m.texture_id != egui::TextureId::default())), "no overlay texture");
-    out.textures_delta.clear();
-    // The canvas composites the moving layer under the covering one (transform_live.rs) and
-    // converts the one image for the display: the covering layer's colour shows.
+    let (_, canvas) = canvas_pixels(&mut app, &ctx);
+    let shown = [canvas.pixels[4 * 8 + 6], canvas.pixels[4 * 8 + 1]];
+    assert_eq!(shown, expected, "moving pixels and covering pixels use the same display conversion");
+    assert_ne!(shown[0], shown[1]);
+}
+
+/// A styled layer (a drop shadow) previews through the canvas, which converts the one image for
+/// the monitor: the pixels shown follow the monitor profile, and the style is still drawn from the
+/// document's own colours (the composite the effects see does not change with the monitor).
+#[test]
+fn styled_layer_preview_tracks_monitor_changes_without_recoloring_effect_inputs() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.run("file.new", json!({"width": 64, "height": 48, "depth": 16})).unwrap();
+    app.run("layer.new.layer", json!({"name": "styled"})).unwrap();
+    app.run("select.rect", json!({"x": 20, "y": 14, "width": 20, "height": 12})).unwrap();
+    app.run("edit.fill", json!({"color": "#0000ff"})).unwrap();
+    app.run("select.deselect", json!({})).unwrap();
+    app.run("layer.layerStyle.dropShadow", json!({"blend": "normal", "distance": 6, "size": 3, "color": "#ff0000", "opacity": 100})).unwrap();
+    app.sync_views();
+    let ctx = gpu_ctx();
+    begin(&mut app, &ctx).unwrap();
+    assert!(app.transform_preview.as_ref().unwrap().live.is_some(), "the styled layer previews live");
+    let bounds = photocraft_geom::Rect::new(0, 0, 64, 48);
     let (shown_doc, key) = crate::canvas::display_doc(&mut app, 0);
-    let moving = crate::transform_live::cpu_doc(&mut app, shown_doc, key);
-    let shown = crate::canvas::display_image(Some(&display), &photocraft_compose::render(&moving, bounds)).pixels[0];
-    assert_eq!(shown, expected[1], "the covering pixels use the display conversion over the moving ones");
+    let raw = photocraft_compose::render(&crate::transform_live::cpu_doc(&mut app, shown_doc, key), bounds);
+    // The shadow is in the composite: red below the block, nothing drawn without the style.
+    assert!(raw.px[30 * 64 + 30][0] > 0.5 && raw.px[30 * 64 + 30][2] < 0.5, "the drop shadow shows: {:?}", raw.px[30 * 64 + 30]);
+    let mut seen = Vec::new();
+    for monitor in ["srgb", "display-p3", "srgb"] {
+        app.session.color.settings.monitor_profile = monitor.into();
+        let display = app.session.color.canvas_display(&app.session.active().unwrap().doc).unwrap();
+        let expected = crate::canvas::display_image(Some(&display), &raw);
+        let (_, canvas) = canvas_pixels(&mut app, &ctx);
+        assert_eq!(canvas.pixels, expected.pixels, "monitor={monitor}");
+        let (shown_doc, key) = crate::canvas::display_doc(&mut app, 0);
+        let again = photocraft_compose::render(&crate::transform_live::cpu_doc(&mut app, shown_doc, key), bounds);
+        assert_eq!(again.px, raw.px, "effects still use document colors");
+        seen.push(canvas.pixels);
+    }
+    assert_ne!(seen[0], seen[1], "the display-p3 monitor changes what is shown");
+    assert_eq!(seen[0], seen[2], "back to sRGB shows the same again");
 }
 
 #[test]
