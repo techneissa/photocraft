@@ -322,6 +322,7 @@ impl PhotocraftApp {
         updates_ui::show(self, &ctx);
         gpu_status::show_fallback(self, &ctx);
         kys_import::show_offer(self, &ctx);
+        crate::keybinds::overlay::show(self, &ctx);
         if self.titlebar_modal_drag(chrome) {
             titlebar::modal_drag_overlay(&ctx);
         }

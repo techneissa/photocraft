@@ -45,6 +45,7 @@ impl PhotocraftApp {
             navigator_plain: std::collections::HashSet::new(),
             info_samplers: None,
             monitors: Default::default(),
+            keybinds: Default::default(),
             checker: None,
             drag: None,
             move_blocked: false,
