@@ -155,8 +155,8 @@ use convert::W;
 use convert::{CONVERT_BATCH, colour_managed, convert_tile, convert_tiles, rgb_gray16_to_f16, rgb_gray32_to_f16};
 pub use convert::{f16_to_f32, f32_to_f16};
 pub use kit::SHADER;
-pub use live::LIVE_SHADER;
 use kit::{Kit, tex_entry};
+pub use live::LIVE_SHADER;
 pub use paging::OVER_BUDGET;
 use paging::first_error;
 #[cfg(test)]

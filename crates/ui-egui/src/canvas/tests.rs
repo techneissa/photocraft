@@ -2551,8 +2551,6 @@ fn guides_draw_over_the_puppet_perspective_and_vanishing_point_previews() {
         out.textures_delta.clear();
         // At 100 % centred on the document, screen and document coordinates coincide.
         let layer = Rect::from_min_max(pos2(100.0, 100.0), pos2(200.0, 160.0));
-        // Puppet Warp's mesh reaches its Expansion (2 px) past the pixels.
-        let near = |r: Rect| (r.min - layer.min).length() < 4.0 && (r.max - layer.max).length() < 4.0;
         let shapes: Vec<&egui::Shape> = out.shapes.iter().map(|s| &s.shape).collect();
         // The warped pixels: the canvas image, which composites the layer in its place
         // (`transform_live`). The paste: a textured mesh on the plane, well inside the document,
