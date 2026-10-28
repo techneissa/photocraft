@@ -244,7 +244,15 @@ impl Compositor {
                     wgpu::BindGroupEntry { binding: 2, resource: ubuf.as_entire_binding() },
                 ],
             });
-            self.live_gpu = Some(LiveGpu { source: live.source.clone(), mesh: Arc::new(Default::default()), nearest: live.nearest, _tex: tex, group, vertices: None, count: 0 });
+            self.live_gpu = Some(LiveGpu {
+                source: live.source.clone(),
+                mesh: Arc::new(Default::default()),
+                nearest: live.nearest,
+                _tex: tex,
+                group,
+                vertices: None,
+                count: 0,
+            });
         }
         let Some(g) = self.live_gpu.as_mut() else { return Ok(()) };
         if !Arc::ptr_eq(&g.mesh, &live.mesh) {

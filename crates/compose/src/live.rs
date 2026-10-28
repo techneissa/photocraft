@@ -352,8 +352,13 @@ mod tests {
     fn identity_and_shift_reproduce_the_source() {
         for fmt in [PixelFormat::RGBA8, PixelFormat::RGBA16, PixelFormat::RGBA32F] {
             let src = Arc::new(red_square(fmt));
-            let live =
-                LiveTransform { layer: LayerId(1), source: src.clone(), rest: None, mesh: Arc::new(quad_mesh([0.0, 0.0, 8.0, 8.0], [0.0, 0.0, 8.0, 8.0])), nearest: false };
+            let live = LiveTransform {
+                layer: LayerId(1),
+                source: src.clone(),
+                rest: None,
+                mesh: Arc::new(quad_mesh([0.0, 0.0, 8.0, 8.0], [0.0, 0.0, 8.0, 8.0])),
+                nearest: false,
+            };
             let r = Rect::new(0, 0, 8, 8);
             let got = rasterize(&live, r);
             assert!(got.iter().zip(src.read_region(r)).all(|(a, b)| (a - b).abs() < 1e-4), "{fmt:?} identity");
@@ -457,7 +462,13 @@ mod tests {
             assert!(live.damage(&doc).width() <= 64);
         }
         // A large but legal box over a small document draws only inside it.
-        let live = LiveTransform { layer: id, source: src, rest: None, mesh: Arc::new(quad_mesh([-1.0e6, -1.0e6, 1.0e6, 1.0e6], [0.0, 0.0, 8.0, 8.0])), nearest: false };
+        let live = LiveTransform {
+            layer: id,
+            source: src,
+            rest: None,
+            mesh: Arc::new(quad_mesh([-1.0e6, -1.0e6, 1.0e6, 1.0e6], [0.0, 0.0, 8.0, 8.0])),
+            nearest: false,
+        };
         let s = apply(&doc, &live).layer(id).and_then(|l| l.surface()).cloned().unwrap();
         assert!(s.content_bounds().intersect(&Rect::new(-2, -2, 34, 34)) == s.content_bounds());
     }

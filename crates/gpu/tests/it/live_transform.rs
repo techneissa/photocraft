@@ -186,7 +186,8 @@ fn a_styled_layer_or_pass_through_group_is_left_to_the_cpu() {
     let id = l.id;
     let source = Arc::new(l.surface().unwrap().clone());
     d.layers.push(l);
-    let live = LiveTransform { layer: id, source, rest: None, mesh: Arc::new(grid(Rect::new(4, 4, 20, 20), 2, turn(0.0, 1.0, [0.0; 2], [3.0, 3.0]))), nearest: false };
+    let live =
+        LiveTransform { layer: id, source, rest: None, mesh: Arc::new(grid(Rect::new(4, 4, 20, 20), 2, turn(0.0, 1.0, [0.0; 2], [3.0, 3.0]))), nearest: false };
     let prepared = live::prepare(&d, &live);
     assert!(photocraft_gpu::plan::plan_with(&prepared, Some(&live)).is_err());
     assert!(photocraft_gpu::plan::plan_with(&prepared, None).is_ok());
