@@ -1,12 +1,16 @@
-//! Select ▸ Subject's engine choice: macOS's own subject cutout (Apple's Vision framework, through
-//! `photocraft_macvision`) or PhotoCraft's own Classic one (`photocraft_algo::segment::subject`).
+//! Select ▸ Subject's first engine: macOS's own subject cutout (Apple's Vision framework, through
+//! `photocraft_macvision`). It is the first step of the chain in
+//! [`super::smartselect_cmds::find_subject_region`], which tries the optional AI model
+//! (`photocraft_ml`) and then PhotoCraft's own Classic finder (`photocraft_algo::segment::subject`).
 //!
 //! The preference `tools.selectSubjectEngine` ([`SubjectEngine`]) picks:
 //!
-//! - `auto`: the Mac's cutout where there is one; Classic where there is none, or where the cutout
-//!   finds no subject or fails;
+//! - `auto`: the Mac's cutout where there is one; where there is none, or it finds no subject or
+//!   fails, the AI model when it is installed; then Classic;
 //! - `macos`: the Mac's cutout. No subject found means nothing is selected; no cutout on this system
-//!   (or Vision failing) means Classic, with a note for the status bar;
+//!   (or Vision failing) means Classic (never the model), with a note for the status bar;
+//! - `model`: the AI model (no cutout step); Classic with a note when it is not installed, the
+//!   computer lacks the memory or it fails;
 //! - `classic`: Classic, as before.
 //!
 //! The cutout sees the pixels the command samples (the active layer or the composite), shrunk to
@@ -14,8 +18,9 @@
 //! whole), and its soft mask is scaled back up to the canvas (bilinear) and becomes the region the
 //! caller stores exactly like Classic's: soft edges stay partial selection.
 //!
-//! It runs inline on the command like Classic does: Vision takes about a second at most, and Select
-//! Subject has no job path (its result is the selection, which scripts read right after).
+//! Select Subject runs the whole chain as a background job when the shell starts it
+//! (`Session::start`; Esc cancels), and inline for scripts and the control channel, which read the
+//! selection right after. This step itself is short: Vision takes about a second at most.
 
 #[cfg(test)]
 use photocraft_algo::segment::subject;

@@ -14,11 +14,11 @@
 - `keepMask` keeps the expanded removal mask, intersected with the previous selection, as the document selection. Otherwise the previous selection is preserved, including the absence of a selection.
 - `fill` is `auto`, `lama`, or `patch`. `auto` tries the locally installed LaMa model, falling back to patch completion when the model is missing or unsupported. `lama` requires the model and reports an error without it. Other inference failures are reported; cancellation never starts a fallback fill.
 - `newLayer` puts the fill on a transparent pixel layer immediately above the target and makes it active. The target stays untouched. Otherwise the fill changes the target's pixels.
-- `engine` is `auto`, `model`, or `classical`. `auto` uses the local subject model when it is installed and the classical subject finder otherwise; `model` requires the model. `classical` bypasses inference.
+- `engine` is `auto`, `macos`, `model`, or `classic` (`classical` is accepted as `classic`); without it the preference `tools.selectSubjectEngine` decides. `auto` uses the Mac's own cutout on a Mac, then the local subject model when it is installed, then the classical subject finder; `model` falls back to the classical finder when the model is not installed or the computer has too little memory. `classic` bypasses inference.
 
 The existing selection limits the fill, including fractional coverage at feathered edges. Pixels outside the removal mask remain unchanged. Filled pixels are opaque at full coverage; a new output layer is transparent elsewhere. The native patch path retains the document's channel model and depth; model input/output uses the existing RGB conversion and surface APIs.
 
-The result contains `layer`, `bounds` (the filled mask's `[x, y, width, height]` in document pixels), `subjectFound`, `filledWith` (`lama` or `patch`), and `subjectEngine` (`model` or `classical`). No subject, an empty intersection with the selection, or no surrounding source pixels produces an error without an edit.
+The result contains `layer`, `bounds` (the filled mask's `[x, y, width, height]` in document pixels), `subjectFound`, `filledWith` (`lama` or `patch`), and `subjectEngine` (`macos`, `model` or `classic`). No subject, an empty intersection with the selection, or no surrounding source pixels produces an error without an edit.
 
 The subject comes from `smartselect_cmds::find_subject_region`, the same helper Select Subject and Remove Background use.
 

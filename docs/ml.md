@@ -4,7 +4,7 @@ PhotoCraft's optional ML features run local ONNX models through the `photocraft-
 
 ## Commands
 
-- `select.subject` and `layer.removeBackground` accept `engine: auto|model|classical`. `auto` uses BiRefNet-lite when installed and otherwise uses the classical implementation. `classical` avoids model inference; `model` requires the model.
+- `select.subject`, `layer.removeBackground` and `edit.removeSubject` accept `engine: auto|macos|model|classic` (`classical` is accepted as `classic`); without it the preference `tools.selectSubjectEngine` decides. `auto` uses the Mac's own cutout on a Mac, then BiRefNet-lite when installed, then the classical implementation. `macos` uses the cutout and falls back to classic. `model` uses BiRefNet-lite; without the model installed (or on a computer with less than 12 GB of memory) it uses classic and says so in the status bar. `classic` avoids model inference.
 - `edit.removeSubject` accepts `fill: auto|lama|patch`. `auto` uses LaMa when installed and otherwise uses the patch based fill; `patch` avoids model inference; `lama` requires the model.
 
 ## Install
