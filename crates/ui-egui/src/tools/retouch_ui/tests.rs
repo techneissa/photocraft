@@ -283,6 +283,29 @@ fn empty_smart_result_is_reported_without_error() {
 }
 
 #[test]
+fn a_smart_result_note_reaches_the_status_bar() {
+    // Select Subject's fallback from the macOS cutout to Classic says so (and an empty result says
+    // what to try, not the note).
+    let mut app = app();
+    report_smart_result(&mut app, Ok(json!({"selected": true, "changed": true, "note": "macOS cutout unavailable, used Classic"})), "nothing there");
+    assert_eq!(app.ui.status.as_str(), "macOS cutout unavailable, used Classic");
+    assert!(!app.ui.status_error);
+    report_smart_result(&mut app, Ok(json!({"selected": false, "changed": false, "note": "x"})), "nothing there");
+    assert_eq!(app.ui.status.as_str(), "nothing there");
+}
+
+#[test]
+fn select_subject_from_the_menu_reports_to_the_status_bar_like_the_button() {
+    // A flat picture has no subject: the menu item says so (it used to stay silent), whichever engine.
+    let mut app = app();
+    app.run("prefs.set", json!({"path": "tools.selectSubjectEngine", "value": "classic"})).unwrap();
+    app.run("select.all", json!({})).unwrap();
+    crate::menus::invoke(&mut app, &egui::Context::default(), "select.subject", json!({})).unwrap();
+    assert_eq!(app.ui.status.as_str(), "No subject found — try Object Selection or the Lasso");
+    assert!(!app.ui.status_error);
+}
+
+#[test]
 fn mixer_brush_is_selectable_and_paints_only_inside_the_selection_via_control() {
     use crate::control::{ControlRequest, Outcome, handle};
 

@@ -447,6 +447,21 @@ pub fn report_smart_result(app: &mut PhotocraftApp, res: Result<Value, String>, 
     if matches!(res, Ok(ref v) if v.get("changed").and_then(Value::as_bool) == Some(false)) {
         app.ui.status = empty_msg.into();
         app.ui.status_error = false;
+    } else if let Ok(v) = &res
+        && let Some(note) = v.get("note").and_then(Value::as_str)
+    {
+        // Select Subject fell back from the macOS cutout to Classic.
+        app.ui.status = smart_note(note).into();
+        app.ui.status_error = false;
+    }
+}
+
+/// The engine's note for a smart selection (its own English words), in the user's language.
+fn smart_note(note: &str) -> &str {
+    match note {
+        "macOS cutout unavailable, used Classic" => tl!("macOS cutout unavailable, used Classic"),
+        "macOS cutout failed, used Classic" => tl!("macOS cutout failed, used Classic"),
+        other => tl!(other),
     }
 }
 
