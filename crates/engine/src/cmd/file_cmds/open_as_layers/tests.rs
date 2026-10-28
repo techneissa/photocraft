@@ -24,6 +24,20 @@ fn image(dir: &str, name: &str, w: u32, h: u32, color: &str, depth: u32, gray: b
     path
 }
 
+/// [`image`] with `profile` (a built-in id) assigned before saving, so the file embeds it.
+fn profiled(dir: &str, name: &str, w: u32, h: u32, color: &str, profile: &str) -> String {
+    let mut s = Session::new();
+    s.execute("file.new", json!({"width": w, "height": h, "background": color})).unwrap();
+    s.execute("edit.assignProfile", json!({"profile": profile})).unwrap();
+    let path = format!("{dir}/{name}");
+    save_doc(&s.active().unwrap().doc, &path, None).unwrap();
+    path
+}
+
+fn pixels(s: &Session, layer: usize, w: u32, h: u32) -> Vec<u8> {
+    s.active().unwrap().doc.layers[layer].surface().unwrap().to_interleaved(Rect::new(0, 0, w as i32, h as i32))
+}
+
 fn png(dir: &str, name: &str, w: u32, h: u32, color: &str) -> String {
     image(dir, name, w, h, color, 8, false)
 }
@@ -162,4 +176,30 @@ fn runs_as_a_background_job_and_leaves_the_files_alone() {
     assert_eq!(r["layers"], 2, "{r}");
     assert_eq!(s.documents().len(), 1);
     assert_eq!(std::fs::read(&a).unwrap(), before);
+}
+
+#[test]
+fn later_files_are_converted_to_the_top_files_profile() {
+    let dir = tmp("profile");
+    let top = profiled(&dir, "p3.png", 16, 16, "#808080", "display-p3");
+    let srgb = png(&dir, "srgb.png", 16, 16, "#ff0000");
+    let also_p3 = profiled(&dir, "also-p3.png", 16, 16, "#3366cc", "display-p3");
+    let mut s = Session::new();
+    s.execute("file.openAsLayers", json!({"paths": [top, srgb.clone(), also_p3.clone()]})).unwrap();
+    let p3 = photocraft_cms::Builtin::DisplayP3.profile().to_bytes();
+    assert_eq!(s.active().unwrap().doc.icc_profile.as_ref().map(|b| b.as_slice()), Some(p3.as_slice()));
+    // The sRGB file's numbers are what Convert to Profile gives the same file.
+    let mut oracle = Session::new();
+    oracle.add_document(photocraft_io::import("srgb.png", &std::fs::read(&srgb).unwrap()).unwrap().document, None);
+    oracle.execute("edit.convertToProfile", json!({"profile": "display-p3"})).unwrap();
+    let want = oracle.active().unwrap().doc.layers[0].surface().unwrap().to_interleaved(Rect::new(0, 0, 16, 16));
+    let got = pixels(&s, 1, 16, 16);
+    assert_eq!(got.len(), want.len());
+    assert!(got.iter().zip(&want).all(|(a, b)| a.abs_diff(*b) <= 1), "{:?} vs {:?}", &got[..4], &want[..4]);
+    // And they did change: sRGB red is not Display P3's (1, 0, 0).
+    assert!(got[0] < 247 && got[1] > 25, "{:?}", &got[..4]);
+    // A file already in the top profile is untouched.
+    let own = photocraft_io::import("also-p3.png", &std::fs::read(&also_p3).unwrap()).unwrap().document;
+    let own = own.layers[0].surface().unwrap().to_interleaved(Rect::new(0, 0, 16, 16));
+    assert_eq!(pixels(&s, 0, 16, 16), own);
 }
