@@ -5,6 +5,9 @@ use egui::{Align2, Color32, CornerRadius, RichText, Sense, Stroke, vec2};
 use crate::theme::{self, Tokens};
 use crate::{PhotocraftApp, icons};
 
+mod nav;
+use nav::{Hit, MAX_ROWS, PAGE, ROW_H};
+
 /// Case-insensitive subsequence match score (higher is better); None = no match.
 pub fn fuzzy_score(query: &str, text: &str) -> Option<i32> {
     if query.is_empty() {
@@ -75,7 +78,7 @@ fn push_recent(list: &mut Vec<String>, id: &str, cap: usize) {
 
 /// The empty-query hits: the recent commands as rows, newest first (UI-217-7). Ids that are
 /// no longer menu commands are skipped.
-fn recent_hits(recents: &[String], menus: &[crate::menus::MenuItem], lang: crate::i18n::Lang) -> Vec<(i32, String, String, Option<String>, bool)> {
+fn recent_hits(recents: &[String], menus: &[crate::menus::MenuItem], lang: crate::i18n::Lang) -> Vec<Hit> {
     recents
         .iter()
         .enumerate()
@@ -96,7 +99,7 @@ fn recent_hits(recents: &[String], menus: &[crate::menus::MenuItem], lang: crate
 
 /// The menu commands matching `q`, as palette rows. Separators are not commands: they would
 /// match on their menu path and list as blank "---" rows (#2479).
-fn menu_hits(menus: Vec<crate::menus::MenuItem>, q: &str, lang: crate::i18n::Lang) -> Vec<(i32, String, String, Option<String>, bool)> {
+fn menu_hits(menus: Vec<crate::menus::MenuItem>, q: &str, lang: crate::i18n::Lang) -> Vec<Hit> {
     menus
         .into_iter()
         .filter(|m| m.label != "---")
@@ -105,7 +108,7 @@ fn menu_hits(menus: Vec<crate::menus::MenuItem>, q: &str, lang: crate::i18n::Lan
             let path = m.path.iter().map(|p| crate::i18n::tr(lang, p)).collect::<Vec<_>>().join(" › ");
             let label = crate::i18n::tr_id(lang, &m.id, &m.label);
             // Match what is shown and the English name (commands are documented in English).
-            let s = fuzzy_score(q, &format!("{label} {path} {} {path_en}", m.label))? + exact_bonus(q, &[label, &m.label]);
+            let s = fuzzy_score(q, &format!("{label} {path} {} {path_en}", m.label))? + exact_bonus(q, &[label, &m.label]) + nav::word_start_bonus(q, label);
             Some((
                 s,
                 m.id,
@@ -115,6 +118,37 @@ fn menu_hits(menus: Vec<crate::menus::MenuItem>, q: &str, lang: crate::i18n::Lan
             ))
         })
         .collect()
+}
+
+/// Every row for the query `q`, best first. An empty query lists the recently run commands
+/// (UI-217-7); with none (or a fresh session) it falls back to the full fuzzy list, as before.
+fn all_hits(app: &PhotocraftApp, q: &str, recents: &[String], lang: crate::i18n::Lang) -> Vec<Hit> {
+    let menus = crate::menus::menu_items(app);
+    let empty = q.trim().is_empty();
+    let mut hits: Vec<Hit> = if empty { recent_hits(recents, &menus, lang) } else { Vec::new() };
+    if !empty || hits.is_empty() {
+        hits.extend(menu_hits(menus, q, lang));
+        for tool in crate::state::Tool::ALL {
+            if let Some(s) = fuzzy_score(q, &format!("{} {}", tl!(tool.label()), tool.label())) {
+                let s = s + exact_bonus(q, &[tl!(tool.label()).as_ref(), tool.label()]) + nav::word_start_bonus(q, tl!(tool.label()));
+                // The tool's key as the user set it, not Photoshop's default.
+                let key = crate::tool_shortcuts::shortcut(app, tool).map(|k| format!("   {}", crate::shortcuts::pretty(&k))).unwrap_or_default();
+                hits.push((s + 2, format!("tool:{tool:?}"), tl!(tool.label()).into(), Some(format!("{}{key}", crate::i18n::tr(lang, "Tool"))), true));
+            }
+        }
+    }
+    nav::rank(&mut hits);
+    hits
+}
+
+/// The highlighted row (egui temp data, like the query).
+fn sel_id() -> egui::Id {
+    egui::Id::unique("palette-sel")
+}
+
+/// How far the list is scrolled.
+fn scroll_id() -> egui::Id {
+    egui::Id::unique("palette-scroll")
 }
 
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
@@ -148,6 +182,16 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     ui.set_width(width);
                     let qid = egui::Id::unique("palette-query");
                     let mut q: String = ui.data_mut(|d| d.get_temp(qid).unwrap_or_default());
+                    let before = q.clone();
+                    // The list keys first: the search field would move its cursor on them.
+                    let (down, up, page_down, page_up) = ctx.input_mut(|i| {
+                        (
+                            i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown),
+                            i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp),
+                            i.consume_key(egui::Modifiers::NONE, egui::Key::PageDown),
+                            i.consume_key(egui::Modifiers::NONE, egui::Key::PageUp),
+                        )
+                    });
                     ui.horizontal(|ui| {
                         let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
                         icons::paint(ui, r, "search", 16.0, t.text_dim);
@@ -167,62 +211,91 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     crate::widgets::hairline(ui);
                     ui.add_space(6.0);
                     let lang = crate::i18n::Lang::from_pref(&app.session.prefs().interface.language);
-                    let menus = crate::menus::menu_items(app);
                     let recents: Vec<String> = ui.data(|d| d.get_temp(recent_id()).unwrap_or_default());
-                    let empty = q.trim().is_empty();
-                    // An empty query lists the recently run commands (UI-217-7); with none (or a
-                    // fresh session) it falls back to the full fuzzy list, as before.
-                    let mut hits: Vec<(i32, String, String, Option<String>, bool)> = if empty { recent_hits(&recents, &menus, lang) } else { Vec::new() };
-                    if !empty || hits.is_empty() {
-                        hits.extend(menu_hits(menus, &q, lang));
-                        for tool in crate::state::Tool::ALL {
-                            if let Some(s) = fuzzy_score(&q, &format!("{} {}", tl!(tool.label()), tool.label())) {
-                                let s = s + exact_bonus(&q, &[tl!(tool.label()).as_ref(), tool.label()]);
-                                hits.push((
-                                    s + 2,
-                                    format!("tool:{tool:?}"),
-                                    tl!(tool.label()).into(),
-                                    Some(format!("{}   {}", crate::i18n::tr(lang, "Tool"), tool.key())),
-                                    true,
-                                ));
-                            }
-                        }
-                    }
-                    hits.sort_by(|a, b| b.0.cmp(&a.0).then(a.2.cmp(&b.2)));
-                    hits.truncate(12);
-                    let sel_id = egui::Id::unique("palette-sel");
+                    let hits = all_hits(app, &q, &recents, lang);
+                    let sel_id = sel_id();
+                    let scroll_id = scroll_id();
                     let mut sel: usize = ui.data_mut(|d| d.get_temp(sel_id).unwrap_or(0));
-                    let (down, up, enter, esc) = ui.input(|i| {
-                        (
-                            i.key_pressed(egui::Key::ArrowDown),
-                            i.key_pressed(egui::Key::ArrowUp),
-                            i.key_pressed(egui::Key::Enter),
-                            i.key_pressed(egui::Key::Escape),
-                        )
-                    });
+                    let mut scroll: f32 = ui.data_mut(|d| d.get_temp(scroll_id).unwrap_or(0.0));
+                    let (enter, esc) = ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Escape)));
+                    let len = hits.len();
+                    if q != before {
+                        // A new query starts at the best hit again.
+                        sel = 0;
+                        scroll = 0.0;
+                    }
+                    let mut reveal = false;
                     if down {
-                        sel = (sel + 1).min(hits.len().saturating_sub(1));
+                        sel = nav::step(sel, 1, len);
+                        reveal = true;
                     }
                     if up {
-                        sel = sel.saturating_sub(1);
+                        sel = nav::step(sel, -1, len);
+                        reveal = true;
                     }
-                    sel = sel.min(hits.len().saturating_sub(1));
+                    if page_down {
+                        sel = nav::page(sel, PAGE as isize, len);
+                        reveal = true;
+                    }
+                    if page_up {
+                        sel = nav::page(sel, -(PAGE as isize), len);
+                        reveal = true;
+                    }
+                    sel = sel.min(len.saturating_sub(1));
                     if hits.is_empty() {
                         ui.label(RichText::new(tl!("No matching commands")).color(t.text_faint));
-                    }
-                    for (i, (_, id, label, detail, enabled)) in hits.iter().enumerate() {
-                        let (rect, resp) = ui.allocate_exact_size(vec2(width, 32.0), Sense::click());
-                        if i == sel || resp.hovered() {
-                            ui.painter().rect_filled(rect, t.radius_sm, if i == sel { t.accent_soft } else { t.hover });
+                    } else {
+                        // As many rows as there are, up to MAX_ROWS, and never past the bottom of the window;
+                        // more rows scroll. The list gets its own height: this Area keeps the size it had.
+                        let room = (screen.bottom() - ui.cursor().top() - 80.0).max(ROW_H * 3.0);
+                        let height = (ROW_H * len.min(MAX_ROWS) as f32).min(room);
+                        let mut list = egui::ScrollArea::vertical().id_salt("palette-list").max_height(height).auto_shrink([false, false]);
+                        if reveal {
+                            scroll = nav::reveal(scroll, sel, height);
+                            list = list.vertical_scroll_offset(scroll);
                         }
-                        let color = if *enabled { t.text } else { t.text_faint };
-                        ui.painter().text(rect.left_center() + vec2(12.0, 0.0), Align2::LEFT_CENTER, label, theme::medium(13.0), color);
-                        if let Some(d) = detail {
-                            ui.painter().text(rect.right_center() - vec2(12.0, 0.0), Align2::RIGHT_CENTER, d, egui::FontId::proportional(11.5), t.text_faint);
-                        }
-                        if resp.clicked() && *enabled {
-                            run = Some(id.clone());
-                        }
+                        // The pointer moving onto a row highlights it; a still pointer doesn't take the
+                        // highlight back from the keys when the list scrolls under it.
+                        let pointer = ui.input(|i| i.pointer.hover_pos());
+                        let pointer_id = egui::Id::unique("palette-pointer");
+                        let moved = pointer.is_some() && pointer != ui.data(|d| d.get_temp::<Option<egui::Pos2>>(pointer_id)).flatten();
+                        ui.data_mut(|d| d.insert_temp(pointer_id, pointer));
+                        let shown_sel = sel;
+                        let out = ui.allocate_ui(vec2(width, height), |ui| {
+                            ui.spacing_mut().item_spacing.y = 0.0;
+                            list.show_rows(ui, ROW_H, len, |ui, range| {
+                                for i in range {
+                                    let Some((_, id, label, detail, enabled)) = hits.get(i) else { continue };
+                                    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_H), Sense::click());
+                                    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, *enabled, label.as_str()));
+                                    if i == shown_sel {
+                                        ui.painter().rect_filled(rect, t.radius_sm, t.accent_soft);
+                                    }
+                                    if resp.hovered() && moved {
+                                        sel = i;
+                                        ctx.request_repaint();
+                                    }
+                                    let color = if *enabled { t.text } else { t.text_faint };
+                                    ui.painter().text(rect.left_center() + vec2(12.0, 0.0), Align2::LEFT_CENTER, label, theme::medium(13.0), color);
+                                    if let Some(d) = detail {
+                                        ui.painter().text(
+                                            rect.right_center() - vec2(12.0, 0.0),
+                                            Align2::RIGHT_CENTER,
+                                            d,
+                                            egui::FontId::proportional(11.5),
+                                            t.text_faint,
+                                        );
+                                    }
+                                    if resp.clicked() && *enabled {
+                                        run = Some(id.clone());
+                                    }
+                                    let command =
+                                        id.strip_prefix("tool:").and_then(crate::state::Tool::from_name).map_or_else(|| id.clone(), crate::tool_shortcuts::id);
+                                    crate::assign_shortcut::on(ui, &resp, &command);
+                                }
+                            })
+                        });
+                        scroll = out.inner.state.offset().y;
                     }
                     if enter && let Some(h) = hits.get(sel).filter(|h| h.4) {
                         run = Some(h.1.clone());
@@ -230,7 +303,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                         // its OK button, instantly closing the dialog we are about to open (#536).
                         ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
                     }
-                    if esc {
+                    // Esc closes the Assign Shortcut menu first, then the palette.
+                    if esc && !crate::assign_shortcut::is_open(ctx) {
                         app.ui.palette_open = false;
                     }
                     ui.add_space(4.0);
@@ -242,6 +316,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     ui.data_mut(|d| {
                         d.insert_temp(qid, q);
                         d.insert_temp(sel_id, sel);
+                        d.insert_temp(scroll_id, scroll);
                     });
                 });
         });
@@ -257,6 +332,11 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
     }
 }
+
+#[cfg(test)]
+mod assign_tests;
+#[cfg(test)]
+mod upgrade_tests;
 
 #[cfg(test)]
 mod tests {
