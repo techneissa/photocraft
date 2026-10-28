@@ -122,6 +122,7 @@ pub(crate) use refs::source_spec;
 pub use refs::{Blending, ChanRef, parse_ref};
 use selection::{load_selection, quick_mask, save_selection};
 use spot::{merge, merge_spot, mergeable, split};
+pub(crate) use targeting::target;
 use targeting::{SLOT_KEY, target_cmd, target_slot};
 pub(crate) use targeting::{
     Target, channel_surface_for_filter, clear_channel, clear_color_channel, color_restriction, edits_channel, filter_mask_layer, inject_target, invert_region,
@@ -129,7 +130,6 @@ pub(crate) use targeting::{
     targeted_color,
 };
 pub use targeting::{follows_filter_mask, follows_target};
-pub(crate) use targeting::target;
 pub(crate) use view::fix_view;
 pub use view::{ChannelTarget, ChannelView, QuickMaskOptions, color_names, composite_name};
 

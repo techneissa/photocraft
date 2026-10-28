@@ -125,9 +125,9 @@ fn double_exposure(s: &mut Session, p: &Value) -> Result<Value> {
 /// After Redo: the step brings the mask back, so target it again, as running the command did.
 /// (Undo needs nothing: with the mask gone the view falls back to the pixels.)
 pub(crate) fn after_redo(s: &mut Session) {
-    let masked = s.active().is_some_and(|st| {
-        st.history.undo_label() == Some(LABEL) && st.active_layer.and_then(|id| st.doc.layer(id)).is_some_and(|l| l.mask.is_some())
-    });
+    let masked = s
+        .active()
+        .is_some_and(|st| st.history.undo_label() == Some(LABEL) && st.active_layer.and_then(|id| st.doc.layer(id)).is_some_and(|l| l.mask.is_some()));
     if masked {
         channel_cmds::target(s, ChannelTarget::LayerMask);
     }
