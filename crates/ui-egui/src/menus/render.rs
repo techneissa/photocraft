@@ -73,7 +73,7 @@ pub(super) fn render_level_rows(ui: &mut egui::Ui, items: &[&MenuItem], depth: u
                 let r = match it.id.as_str() {
                     "image.mode.bits8" | "image.mode.bits16" => r.on_hover_text(crate::i18n::tr(lang, "Integer")),
                     "image.mode.bits32" => r.on_hover_text(crate::i18n::tr(lang, "Floating point")),
-                    "layer.doubleExposure" => r.on_disabled_hover_text(crate::i18n::tr(lang, "Needs two pixel layers")),
+                    "layer.doubleExposure" => r.on_disabled_hover_text(crate::i18n::tr(lang, "Needs two visible pixel layers")),
                     _ => r,
                 };
                 let hit = r.clicked() || released_on(ui, &r);
