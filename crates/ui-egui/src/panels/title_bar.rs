@@ -106,16 +106,9 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         app.ui.workspace = ws;
                         crate::menus::apply_workspace(app);
                     }
+                    crate::assign_shortcut::next(ui, "edit.search");
                     if icons_shown >= 1
-                        && crate::assign_shortcut::button(
-                            ui,
-                            "search",
-                            28.0,
-                            app.ui.palette_open,
-                            &crate::shortcuts::tip_label(app, "Search commands", "edit.search"),
-                            "edit.search",
-                        )
-                        .clicked()
+                        && icons::button(ui, "search", 28.0, app.ui.palette_open, &crate::shortcuts::tip_label(app, "Search commands", "edit.search")).clicked()
                     {
                         app.ui.palette_open = !app.ui.palette_open;
                     }

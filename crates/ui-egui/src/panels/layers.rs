@@ -475,7 +475,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         };
         let mask_btn = ui.add_enabled_ui(mask_cmd.is_some(), |ui| icons::button(ui, "layer-mask", 26.0, false, &mask_tip)).inner;
         mask_btn.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &mask_tip));
-        crate::assign_shortcut::on(ui, &mask_btn, "layer.layerMask.revealAll");
+        crate::assign_shortcut::on(ui, &mask_btn, mask_cmd.unwrap_or("layer.layerMask.revealAll"));
         if mask_btn.clicked()
             && let Some(cmd) = mask_cmd
         {
@@ -501,9 +501,8 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         });
         // Photoshop's footer starts with Link Layers (enabled with two or more layers selected).
         let can_link = app.session.is_enabled("layer.linkLayers");
-        let link = ui.add_enabled_ui(can_link, |ui| icons::button(ui, "link-2", 26.0, false, tl!("Link layers"))).inner;
-        crate::assign_shortcut::on(ui, &link, "layer.linkLayers");
-        if link.clicked() {
+        crate::assign_shortcut::next(ui, "layer.linkLayers");
+        if ui.add_enabled_ui(can_link, |ui| icons::button(ui, "link-2", 26.0, false, tl!("Link layers"))).inner.clicked() {
             actions.push(("layer.linkLayers".into(), json!({})));
         }
     });

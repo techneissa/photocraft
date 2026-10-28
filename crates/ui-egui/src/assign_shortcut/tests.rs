@@ -1,4 +1,4 @@
-use egui::{Event, Modifiers, vec2};
+use egui::{Event, Key, Modifiers, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
 use serde_json::{Value, json};
 
@@ -102,11 +102,12 @@ fn open_shortcuts_for_reuses_the_open_dialog() {
 }
 
 #[test]
-fn right_click_on_a_wrapped_icon_button_offers_assign_shortcut_and_a_left_click_still_clicks() {
+fn right_click_on_an_icon_button_marked_with_next_offers_assign_shortcut_and_a_left_click_still_clicks() {
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let mut h = Harness::builder().with_size(vec2(400.0, 300.0)).build_ui_state(
         |ui, (app, clicks): &mut (PhotocraftApp, u32)| {
-            if super::button(ui, "search", 28.0, false, "Search commands", "edit.search").clicked() {
+            super::next(ui, "edit.search");
+            if crate::icons::button(ui, "search", 28.0, false, "Search commands").clicked() {
                 *clicks += 1;
             }
             super::show(app, &ui.ctx().clone());
@@ -130,4 +131,164 @@ fn right_click_on_a_wrapped_icon_button_offers_assign_shortcut_and_a_left_click_
 fn assert_asked_for_in(app: &PhotocraftApp, command: &str) {
     assert_eq!(dialog_field(app, "selected"), Some(json!(command)));
     assert_eq!(dialog_field(app, "capture"), Some(json!(true)));
+}
+
+fn toolbar_harness() -> Harness<'static, PhotocraftApp> {
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let mut h = Harness::builder().with_size(vec2(800.0, 1400.0)).build_ui_state(
+        |ui, app: &mut PhotocraftApp| {
+            if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                crate::panels::toolbar(app, ui);
+            }
+            super::show(app, &ui.ctx().clone());
+        },
+        app,
+    );
+    PhotocraftApp::setup_context(&h.ctx, Default::default());
+    h.run_steps(2);
+    h
+}
+
+#[test]
+fn right_click_on_the_toolbars_edit_and_quick_mask_buttons_offers_assign_shortcut() {
+    for (label, command) in [("Edit Toolbar…", "edit.toolbar"), ("Edit in Quick Mask Mode", "select.editInQuickMaskMode")] {
+        let mut h = toolbar_harness();
+        h.get_by_label_contains(label).click_secondary();
+        h.run_steps(2);
+        h.get_by_label_contains("Assign Shortcut").click();
+        h.run_steps(3);
+        assert_asked_for(&h, command);
+    }
+}
+
+#[test]
+fn right_click_on_a_flyout_tool_row_offers_assign_shortcut_and_closes_the_flyout() {
+    let mut h = toolbar_harness();
+    // Right-click on a tool that shares its slot opens the flyout, not the small menu.
+    let button = h.get_by_label("Brush Tool  (B)").rect();
+    h.get_by_label("Brush Tool  (B)").click_secondary();
+    h.run_steps(3);
+    assert!(!super::is_open(&h.ctx), "the flyout takes the right-click on the tool's own button");
+    // The second row of the flyout (Pencil), beside the button.
+    let margin = egui::Frame::popup(&h.ctx.global_style()).inner_margin.top as f32;
+    let row = egui::pos2(button.right() + 6.0 + margin + 60.0, button.top() + margin + 26.0 + 13.0);
+    h.event(Event::PointerMoved(row));
+    h.run_steps(2);
+    for pressed in [true, false] {
+        h.event(Event::PointerButton { pos: row, button: egui::PointerButton::Secondary, pressed, modifiers: Modifiers::NONE });
+    }
+    h.run_steps(3);
+    assert!(super::is_open(&h.ctx), "a right-click on a flyout row offers the small menu");
+    h.get_by_label_contains("Assign Shortcut").click();
+    h.run_steps(3);
+    assert_asked_for(&h, "tools.select.pencil");
+}
+
+#[test]
+fn the_options_bar_tool_icons_menu_has_assign_shortcut() {
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let mut h = Harness::builder().with_size(vec2(1200.0, 300.0)).build_ui_state(
+        |ui, app: &mut PhotocraftApp| {
+            if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                crate::panels::options_bar(app, ui);
+            }
+            super::show(app, &ui.ctx().clone());
+        },
+        app,
+    );
+    PhotocraftApp::setup_context(&h.ctx, Default::default());
+    h.run_steps(2);
+    let tool = h.state().ui.tool;
+    h.get_by_label(crate::i18n::t(tool.label())).click_secondary();
+    h.run_steps(3);
+    assert!(h.query_by_label("Reset Tool").is_some(), "its own menu still opens");
+    h.get_by_label("Assign Shortcut…").click();
+    h.run_steps(3);
+    assert_asked_for(&h, &crate::tool_shortcuts::id(tool));
+}
+
+#[test]
+fn esc_and_tool_keys_belong_to_the_small_menu() {
+    let mut h = app_harness();
+    let ctx = h.ctx.clone();
+    h.state_mut().run("select.all", json!({})).unwrap();
+    h.state_mut().ui.tool = crate::state::Tool::Brush;
+    h.run_steps(2);
+    super::offer(&ctx, "edit.undo", egui::pos2(300.0, 300.0));
+    h.run_steps(2);
+    h.key_press(Key::V);
+    h.run_steps(2);
+    assert_eq!(h.state().ui.tool, crate::state::Tool::Brush, "V doesn't switch tools under the menu");
+    h.key_press(Key::Escape);
+    h.run_steps(2);
+    assert!(!super::is_open(&ctx), "Esc closes the menu");
+    assert!(h.state().session.active().is_some_and(|s| s.doc.selection.is_some()), "and deselects nothing");
+    h.key_press(Key::V);
+    h.run_steps(2);
+    assert_eq!(h.state().ui.tool, crate::state::Tool::Move, "with the menu gone V is the Move tool again");
+}
+
+#[test]
+fn a_click_outside_closes_the_menu_and_goes_no_further() {
+    let mut h = app_harness();
+    let ctx = h.ctx.clone();
+    h.state_mut().run("layer.new.layer", json!({})).unwrap();
+    h.state_mut().sync_views();
+    h.run_steps(2);
+    let layers = h.state().session.active().unwrap().doc.layer_count();
+    super::offer(&ctx, "edit.undo", egui::pos2(300.0, 300.0));
+    h.run_steps(2);
+    h.get_by_label("Delete layer").click();
+    h.run_steps(3);
+    assert!(!super::is_open(&ctx), "the click closes the menu");
+    assert_eq!(h.state().session.active().unwrap().doc.layer_count(), layers, "and doesn't press Delete Layer");
+    assert!(h.state().ui.dialogs.is_empty() && h.state().ui.layer_menu.is_none());
+    // With the menu gone the same button works.
+    h.get_by_label("Delete layer").click();
+    h.run_steps(3);
+    assert!(h.state().session.active().unwrap().doc.layer_count() < layers || !h.state().ui.dialogs.is_empty());
+}
+
+#[test]
+fn a_menu_from_a_palette_row_goes_with_the_palette() {
+    let mut h = app_harness();
+    let ctx = h.ctx.clone();
+    crate::menus::invoke(h.state_mut(), &ctx, "edit.search", json!({})).unwrap();
+    h.run_steps(2);
+    h.event(Event::Text("zoom tool".into()));
+    h.run_steps(2);
+    h.get_by_label("Zoom Tool").click_secondary();
+    h.run_steps(2);
+    assert!(super::is_open(&ctx));
+    // Enter and the arrows are the menu's, not the palette's: nothing runs, the highlight stays.
+    h.key_press(Key::Enter);
+    h.key_press(Key::ArrowDown);
+    h.run_steps(2);
+    assert!(h.state().ui.palette_open && super::is_open(&ctx), "Enter does not run the highlighted row");
+    h.state_mut().ui.palette_open = false;
+    h.run_steps(2);
+    assert!(!super::is_open(&ctx), "the palette closing takes the menu with it");
+}
+
+#[test]
+fn open_shortcuts_for_a_command_the_dialog_does_not_list_captures_nothing() {
+    let mut h = app_harness();
+    crate::prefs_ui::open_shortcuts_for(h.state_mut(), "no.such.command");
+    assert_eq!(dialog_field(h.state(), "capture"), Some(json!(false)));
+    assert_eq!(dialog_field(h.state(), "selected"), Some(json!("")));
+    crate::prefs_ui::open_shortcuts_for(h.state_mut(), "edit.undo");
+    assert_eq!(dialog_field(h.state(), "capture"), Some(json!(true)));
+}
+
+#[test]
+fn the_add_mask_button_offers_the_command_it_runs() {
+    let mut h = app_harness();
+    h.state_mut().run("select.all", json!({})).unwrap();
+    h.run_steps(2);
+    h.get_by_label_contains("Add a mask").click_secondary();
+    h.run_steps(2);
+    h.get_by_label_contains("Assign Shortcut").click();
+    h.run_steps(3);
+    // A selection makes it the mask from the selection, not Reveal All.
+    assert_asked_for(&h, "layer.layerMask.revealSelection");
 }
