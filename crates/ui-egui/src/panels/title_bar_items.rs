@@ -10,11 +10,11 @@
 //! and set with `prefs.get` and `prefs.set` like any preference. A hidden item only leaves the
 //! bar: Edit › Search, Window › Workspace and Preferences › Interface still do what it did.
 
-use egui::{Popup, PopupCloseBehavior, RichText};
+use egui::{Popup, PopupCloseBehavior};
 use photocraft_engine::prefs::TopBar;
 use serde_json::{Map, Value, json};
 
-use super::{PhotocraftApp, Tokens, widgets};
+use super::{PhotocraftApp, widgets};
 
 #[cfg(test)]
 mod tests;
@@ -74,6 +74,18 @@ pub fn set_shown(app: &mut PhotocraftApp, id: &str, on: bool) -> Result<(), Stri
     app.run("prefs.set", json!({"path": format!("interface.topBar.{id}"), "value": on})).map(|_| ())
 }
 
+/// Whether a drag that just started on the bar's gap moves the window. With the items menu open it
+/// only closes the menu: the window would move while the menu stays at the old place until the
+/// mouse is released.
+pub fn drag_moves_window(ctx: &egui::Context, gap: &egui::Response) -> bool {
+    let menu = Popup::context_menu(gap);
+    if !menu.is_open() {
+        return true;
+    }
+    Popup::close_id(ctx, menu.get_id());
+    false
+}
+
 /// A right-click on an empty part of the bar: every item with a check box, then the way to the
 /// Preferences page. The menu stays open while items are turned on and off.
 pub fn bar_menu(app: &mut PhotocraftApp, response: &egui::Response) {
@@ -88,7 +100,7 @@ pub fn bar_menu(app: &mut PhotocraftApp, response: &egui::Response) {
             }
         }
         ui.separator();
-        if ui.button(tl!("Top Bar Settings…")).clicked() {
+        if ui.button(tl!("Top Bar Settings…")).on_hover_text(tl!("Menus and window buttons always stay.")).clicked() {
             crate::prefs_ui::open_preferences(app, "interface");
             ui.close();
         }
@@ -106,10 +118,7 @@ pub fn group_matches(query: &str) -> bool {
 /// The Top Bar group of Preferences › Interface: a check box per item, on the dialog's working
 /// copy of the section (`obj`), which Preferences saves with OK like the rest.
 pub fn editor(ui: &mut egui::Ui, obj: &mut Map<String, Value>) {
-    let t = Tokens::get(ui.ctx());
     let mut bar: TopBar = obj.get("topBar").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
-    ui.label(RichText::new(tl!("Menus and window buttons always stay.")).color(t.text_faint));
-    ui.add_space(4.0);
     ui.spacing_mut().item_spacing.y = 7.0;
     for item in &ITEMS {
         let mut on = bar.shown(item.id).unwrap_or(true);
