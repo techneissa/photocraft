@@ -307,6 +307,29 @@ mod warm {
             assert_eq!(v, 7);
             assert_eq!(W.get_or_init(slow), &7);
         }
+
+        static BUILDS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+        fn counted() -> u32 {
+            BUILDS.fetch_add(1, Ordering::SeqCst);
+            9
+        }
+
+        /// The font scan is the build: two opens (a launch warm-up, then two file opens) run it once.
+        #[test]
+        fn the_build_runs_once_however_many_callers_ask() {
+            static W: Warm<u32> = Warm::new();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while W.try_get(counted, true).is_none() {
+                assert!(Instant::now() < deadline, "the background build never finished");
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            for _ in 0..2 {
+                assert_eq!(W.get_or_init(counted), &9);
+                assert_eq!(W.try_get(counted, true), Some(&9));
+            }
+            assert_eq!(BUILDS.load(Ordering::SeqCst), 1);
+        }
     }
 }
 
