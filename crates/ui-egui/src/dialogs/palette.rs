@@ -295,7 +295,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                                 }
                             })
                         });
-                        scroll = out.inner.state.offset().y;
+                        scroll = out.inner.state.clamped_offset().y;
                     }
                     if enter && let Some(h) = hits.get(sel).filter(|h| h.4) {
                         run = Some(h.1.clone());

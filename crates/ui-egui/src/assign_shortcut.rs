@@ -18,11 +18,11 @@ struct Offer {
 }
 
 fn offer_id() -> Id {
-    Id::new("assign-shortcut-offer")
+    Id::unique("assign-shortcut-offer")
 }
 
 fn request_id() -> Id {
-    Id::new("assign-shortcut-request")
+    Id::unique("assign-shortcut-request")
 }
 
 /// Offer the menu for `command` at `pos`.
@@ -83,7 +83,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let Some(offer) = ctx.data(|d| d.get_temp::<Offer>(offer_id())) else { return };
     let t = Tokens::get(ctx);
     let mut picked = false;
-    let area = egui::Area::new(Id::new("assign-shortcut-menu")).order(Order::Tooltip).fixed_pos(offer.pos).constrain(true).show(ctx, |ui| {
+    let area = egui::Area::new(Id::unique("assign-shortcut-menu")).order(Order::Tooltip).fixed_pos(offer.pos).constrain(true).show(ctx, |ui| {
         egui::Frame::popup(ui.style()).show(ui, |ui| {
             crate::widgets::style_spectrum_popup_menu(ui);
             ui.set_min_width(150.0);

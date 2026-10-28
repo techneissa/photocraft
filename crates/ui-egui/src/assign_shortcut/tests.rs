@@ -1,4 +1,4 @@
-use egui::{Event, Key, Modifiers, vec2};
+use egui::{Event, Modifiers, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
 use serde_json::{Value, json};
 
@@ -99,4 +99,35 @@ fn open_shortcuts_for_reuses_the_open_dialog() {
     assert_eq!(a, b, "one Keyboard Shortcuts dialog");
     assert_asked_for(&h, "tools.select.zoom");
     assert_eq!(dialog_field(h.state(), "filter"), Some(json!("Zoom Tool")), "its row is in view");
+}
+
+#[test]
+fn right_click_on_a_wrapped_icon_button_offers_assign_shortcut_and_a_left_click_still_clicks() {
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let mut h = Harness::builder().with_size(vec2(400.0, 300.0)).build_ui_state(
+        |ui, (app, clicks): &mut (PhotocraftApp, u32)| {
+            if super::button(ui, "search", 28.0, false, "Search commands", "edit.search").clicked() {
+                *clicks += 1;
+            }
+            super::show(app, &ui.ctx().clone());
+        },
+        (app, 0u32),
+    );
+    PhotocraftApp::setup_context(&h.ctx, Default::default());
+    h.run_steps(2);
+    h.get_by_label("Search commands").click();
+    h.run_steps(2);
+    assert_eq!(h.state().1, 1, "a left click is the button's own");
+    assert!(!super::is_open(&h.ctx));
+    h.get_by_label("Search commands").click_secondary();
+    h.run_steps(2);
+    assert_eq!(h.state().1, 1, "a right-click is not a click");
+    h.get_by_label_contains("Assign Shortcut").click();
+    h.run_steps(3);
+    assert_asked_for_in(&h.state().0, "edit.search");
+}
+
+fn assert_asked_for_in(app: &PhotocraftApp, command: &str) {
+    assert_eq!(dialog_field(app, "selected"), Some(json!(command)));
+    assert_eq!(dialog_field(app, "capture"), Some(json!(true)));
 }
