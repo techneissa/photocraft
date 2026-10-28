@@ -427,6 +427,41 @@ mod tests {
         assert_eq!(live.damage(&doc), Rect::new(2, 2, 16, 16));
     }
 
+    /// A hostile box (NaN, infinite, astronomically large or far-away corners) is refused or
+    /// clipped to the document: nothing is drawn from it, nothing panics and the layer stays as
+    /// empty (no allocation sized by the box).
+    #[test]
+    fn hostile_boxes_are_refused_not_composited() {
+        let size = photocraft_geom::Size { width: 32, height: 32 };
+        let mut doc = Document::new("D", size, photocraft_color::ColorMode::Rgb, photocraft_color::SampleType::U8);
+        let l = photocraft_doc::Layer::new("L", LayerContent::Raster(red_square(PixelFormat::RGBA8)));
+        let id = l.id;
+        doc.layers.push(l);
+        let src = Arc::new(red_square(PixelFormat::RGBA8));
+        let (nan, inf) = (f32::NAN, f32::INFINITY);
+        for r in [
+            [nan, 0.0, 8.0, 8.0],
+            [0.0, 0.0, inf, 8.0],
+            [-inf, -inf, inf, inf],
+            [-1e30, -1e30, 1e30, 1e30],
+            [1e18, 1e18, 1e18 + 40.0, 1e18 + 40.0],
+            [0.0, 0.0, 1e12, 1.0],
+            [0.0, 0.0, 2.0e7, 2.0e7],
+        ] {
+            let live = LiveTransform { layer: id, source: src.clone(), rest: None, mesh: Arc::new(quad_mesh(r, [0.0, 0.0, 8.0, 8.0])), nearest: false };
+            assert!(live.mesh.bounds().is_empty(), "{r:?} is refused");
+            let d = apply(&doc, &live);
+            let s = d.layer(id).and_then(|l| l.surface()).unwrap();
+            // Prepared, the layer holds only what stays (nothing here): nothing is drawn from the box.
+            assert!(s.content_bounds().is_empty(), "{r:?}: nothing drawn");
+            assert!(live.damage(&doc).width() <= 64);
+        }
+        // A large but legal box over a small document draws only inside it.
+        let live = LiveTransform { layer: id, source: src, rest: None, mesh: Arc::new(quad_mesh([-1.0e6, -1.0e6, 1.0e6, 1.0e6], [0.0, 0.0, 8.0, 8.0])), nearest: false };
+        let s = apply(&doc, &live).layer(id).and_then(|l| l.surface()).cloned().unwrap();
+        assert!(s.content_bounds().intersect(&Rect::new(-2, -2, 34, 34)) == s.content_bounds());
+    }
+
     /// Hostile meshes (indices out of range, NaN, huge coordinates, degenerate triangles) draw
     /// nothing for the bad triangles and never panic.
     #[test]

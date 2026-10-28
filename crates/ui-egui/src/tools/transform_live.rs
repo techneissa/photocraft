@@ -481,6 +481,24 @@ mod tests {
         assert!(current(&app, doc).unwrap().1.nearest);
     }
 
+    /// A box dragged to NaN, infinite or astronomical corners draws nothing and never panics, on
+    /// the canvas's document and the CPU's alike.
+    #[test]
+    fn hostile_boxes_do_not_reach_the_canvas() {
+        let mut app = app_with_layer("Normal");
+        let ctx = egui::Context::default();
+        crate::transform_tool::begin(&mut app, &ctx).unwrap();
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 1e300, -1e300, 1e18] {
+            let t = app.ui.transform.as_mut().unwrap();
+            t.quad = [[0.0, 0.0], [bad, 0.0], [bad, bad], [0.0, bad]];
+            let (shown, key) = crate::canvas::display_doc(&mut app, 0);
+            let moved = crate::transform_live::cpu_doc(&mut app, shown, key);
+            let id = app.session.active().unwrap().active_layer.unwrap();
+            let s = moved.layer(id).and_then(|l| l.surface()).unwrap();
+            assert!(s.content_bounds().width() <= 4096, "{bad}: nothing sized by the box");
+        }
+    }
+
     /// A box past the horizon or a degenerate one draws only what's in front; a linked mask moves
     /// with the pixels (its moved copy is in the source), an unlinked one stays in the layer.
     #[test]
