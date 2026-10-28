@@ -1093,3 +1093,29 @@ fn opening_an_open_file_again_shows_its_tab() {
         let _ = std::fs::remove_dir_all(&d);
     }
 }
+
+/// An Open as Layers manifest dropped on the canvas opens its files as layers of a new document;
+/// it is never queued for Place Embedded.
+#[test]
+fn open_as_layers_manifest_dropped_onto_the_canvas_is_opened_not_placed() {
+    let dir = std::env::temp_dir().join(format!("photocraft-drop-stack-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let (a, b) = (dir.join("top.png"), dir.join("bottom.png"));
+    std::fs::write(&a, png_bytes(6, 4)).unwrap();
+    std::fs::write(&b, png_bytes(8, 8)).unwrap();
+    let stack = dir.join("set.pcstack");
+    std::fs::write(&stack, json!({"kind": "photocraft-open-as-layers", "version": 1, "files": [a, b]}).to_string()).unwrap();
+    let ctx = egui::Context::default();
+    let mut app = app_with_canvas();
+    let (layers, steps) = (layer_count(&app), history_steps(&app));
+    app.open_dropped(&ctx, vec![dropped(stack, Err("egui's reader must not be used".into()))], Some(egui::pos2(400.0, 300.0)));
+    assert!(app.drop_places.is_empty(), "not queued for Place");
+    assert!(app.ui.transform.is_none());
+    assert!(app.ui.notices.is_empty(), "{:?}", app.ui.notices.iter().map(|n| &n.title).collect::<Vec<_>>());
+    assert_eq!(app.session.documents().len(), 2);
+    assert_eq!(app.session.documents()[0].doc.layers.len(), layers, "the canvas document is unchanged");
+    assert_eq!(app.session.documents()[0].history.past_len(), steps);
+    let names: Vec<String> = app.session.active().unwrap().doc.layers.iter().map(|l| l.name.clone()).collect();
+    assert_eq!(names, ["bottom", "top"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}

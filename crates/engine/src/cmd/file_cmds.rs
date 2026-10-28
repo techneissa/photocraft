@@ -24,6 +24,7 @@ mod batch_run;
 mod export;
 mod info;
 mod open;
+pub(crate) mod open_as_layers;
 mod paths;
 mod processing;
 mod save;
