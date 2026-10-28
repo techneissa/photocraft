@@ -443,7 +443,7 @@ mod shortcuts;
 mod store;
 mod validate;
 
-pub use chords::{check_chord, check_when, chord_steps, clashes, damaged as damaged_when, normalize_chord, when_of};
+pub use chords::{can_overlap, check_chord, check_when, chord_steps, clashes, damaged as damaged_when, normalize_chord, when_of};
 pub use cmds::specs;
 #[cfg(test)]
 pub(crate) use files::write_files_atomically;

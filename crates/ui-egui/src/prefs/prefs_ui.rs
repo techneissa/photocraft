@@ -68,6 +68,9 @@ mod graphics;
 mod save;
 mod shortcut_target;
 mod shortcuts;
+mod shortcuts_backup;
+mod shortcuts_chord;
+mod shortcuts_when;
 mod startup;
 
 #[cfg(test)]
@@ -109,6 +112,8 @@ mod recovery_tests;
 mod shortcut_capture_tests;
 #[cfg(test)]
 mod shortcut_set_tests;
+#[cfg(test)]
+mod shortcuts_upgrade_tests;
 
 #[cfg(test)]
 mod tests;

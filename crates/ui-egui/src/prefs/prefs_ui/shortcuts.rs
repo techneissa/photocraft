@@ -117,7 +117,7 @@ fn modifier_key_modifiers(key: egui::Key) -> egui::Modifiers {
     }
 }
 
-fn capture_mods_field(v: Option<&Value>) -> egui::Modifiers {
+pub(super) fn capture_mods_field(v: Option<&Value>) -> egui::Modifiers {
     let o = v.and_then(Value::as_object);
     egui::Modifiers {
         shift: o.and_then(|o| o.get("shift")).and_then(Value::as_bool).unwrap_or(false),
@@ -128,7 +128,7 @@ fn capture_mods_field(v: Option<&Value>) -> egui::Modifiers {
     }
 }
 
-fn capture_mods_json(m: egui::Modifiers) -> Value {
+pub(super) fn capture_mods_json(m: egui::Modifiers) -> Value {
     json!({
         "shift": m.shift,
         "ctrl": m.ctrl,
@@ -183,10 +183,12 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
             if crate::widgets::pill_tab(ui, name, tab == i as u64).clicked() {
                 tab = i as u64;
                 f.insert("capture".into(), json!(false));
+                f.insert("captureChord".into(), json!(false));
             }
         }
     });
     f.insert("tab".into(), json!(tab));
+    super::shortcuts_chord::capture(app, ui, f);
     ui.add_space(6.0);
     if tab == 2 {
         toolbar_tab(ui, f);
@@ -202,6 +204,10 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     let alternates_ok = parsed_alts.as_ref().is_none_or(Result::is_ok);
     let mut alt_overrides = parsed_alts.and_then(Result::ok).unwrap_or_default();
     let mut capture_alt = f.get("captureAlt").and_then(Value::as_bool).unwrap_or(false);
+    // Chords and When conditions (command id → text), and the condition being typed.
+    let mut chords = super::shortcuts_chord::load_map(f);
+    let mut whens = super::shortcuts_when::load_map(f);
+    let mut when_edit = super::shortcuts_when::load(f);
     // A key just assigned that another command holds: Photoshop's Accept and Go to Conflict /
     // Undo Changes (an object: the key, the other command, and this one's keys before).
     let mut conflict: Option<Value> = f.get("conflict").filter(|c| c.is_object()).cloned();
@@ -274,6 +280,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     .filter(|(id, _, _, def)| {
                         let cur = eff(&overrides, id, def);
                         *id != selected
+                            && prefs::can_overlap(&whens, id, &selected)
                             && (cur.as_deref().and_then(prefs::normalize_shortcut) == Some(sc.clone())
                                 || eff_alts(&alt_overrides, id, cur.as_deref()).contains(&sc))
                     })
@@ -328,7 +335,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     let reveal = f.remove("reveal").is_some();
     egui::ScrollArea::vertical().max_height(420.0).id_salt("shortcuts-scroll").show(ui, |ui| {
         let mut last_top = String::new();
-        egui::Grid::new("shortcut-grid").num_columns(3).spacing([12.0, 3.0]).striped(true).show(ui, |ui| {
+        egui::Grid::new("shortcut-grid").num_columns(4).spacing([12.0, 3.0]).striped(true).show(ui, |ui| {
             for (id, label, path, def) in &items {
                 if tab == 1 && crate::tool_shortcuts::tool(id).is_some() {
                     continue;
@@ -349,6 +356,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                 let top = shown_path.first().cloned().unwrap_or_else(|| tl!("Other").into());
                 if top != last_top {
                     ui.label(RichText::new(&top).font(crate::theme::semibold(12.5)).color(t.text));
+                    ui.label("");
                     ui.label("");
                     ui.label("");
                     ui.end_row();
@@ -397,6 +405,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                                 message_warning = false;
                             }
                         }
+                        super::shortcuts_chord::chip(ui, &t, id, &mut chords, &mut selected);
                         if sel && capture && capture_alt {
                             ui.label(RichText::new(tl!("Press keys…")).size(11.0).color(t.accent_text));
                         }
@@ -404,6 +413,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                             ui.label(RichText::new(tl!("modified")).color(t.text_faint).size(10.5));
                         }
                     });
+                    super::shortcuts_when::cell(ui, &t, id, &name, &mut whens, &mut when_edit, &mut selected);
                 } else {
                     // Edit › Menus, Keyboard Shortcuts, Preferences, Save and Exit always stay (#5096).
                     let hideable = photocraft_engine::prefs::MenuCustomization::hideable(id);
@@ -438,9 +448,12 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                 message.clear();
                 message_warning = false;
             }
+            capture &= !super::shortcuts_chord::add_button(ui, f, has_sel);
             if ui.add_enabled(has_sel, egui::Button::new(tl!("Use Default"))).clicked() {
                 overrides.remove(&selected);
                 alt_overrides.remove(&selected);
+                chords.remove(&selected);
+                whens.remove(&selected);
                 message = tl!("Default restored.").into();
                 message_warning = false;
             }
@@ -452,6 +465,8 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
             if ui.button(tl!("Reset All to Defaults")).clicked() {
                 overrides.clear();
                 alt_overrides.clear();
+                chords.clear();
+                whens.clear();
                 message = tl!("All shortcuts reset to PhotoCraft defaults.").into();
                 message_warning = false;
             }
@@ -468,6 +483,8 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
         hidden.clear();
         colors.clear();
     }
+    super::shortcuts_when::strip(ui, &t, tab, &items, &mut whens, &mut when_edit);
+    (message, message_warning) = super::shortcuts_when::notes(&items, f, &whens, &overrides, &alt_overrides, (message, message_warning));
     if !message.is_empty() {
         ui.label(RichText::new(&message).color(if message_warning { t.warning } else { t.text_dim }));
     }
@@ -518,6 +535,10 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
             }
         });
     }
+    super::shortcuts_chord::conflict_row(ui, f, &mut chords, (&mut selected, &mut filter), (&mut message, &mut message_warning));
+    super::shortcuts_when::store(f, &when_edit);
+    f.insert("chords".into(), json!(chords));
+    f.insert("when".into(), json!(whens));
     if overrides_ok {
         f.insert("overrides".into(), json!(overrides));
     }
@@ -545,7 +566,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
 
 /// A command's keys as the dialog stands, main key first: the edited main key (or its default)
 /// and its further keys.
-fn dialog_keys(overrides: &BTreeMap<String, String>, alternates: &BTreeMap<String, Vec<String>>, id: &str, default: Option<&str>) -> Vec<String> {
+pub(super) fn dialog_keys(overrides: &BTreeMap<String, String>, alternates: &BTreeMap<String, Vec<String>>, id: &str, default: Option<&str>) -> Vec<String> {
     let main = match overrides.get(id) {
         Some(s) if s.is_empty() => None,
         Some(s) => Some(s.as_str()),
@@ -594,6 +615,7 @@ fn set_row(
     let set_label = if active.is_empty() { defaults.clone() } else { active.clone() };
     let mut export = false;
     let mut summarize = false;
+    let mut json_files = (false, false);
     ui.horizontal(|ui| {
         ui.label(tl!("Set:"));
         let mut chosen = active.clone();
@@ -620,7 +642,9 @@ fn set_row(
         }
         export = ui.button(tl!("Export…")).on_hover_text(tl!("Save these shortcuts as a .kys file")).clicked();
         summarize = ui.button(tl!("Summarize…")).on_hover_text(tl!("Save a list of these shortcuts as a web page")).clicked();
+        json_files = super::shortcuts_backup::icons(ui);
     });
+    super::shortcuts_backup::run(app, f, json_files, (message, warning));
     if let Some(name) = new_name.as_mut() {
         let mut create = false;
         let mut cancel = false;
@@ -691,7 +715,7 @@ fn set_row(
 }
 
 /// Save `text` through the save dialog under the suggested file name.
-fn save_text(app: &mut PhotocraftApp, suggested: &str, text: String) -> Result<Value, String> {
+pub(super) fn save_text(app: &mut PhotocraftApp, suggested: &str, text: String) -> Result<Value, String> {
     // A set name can hold characters a file name can't.
     let name: String = suggested.chars().map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c }).collect();
     app.pick_save(&name, move |app, path| {

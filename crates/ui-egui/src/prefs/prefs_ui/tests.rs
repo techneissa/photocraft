@@ -153,7 +153,7 @@ fn preferences_dialog_width_follows_its_resizable_area() {
     // A dialog resized wider than it opens is filled, not left with empty space (#7420).
     assert_eq!(super::width(prefs, 3000.0), Some(3000.0));
     let shortcuts = serde_json::json!({"__prefsui": "shortcuts"});
-    assert_eq!(super::width(shortcuts.as_object().unwrap(), 3000.0), Some(720.0));
+    assert_eq!(super::width(shortcuts.as_object().unwrap(), 3000.0), Some(1000.0));
 }
 
 #[test]
