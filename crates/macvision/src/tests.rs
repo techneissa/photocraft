@@ -1,7 +1,7 @@
 //! Tests of the pure parts and of the public API on every platform; the Vision tests are in
 //! `mac_tests` (macOS only).
 
-use crate::scale::{Layout, box_downscale_rgba, coverage, read_mask};
+use crate::scale::{Layout, MIN_SIDE, box_downscale_rgba, coverage, read_mask, too_thin};
 use crate::{Error, MAX_INPUT_PIXELS, MAX_VISION_PIXELS, Mask, available, subject_mask, vision_size};
 
 fn mask(w: u32, h: u32, f: impl Fn(u32, u32) -> u8) -> Mask {
@@ -151,4 +151,23 @@ fn every_error_has_a_message() {
         assert!(!e.to_string().is_empty());
     }
     assert!(Error::Os("boom".into()).to_string().contains("boom"));
+}
+
+#[test]
+fn pictures_under_eight_pixels_on_a_side_are_too_thin() {
+    assert_eq!(MIN_SIDE, 8);
+    assert!(too_thin(7, 1000) && too_thin(1000, 7) && too_thin(0, 0));
+    assert!(!too_thin(8, 8) && !too_thin(4000, 1000));
+    // The size Vision would get for a huge strip is thin too.
+    let (w, h) = vision_size(1_000_000, 8);
+    assert!(too_thin(w, h), "{w}×{h}");
+}
+
+#[test]
+fn absurd_sizes_are_refused_not_overflowed() {
+    assert!(box_downscale_rgba(&[], (u32::MAX, u32::MAX), (2, 2)).is_none());
+    assert!(box_downscale_rgba(&[0; 16], (2, 2), (u32::MAX, u32::MAX)).is_none());
+    assert!(Mask { width: u32::MAX, height: u32::MAX, data: vec![0; 4] }.resized(2, 2).is_none());
+    assert!(Mask { width: 2, height: 2, data: vec![0; 4] }.resized(u32::MAX, u32::MAX).is_none());
+    assert!(Mask { width: 2, height: 2, data: vec![0; 4] }.resized(1 << 20, 1 << 20).is_none(), "past the pixel cap");
 }

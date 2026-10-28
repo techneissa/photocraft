@@ -23,20 +23,20 @@ fn mean(m: &Mask, x0: u32, y0: u32, x1: u32, y1: u32) -> f32 {
     sum as f32 / ((x1 - x0) * (y1 - y0)) as f32 / 255.0
 }
 
-/// A smooth warm-grey backdrop with a "person": a head and a torso with shirt folds and a face, so
-/// it has what a subject detector looks for. Deterministic.
-fn figure(w: u32, h: u32) -> Vec<u8> {
-    let (cx, head_cy, head_r) = (w as f32 * 0.5, h as f32 * 0.30, w as f32 * 0.11);
+/// A smooth warm-grey backdrop with a "person" drawn inside the box `(bx, by, bw, bh)`: a head and a
+/// torso with shirt folds and a face, so it has what a subject detector looks for. Deterministic.
+fn figure_in(w: u32, h: u32, (bx, by, bw, bh): (u32, u32, u32, u32)) -> Vec<u8> {
+    let (cx, head_cy, head_r) = (bx as f32 + bw as f32 * 0.5, by as f32 + bh as f32 * 0.30, bw as f32 * 0.11);
+    let (shoulder, torso_end) = (by as f32 + bh as f32 * 0.45, by as f32 + bh as f32 * 0.95);
     let mut out = Vec::with_capacity((w * h * 4) as usize);
     for y in 0..h {
         for x in 0..w {
             let (fx, fy) = (x as f32, y as f32);
             let bg = 200.0 - 30.0 * (fy / h as f32);
             let in_head = (fx - cx).powi(2) + (fy - head_cy).powi(2) < head_r.powi(2);
-            let shoulder = h as f32 * 0.45;
-            let half_w = w as f32 * (0.14 + 0.16 * ((fy - shoulder) / (h as f32 * 0.1)).clamp(0.0, 1.0));
-            let in_neck = (fx - cx).abs() < w as f32 * 0.04 && fy > head_cy && fy < shoulder;
-            let in_torso = fy >= shoulder && fy < h as f32 * 0.95 && (fx - cx).abs() < half_w;
+            let half_w = bw as f32 * (0.14 + 0.16 * ((fy - shoulder) / (bh as f32 * 0.1)).clamp(0.0, 1.0));
+            let in_neck = (fx - cx).abs() < bw as f32 * 0.04 && fy > head_cy && fy < shoulder;
+            let in_torso = fy >= shoulder && fy < torso_end && (fx - cx).abs() < half_w;
             let px = if in_head {
                 let eye = ((fx - cx).abs() - head_r * 0.4).powi(2) + (fy - head_cy + head_r * 0.15).powi(2) < (head_r * 0.1).powi(2);
                 if eye { [60, 40, 30] } else { [225, 175, 140] }
@@ -52,6 +52,10 @@ fn figure(w: u32, h: u32) -> Vec<u8> {
         }
     }
     out
+}
+
+fn figure(w: u32, h: u32) -> Vec<u8> {
+    figure_in(w, h, (0, 0, w, h))
 }
 
 #[test]
@@ -90,14 +94,6 @@ fn a_flat_picture_has_no_subject() {
 }
 
 #[test]
-fn a_tiny_picture_is_refused_not_thrown_at_vision() {
-    if !available() {
-        return;
-    }
-    assert_eq!(subject_mask(&[0; 4 * 4 * 4], 4, 4), Err(Error::BadInput));
-}
-
-#[test]
 fn a_real_portrait_is_cut_out_whole() {
     let Some(path) = std::env::var_os("PHOTOCRAFT_MACVISION_IMAGE").map(PathBuf::from).filter(|p| p.is_file()) else {
         eprintln!("skip: set PHOTOCRAFT_MACVISION_IMAGE to a portrait (JPEG or PNG)");
@@ -122,4 +118,37 @@ fn a_real_portrait_is_cut_out_whole() {
         let out = dir.join("mask.png");
         image::GrayImage::from_raw(w, h, m.data).map(|g| g.save(&out)).transpose().unwrap_or_else(|e| panic!("{}: {e}", out.display()));
     }
+}
+
+/// Which way up the mask is: a subject only in the top 15 % of the picture comes back there and
+/// nothing in the bottom 15 % (a flipped mask would swap them); the mirror image at the bottom too.
+#[test]
+fn a_subject_at_the_top_stays_at_the_top_and_at_the_bottom_at_the_bottom() {
+    if !available() {
+        eprintln!("skip: no Vision subject request on this Mac");
+        return;
+    }
+    let (w, h, bw, bh) = (640u32, 800u32, 300u32, 120u32);
+    let bx = (w - bw) / 2;
+    // The torso of the figure drawn in `by..by + bh`: its middle, away from the edges.
+    let torso = |m: &Mask, by: u32| mean(m, 320 - bw / 8, by + bh * 6 / 10, 320 + bw / 8, by + bh * 9 / 10);
+    let top = subject_mask(&figure_in(w, h, (bx, 0, bw, bh)), w, h).unwrap_or_else(|e| panic!("{e}"));
+    assert!(torso(&top, 0) > 0.9, "the figure is covered at the top: {}", torso(&top, 0));
+    assert!(mean(&top, 0, h - h * 15 / 100, w, h) < 0.01, "nothing in the bottom 15 %");
+    let by = h - bh;
+    let bottom = subject_mask(&figure_in(w, h, (bx, by, bw, bh)), w, h).unwrap_or_else(|e| panic!("{e}"));
+    assert!(torso(&bottom, by) > 0.9, "the figure is covered at the bottom: {}", torso(&bottom, by));
+    assert!(mean(&bottom, 0, 0, w, h * 15 / 100) < 0.01, "nothing in the top 15 %");
+}
+
+#[test]
+fn a_strip_too_thin_for_vision_is_no_subject_not_a_failure() {
+    if !available() {
+        return;
+    }
+    for (w, h) in [(3000u32, 5u32), (7, 400), (1, 1)] {
+        assert_eq!(subject_mask(&vec![128; (w * h * 4) as usize], w, h), Err(Error::NoSubject), "{w}×{h}");
+    }
+    // A strip that is only thin once shrunk: 1 000 000 × 8 is past the pixel budget.
+    assert_eq!(subject_mask(&vec![128; 1_000_000 * 8 * 4], 1_000_000, 8), Err(Error::NoSubject));
 }

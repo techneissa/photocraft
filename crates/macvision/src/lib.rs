@@ -55,7 +55,8 @@ impl Mask {
 pub enum Error {
     /// Not a Mac, or macOS older than 12 (no subject cutout there).
     Unavailable,
-    /// Vision ran and found no foreground subject.
+    /// Vision ran and found no foreground subject, or the picture is a strip too thin (under 8
+    /// pixels on a side) to hold one.
     NoSubject,
     /// The pixel buffer does not match `width × height × 4`, or the picture is empty or past
     /// [`MAX_INPUT_PIXELS`].
@@ -85,7 +86,8 @@ pub fn available() -> bool {
 
 /// Cut the subject out of `rgba` (straight RGBA, 8 bits, `width × height` pixels, row-major) as a
 /// coverage mask of the same size. Pictures past [`MAX_VISION_PIXELS`] are shrunk for Vision and
-/// the mask scaled back up. Runs for about a second; call it off the UI thread when there is one.
+/// the mask scaled back up. A picture under 8 pixels on a side (after shrinking) is
+/// [`Error::NoSubject`]. Runs for about a second; call it off the UI thread when there is one.
 pub fn subject_mask(rgba: &[u8], width: u32, height: u32) -> Result<Mask, Error> {
     let px = u64::from(width) * u64::from(height);
     if width == 0 || height == 0 || px > MAX_INPUT_PIXELS || rgba.len() as u64 != px * 4 {
@@ -95,6 +97,11 @@ pub fn subject_mask(rgba: &[u8], width: u32, height: u32) -> Result<Mask, Error>
         return Err(Error::Unavailable);
     }
     let (vw, vh) = vision_size(width, height);
+    // A strip too thin for Vision (here or once shrunk) has no room for a subject: that is no
+    // subject found, not a failure.
+    if scale::too_thin(vw, vh) {
+        return Err(Error::NoSubject);
+    }
     if (vw, vh) == (width, height) {
         return imp::subject_mask(rgba, width, height);
     }
