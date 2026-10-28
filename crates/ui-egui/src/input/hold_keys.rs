@@ -174,6 +174,10 @@ fn held(i: &InputState, sc: &KeyboardShortcut) -> bool {
 /// Space). Never while a text field has the keyboard, or while editing type on the canvas
 /// (Space must insert a space, not grab the Hand tool).
 pub fn held_tool(app: &PhotocraftApp, ctx: &egui::Context) -> Option<Temporary> {
+    // An open dropdown list takes the typing of its search: Space is a space, not the Hand tool.
+    if crate::widgets::dropdown_list_open(ctx) {
+        return None;
+    }
     if ctx.text_edit_focused() || app.ui.text_edit.is_some() {
         return None;
     }
@@ -216,11 +220,17 @@ pub fn erases_while_held(t: Tool) -> bool {
 /// Is the erase key (`~` by default) held with a tool that [`erases_while_held`]? Never while a
 /// text field has the keyboard.
 pub fn erase_held(app: &PhotocraftApp, ctx: &egui::Context) -> bool {
+    if crate::widgets::dropdown_list_open(ctx) {
+        return false;
+    }
     erases_while_held(app.ui.tool) && !ctx.text_edit_focused() && binding_of(app, ERASE).is_some_and(|sc| ctx.input(|i| held(i, &sc)))
 }
 
 /// Is the reposition key (the Hand key, any modifiers) down?
 pub fn reposition_held(app: &PhotocraftApp, ctx: &egui::Context) -> bool {
+    if crate::widgets::dropdown_list_open(ctx) {
+        return false;
+    }
     !ctx.text_edit_focused() && app.ui.text_edit.is_none() && binding(app, Temporary::Hand).is_some_and(|sc| ctx.input(|i| i.key_down(sc.logical_key)))
 }
 

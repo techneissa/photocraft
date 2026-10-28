@@ -46,8 +46,8 @@ fn arrow_keys_step_the_open_blend_mode_dropdown_without_nudging_the_layer() {
     assert_eq!(layer(&h).0, BlendMode::Normal);
 }
 
-/// #1481: with the Blend Mode list open, a letter picks the next mode starting with it (as in
-/// Photoshop's pop-up menus) instead of reaching the tool shortcuts, and ↩ closes the list.
+/// #1481: with the Blend Mode list open, typing goes to the list (it narrows to the matching modes,
+/// `dropdown_search`) instead of the tool shortcuts, and ↩ picks the first match and closes the list.
 #[test]
 fn letters_pick_blend_modes_in_the_open_list_without_switching_tools() {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
@@ -74,17 +74,17 @@ fn letters_pick_blend_modes_in_the_open_list_without_switching_tools() {
     };
     h.query_all_by_role(Role::ComboBox).find(|n| named(n)).expect("the Layers panel's Blend Mode dropdown").click();
     h.run_steps(2);
+    // M is the Marquee tool's key: typed into the list it narrows it instead.
     type_key(&mut h, egui::Key::M, "m");
-    assert_eq!(blend(&h), BlendMode::Multiply, "M picks Multiply");
+    type_key(&mut h, egui::Key::U, "u");
+    assert_eq!(blend(&h), BlendMode::Normal, "typing picks nothing by itself");
     assert_eq!(h.state().ui.tool, Tool::Move, "M doesn't also pick the Marquee tool");
-    type_key(&mut h, egui::Key::D, "d");
-    assert_eq!(blend(&h), BlendMode::DarkerColor, "D picks the next mode starting with D");
-    type_key(&mut h, egui::Key::D, "d");
-    assert_eq!(blend(&h), BlendMode::Difference, "D again picks the one after");
+    assert!(h.query_by_label("Multiply").is_some() && h.query_by_label("Screen").is_none(), "the list narrowed to the modes with \"mu\"");
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
     assert!(!crate::widgets::dropdown_list_open(&h.ctx), "↩ closes the list");
-    assert_eq!(blend(&h), BlendMode::Difference, "↩ keeps the mode");
+    assert_eq!(blend(&h), BlendMode::Multiply, "↩ picks the first match, Multiply");
+    assert_eq!(h.state().ui.tool, Tool::Move);
     // With the list closed the letters are the tools' again.
     h.key_press(egui::Key::M);
     h.event(egui::Event::Text("m".into()));

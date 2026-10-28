@@ -10,11 +10,23 @@ use serde_json::json;
 
 use crate::PhotocraftApp;
 
-/// The app with a new document after `setup` (its last layer is the active one).
+/// The app with a new document after `setup` (its last layer is the active one), with the wheel
+/// stepping blend modes on (Preferences › Interface; off by default).
 fn harness(setup: impl FnOnce(&mut PhotocraftApp) + 'static) -> Harness<'static, PhotocraftApp> {
-    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
+    harness_sized(vec2(1440.0, 900.0), setup)
+}
+
+/// [`harness`] in a window of `size`.
+fn harness_sized(size: egui::Vec2, setup: impl FnOnce(&mut PhotocraftApp) + 'static) -> Harness<'static, PhotocraftApp> {
+    harness_with(size, true, setup)
+}
+
+/// [`harness`] in a window of `size`, the wheel preference `wheel_steps`.
+pub(crate) fn harness_with(size: egui::Vec2, wheel_steps: bool, setup: impl FnOnce(&mut PhotocraftApp) + 'static) -> Harness<'static, PhotocraftApp> {
+    let mut h = Harness::builder().with_size(size).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.session.edit_prefs(|p| p.interface.scroll_wheel_changes_blend_mode = wheel_steps);
         app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
         setup(&mut app);
         app
@@ -24,27 +36,27 @@ fn harness(setup: impl FnOnce(&mut PhotocraftApp) + 'static) -> Harness<'static,
 }
 
 /// A filled pixel layer above the Background, active.
-fn pixel_layer(app: &mut PhotocraftApp) {
+pub(crate) fn pixel_layer(app: &mut PhotocraftApp) {
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("edit.fill", json!({"color": "#cc3366"})).unwrap();
 }
 
-fn blend(h: &Harness<'_, PhotocraftApp>) -> BlendMode {
+pub(crate) fn blend(h: &Harness<'_, PhotocraftApp>) -> BlendMode {
     let st = h.state().session.active().unwrap();
     st.doc.layer(st.active_layer.unwrap()).unwrap().blend
 }
 
-fn steps(h: &Harness<'_, PhotocraftApp>) -> usize {
+pub(crate) fn steps(h: &Harness<'_, PhotocraftApp>) -> usize {
     h.state().session.active().unwrap().history.past_len()
 }
 
 /// The Layers panel's dropdown: the lowest one (the options bar and the title bar have some too).
-fn dropdown(h: &Harness<'_, PhotocraftApp>) -> Rect {
+pub(crate) fn dropdown(h: &Harness<'_, PhotocraftApp>) -> Rect {
     h.query_all_by_role(Role::ComboBox).map(|n| n.rect()).max_by(|a, b| a.top().total_cmp(&b.top())).unwrap()
 }
 
 /// `lines` wheel lines at `at` in one event: negative is down.
-fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, lines: f32) {
+pub(crate) fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, lines: f32) {
     h.hover_at(at);
     h.run_steps(1);
     h.event(egui::Event::MouseWheel {
@@ -133,7 +145,7 @@ fn the_wheel_leaves_the_greyed_background_blend_mode_alone() {
     assert_eq!((blend(&h), steps(&h)), (BlendMode::Normal, undo));
 }
 
-fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2) {
+pub(crate) fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2) {
     h.hover_at(at);
     h.run_steps(1);
     for pressed in [true, false] {
@@ -143,8 +155,15 @@ fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2) {
     h.run_steps(2);
 }
 
+/// The open list's frame: the popup area above the panels that holds the "Normal" entry.
+fn open_list(h: &Harness<'_, PhotocraftApp>) -> Rect {
+    let normal = entry(h, "Normal").center();
+    let layer = h.ctx.layer_id_at(normal).expect("the open list is a popup area");
+    h.ctx.memory(|m| m.area_rect(layer.id)).expect("the open list is a popup area")
+}
+
 /// Where the entry `label` of the open list is (also when it is scrolled out of sight).
-fn entry(h: &Harness<'_, PhotocraftApp>, label: &str) -> Rect {
+pub(crate) fn entry(h: &Harness<'_, PhotocraftApp>, label: &str) -> Rect {
     h.get_by_label(label).rect()
 }
 
@@ -166,16 +185,19 @@ fn wheel_steps_in_the_open_list_keep_the_chosen_mode_in_view() {
     let mut h = harness(pixel_layer);
     let at = dropdown(&h).center();
     click(&mut h, at);
-    // Unscrolled, the list shows its first entry at the top and is at most 420 pt tall.
-    let (top, darken) = (entry(&h, "Normal").top(), entry(&h, "Darken").center());
+    // The list holds at most what fits below the box in the window: it scrolls, so the chosen mode
+    // must stay inside it.
+    let list = open_list(&h);
+    assert!(list.height() < 27.0 * 20.0, "a 900 pt window can't show every mode: {list:?}");
+    let darken = entry(&h, "Darken").center();
     for _ in 0..22 {
         wheel(&mut h, darken, -1.0);
     }
     h.run_steps(30);
     assert_eq!(blend(&h), BlendMode::Divide);
-    let in_view = |r: Rect| r.top() >= top - 0.5 && r.bottom() <= top + 420.0 + 0.5;
+    let in_view = |r: Rect| r.top() >= list.top() - 0.5 && r.bottom() <= list.bottom() + 0.5;
     let chosen = entry(&h, "Divide");
-    assert!(in_view(chosen), "{chosen:?} in view below {top}");
+    assert!(in_view(chosen), "{chosen:?} in view of {list:?}");
     // The wheel over the button scrolls the open list along too.
     for _ in 0..21 {
         wheel(&mut h, at, 1.0);
@@ -183,7 +205,7 @@ fn wheel_steps_in_the_open_list_keep_the_chosen_mode_in_view() {
     h.run_steps(30);
     assert_eq!(blend(&h), BlendMode::Dissolve);
     let chosen = entry(&h, "Dissolve");
-    assert!(in_view(chosen), "{chosen:?} in view below {top}");
+    assert!(in_view(chosen), "{chosen:?} in view of {list:?}");
 }
 
 /// The mode the canvas previews on the active layer, if any (#970).
@@ -211,4 +233,47 @@ fn a_wheel_step_ends_the_hover_preview_until_the_pointer_moves() {
     h.hover_at(multiply);
     h.run_steps(3);
     assert_eq!(previewed(&mut h), Some(BlendMode::Multiply), "a moved pointer previews again");
+}
+
+/// Every mode the Layers panel's list offers for a layer.
+fn every_mode() -> Vec<&'static str> {
+    BlendMode::LAYER_MODES.iter().map(|m| m.label()).collect()
+}
+
+#[test]
+fn a_tall_window_shows_every_blend_mode_without_scrolling() {
+    // #7261: the list stopped at 14 rows (420 pt), so Soft Light and the rest hid behind a scroll bar.
+    let mut h = harness_sized(vec2(1440.0, 1500.0), pixel_layer);
+    let at = dropdown(&h).center();
+    click(&mut h, at);
+    let (list, window) = (open_list(&h), Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 1500.0)));
+    assert!(window.contains_rect(list), "the list {list:?} is inside the window");
+    let modes = every_mode();
+    assert_eq!(modes.len(), 27);
+    for label in modes {
+        // "Color" is also the Color panel's tab: the row is the one under the box.
+        let below = dropdown(&h).bottom();
+        let row = h.query_all_by_label(label).map(|n| n.rect()).find(|r| r.top() >= below).unwrap_or_else(|| panic!("{label} has a row"));
+        assert!(list.contains_rect(row), "{label} {row:?} is inside the list {list:?}");
+    }
+    assert!(list.top() >= dropdown(&h).bottom(), "the list opens below its box, not over it");
+}
+
+#[test]
+fn a_short_window_still_scrolls_the_blend_list_inside_the_window() {
+    let mut h = harness_sized(vec2(1440.0, 500.0), pixel_layer);
+    let at = dropdown(&h).center();
+    click(&mut h, at);
+    let (list, window) = (open_list(&h), Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 500.0)));
+    assert!(window.contains_rect(list), "the list {list:?} stays inside the window");
+    let last = entry(&h, "Luminosity");
+    assert!(last.bottom() > list.bottom(), "the last mode {last:?} is below the list {list:?}: it scrolls");
+    // The wheel over the list still reaches it.
+    let darken = entry(&h, "Darken").center();
+    for _ in 0..30 {
+        wheel(&mut h, darken, -1.0);
+    }
+    h.run_steps(30);
+    assert_eq!(blend(&h), BlendMode::Luminosity);
+    assert!(list.contains_rect(entry(&h, "Luminosity")), "the last mode scrolled into the list");
 }

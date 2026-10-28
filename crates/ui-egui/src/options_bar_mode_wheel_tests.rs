@@ -12,11 +12,18 @@ use serde_json::json;
 use crate::PhotocraftApp;
 use crate::state::Tool;
 
-/// The app with a new document and `tool` chosen.
+/// The app with a new document and `tool` chosen, the wheel stepping blend modes on (Preferences ›
+/// Interface; off by default).
 fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
+    harness_with(tool, true)
+}
+
+/// [`harness`] with the wheel preference `wheel_steps`.
+pub(crate) fn harness_with(tool: Tool, wheel_steps: bool) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.session.edit_prefs(|p| p.interface.scroll_wheel_changes_blend_mode = wheel_steps);
         app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
         app.ui.tool = tool;
         app
@@ -26,12 +33,12 @@ fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
 }
 
 /// The options bar's Mode dropdown: the highest one showing `Normal` (the Layers panel's is lower).
-fn mode_dropdown(h: &Harness<'_, PhotocraftApp>) -> Rect {
+pub(crate) fn mode_dropdown(h: &Harness<'_, PhotocraftApp>) -> Rect {
     h.query_all_by_role(Role::ComboBox).filter(|n| n.value().as_deref() == Some("Normal")).map(|n| n.rect()).min_by(|a, b| a.top().total_cmp(&b.top())).unwrap()
 }
 
 /// `lines` wheel lines at `at` in one event: negative is down.
-fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, lines: f32) {
+pub(crate) fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, lines: f32) {
     h.hover_at(at);
     h.run_steps(1);
     h.event(egui::Event::MouseWheel {
@@ -44,7 +51,7 @@ fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, lines: f32) {
     h.run_steps(3);
 }
 
-fn brush_mode(h: &Harness<'_, PhotocraftApp>) -> BlendMode {
+pub(crate) fn brush_mode(h: &Harness<'_, PhotocraftApp>) -> BlendMode {
     h.state().session.tools.brush.mode
 }
 
