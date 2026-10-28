@@ -129,9 +129,8 @@ mod tests {
         h.event(egui::Event::Text(text.into()));
     }
 
-    /// Typing in an open list narrows it now (`dropdown_search`); ↩ picks the first match and closes it.
     #[test]
-    fn letters_narrow_the_open_list_and_enter_picks_and_closes_it() {
+    fn letters_pick_options_of_the_open_list_and_enter_closes_it() {
         use egui::accesskit::Role;
         use egui_kittest::{Harness, kittest::Queryable};
 
@@ -150,15 +149,17 @@ mod tests {
         h.run();
         type_key(&h, egui::Key::D, "D");
         h.run();
-        assert_eq!(*h.state(), 0, "D picks nothing by itself");
-        assert!(h.query_by_label("Multiply").is_none(), "D leaves the options with a D");
+        assert_eq!(*h.state(), 0, "D narrows the list to the options with a D (dropdown_search) and picks nothing by itself");
+        assert!(h.query_by_label("Multiply").is_none());
+        type_key(&h, egui::Key::A, "a");
+        h.run();
         assert!(super::list_open(&h.ctx), "the list stays open while typing");
         h.key_press(egui::Key::Enter);
         h.run();
         h.run();
-        assert_eq!(*h.state(), 1, "↩ picks the first match");
+        assert_eq!(*h.state(), 2, "↩ picks the first match of \"da\", Darken");
         assert!(!super::list_open(&h.ctx), "↩ closes the list");
-        // Opened again, the letters typed before are forgotten: M finds Multiply.
+        // Opened again, the letters typed before are forgotten: M finds Multiply, ↩ picks it.
         h.get_by_role(Role::ComboBox).click();
         h.run();
         type_key(&h, egui::Key::M, "m");

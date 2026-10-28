@@ -243,3 +243,79 @@ fn the_tooltip_dropdown_searches_too() {
     h.run();
     assert_eq!(*h.state(), 2);
 }
+
+#[test]
+fn the_field_is_named_search_and_takes_ime_text() {
+    let mut h = dropdown_harness();
+    open(&mut h);
+    type_text(&mut h, "d");
+    assert!(h.query_by_label("Search").is_some(), "the field has the accessible name Search");
+    h.event(egui::Event::Ime(egui::ImeEvent::Preedit { text: "a".into(), active_range_chars: None }));
+    h.run();
+    h.event(egui::Event::Ime(egui::ImeEvent::Commit("ar".into())));
+    h.run();
+    h.run();
+    assert!(h.query_by_label("Darken").is_some() && h.query_by_label("Dissolve").is_none(), "an IME commit lands in the field");
+}
+
+#[test]
+fn a_composing_ime_shows_the_field_before_any_text_is_typed() {
+    let mut h = dropdown_harness();
+    open(&mut h);
+    assert!(h.query_by_label("Search").is_none(), "no field before typing");
+    h.event(egui::Event::Ime(egui::ImeEvent::Preedit { text: "d".into(), active_range_chars: None }));
+    h.run();
+    h.run();
+    assert!(h.query_by_label("Search").is_some(), "the field shows to take the preedit");
+    assert!(h.query_by_label("Dissolve").is_some() && h.query_by_label("Multiply").is_none(), "the rows follow the preedit text");
+    h.event(egui::Event::Ime(egui::ImeEvent::Commit("dar".into())));
+    h.run();
+    h.run();
+    assert!(h.query_by_label("Darken").is_some() && h.query_by_label("Normal").is_none());
+}
+
+/// Space typed in the search ("linear b") must not turn the canvas into the Hand tool or pan it.
+#[test]
+fn space_while_typing_neither_switches_tools_nor_pans() {
+    use crate::PhotocraftApp;
+    use crate::state::Tool;
+    use egui_kittest::kittest::NodeT;
+    use serde_json::json;
+
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        app.run("layer.new.layer", json!({})).unwrap();
+        app.ui.tool = Tool::Brush;
+        app
+    });
+    h.run_steps(6);
+    let named = |n: &egui_kittest::Node<'_>| n.accesskit_node().value().as_deref() == Some("Normal");
+    h.query_all_by_role(Role::ComboBox).find(|n| named(n)).expect("the Blend Mode dropdown").click();
+    h.run_steps(2);
+    let center = h.state().ui.views[0].center;
+    h.event(egui::Event::Text("linear".into()));
+    h.run_steps(2);
+    let space =
+        |pressed| egui::Event::Key { key: egui::Key::Space, physical_key: Some(egui::Key::Space), pressed, repeat: false, modifiers: egui::Modifiers::NONE };
+    h.event(space(true));
+    h.event(egui::Event::Text(" ".into()));
+    h.run_steps(2);
+    assert_eq!(crate::hold_keys::held_tool(h.state(), &h.ctx), None, "Space held in the open list is not the Hand tool");
+    assert!(!crate::hold_keys::reposition_held(h.state(), &h.ctx));
+    h.event(egui::Event::Text("b".into()));
+    h.run_steps(2);
+    assert!(h.query_by_label("Linear Burn").is_some() && h.query_by_label("Linear Dodge (Add)").is_none(), "\"linear b\" narrows to Linear Burn");
+    assert_eq!(h.state().ui.tool, Tool::Brush);
+    assert_eq!(h.state().ui.views[0].center, center, "the canvas didn't pan");
+    // Closed, the held Space is the Hand tool's again.
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    h.key_press(egui::Key::Escape);
+    h.run_steps(3);
+    assert!(!crate::widgets::dropdown_list_open(&h.ctx));
+    assert_eq!(crate::hold_keys::held_tool(h.state(), &h.ctx), Some(crate::hold_keys::Temporary::Hand));
+    h.event(space(false));
+    h.run_steps(2);
+}

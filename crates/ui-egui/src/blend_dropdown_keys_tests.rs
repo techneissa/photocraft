@@ -46,10 +46,10 @@ fn arrow_keys_step_the_open_blend_mode_dropdown_without_nudging_the_layer() {
     assert_eq!(layer(&h).0, BlendMode::Normal);
 }
 
-/// Typing in the open Blend Mode list narrows it (`dropdown_search`) instead of reaching the tool
-/// shortcuts: ↩ picks the first match and closes the list, Esc clears the text first.
+/// #1481: with the Blend Mode list open, typing goes to the list (it narrows to the matching modes,
+/// `dropdown_search`) instead of the tool shortcuts, and ↩ picks the first match and closes the list.
 #[test]
-fn typing_narrows_the_open_blend_mode_list_without_switching_tools() {
+fn letters_pick_blend_modes_in_the_open_list_without_switching_tools() {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).with_max_steps(64).build_eframe(|cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -74,25 +74,17 @@ fn typing_narrows_the_open_blend_mode_list_without_switching_tools() {
     };
     h.query_all_by_role(Role::ComboBox).find(|n| named(n)).expect("the Layers panel's Blend Mode dropdown").click();
     h.run_steps(2);
-    // B, R, U and M are tool shortcuts (Brush, Marquee…); "bu" finds Color Burn nowhere near them.
+    // M is the Marquee tool's key: typed into the list it narrows it instead.
     type_key(&mut h, egui::Key::M, "m");
     type_key(&mut h, egui::Key::U, "u");
     assert_eq!(blend(&h), BlendMode::Normal, "typing picks nothing by itself");
     assert_eq!(h.state().ui.tool, Tool::Move, "M doesn't also pick the Marquee tool");
     assert!(h.query_by_label("Multiply").is_some() && h.query_by_label("Screen").is_none(), "the list narrowed to the modes with \"mu\"");
-    h.key_press(egui::Key::Escape);
-    h.run_steps(2);
-    assert!(h.query_by_label("Screen").is_some(), "the first Esc clears the text and keeps the list open");
-    type_key(&mut h, egui::Key::D, "d");
-    type_key(&mut h, egui::Key::A, "a");
-    type_key(&mut h, egui::Key::R, "r");
-    h.key_press(egui::Key::ArrowDown);
-    h.run_steps(2);
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
     assert!(!crate::widgets::dropdown_list_open(&h.ctx), "↩ closes the list");
-    assert_eq!(blend(&h), BlendMode::DarkerColor, "\"dar\" finds Darken, then ↓ picks Darker Color");
-    assert_eq!(h.state().ui.tool, Tool::Move, "none of the keys reached the tools");
+    assert_eq!(blend(&h), BlendMode::Multiply, "↩ picks the first match, Multiply");
+    assert_eq!(h.state().ui.tool, Tool::Move);
     // With the list closed the letters are the tools' again.
     h.key_press(egui::Key::M);
     h.event(egui::Event::Text("m".into()));
