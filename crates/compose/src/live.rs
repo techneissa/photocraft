@@ -85,6 +85,8 @@ pub struct LiveTransform {
     /// over them); `None` when the whole layer moves.
     pub rest: Option<Arc<Surface>>,
     pub mesh: Arc<LiveMesh>,
+    /// Sample the nearest texel instead of blending four (Preferences › Interpolation: Nearest).
+    pub nearest: bool,
 }
 
 impl LiveTransform {
@@ -137,7 +139,7 @@ pub fn rasterize(live: &LiveTransform, rect: Rect) -> Vec<f32> {
                 let Some(uv) = t.at(x as f32 + 0.5, py) else { continue };
                 let i = (x - rect.x0) as usize;
                 if let (Some(o), Some(h)) = (moved.get_mut(i * n..i * n + n), hit.get_mut(i)) {
-                    src.sample(uv, o);
+                    src.sample(uv, live.nearest, o);
                     *h = true;
                 }
             }
@@ -282,9 +284,15 @@ impl Texels {
         self.px.get(i..i + self.n)
     }
 
-    /// Bilinear sample at source point `uv` (texel centres at `.5`), premultiplied, into `out`.
-    fn sample(&self, uv: [f32; 2], out: &mut [f32]) {
+    /// Sample at source point `uv` (texel centres at `.5`), bilinear or `nearest`, premultiplied, into `out`.
+    fn sample(&self, uv: [f32; 2], nearest: bool, out: &mut [f32]) {
         out.fill(0.0);
+        if nearest {
+            if let Some(t) = self.texel(uv[0].floor() as i32, uv[1].floor() as i32) {
+                out.copy_from_slice(t);
+            }
+            return;
+        }
         let (fx, fy) = (uv[0] - 0.5, uv[1] - 0.5);
         let (x0, y0) = (fx.floor(), fy.floor());
         let (ax, ay) = (fx - x0, fy - y0);
@@ -345,7 +353,7 @@ mod tests {
         for fmt in [PixelFormat::RGBA8, PixelFormat::RGBA16, PixelFormat::RGBA32F] {
             let src = Arc::new(red_square(fmt));
             let live =
-                LiveTransform { layer: LayerId(1), source: src.clone(), rest: None, mesh: Arc::new(quad_mesh([0.0, 0.0, 8.0, 8.0], [0.0, 0.0, 8.0, 8.0])) };
+                LiveTransform { layer: LayerId(1), source: src.clone(), rest: None, mesh: Arc::new(quad_mesh([0.0, 0.0, 8.0, 8.0], [0.0, 0.0, 8.0, 8.0])), nearest: false };
             let r = Rect::new(0, 0, 8, 8);
             let got = rasterize(&live, r);
             assert!(got.iter().zip(src.read_region(r)).all(|(a, b)| (a - b).abs() < 1e-4), "{fmt:?} identity");
@@ -368,6 +376,7 @@ mod tests {
             source: Arc::new(red_square(fmt)),
             rest: None,
             mesh: Arc::new(quad_mesh([0.0, 0.0, 32.0, 32.0], [0.0, 0.0, 8.0, 8.0])),
+            nearest: false,
         };
         let px = rasterize(&live, Rect::new(0, 16, 32, 17));
         let alpha: Vec<f32> = px.as_chunks::<4>().0.iter().map(|p| p[3]).collect();
@@ -375,6 +384,20 @@ mod tests {
         assert!(alpha[2] < 0.01, "outside");
         assert!(alpha[7] > 0.2 && alpha[7] < 0.8, "the edge is soft: {}", alpha[7]);
         assert!(px.as_chunks::<4>().0.iter().filter(|p| p[3] > 0.01).all(|p| (p[0] - 1.0).abs() < 0.01), "straight colour stays red at the soft edge");
+    }
+
+    /// Nearest sampling keeps every texel hard when scaling up: alpha is 0 or 1 and the colour is
+    /// the source's, where bilinear fades the edge.
+    #[test]
+    fn nearest_scales_up_with_hard_texels() {
+        let src = Arc::new(red_square(PixelFormat::RGBA8));
+        let mesh = Arc::new(quad_mesh([0.0, 0.0, 32.0, 32.0], [0.0, 0.0, 8.0, 8.0]));
+        let live = LiveTransform { layer: LayerId(1), source: src, rest: None, mesh, nearest: true };
+        let px = rasterize(&live, Rect::new(0, 16, 32, 17));
+        let alpha: Vec<f32> = px.as_chunks::<4>().0.iter().map(|p| p[3]).collect();
+        assert!(alpha.iter().all(|a| *a == 0.0 || *a == 1.0), "hard edge: {alpha:?}");
+        // Source x 2..6 covers document x 8..24 at 4x.
+        assert!(alpha[8] == 1.0 && alpha[23] == 1.0 && alpha[7] == 0.0 && alpha[24] == 0.0);
     }
 
     /// `apply` moves the layer's pixels and keeps everything else about it; linked masks go, an
@@ -393,6 +416,7 @@ mod tests {
             source: Arc::new(red_square(PixelFormat::RGBA8)),
             rest: None,
             mesh: Arc::new(quad_mesh([8.0, 8.0, 16.0, 16.0], [0.0, 0.0, 8.0, 8.0])),
+            nearest: false,
         };
         let d = apply(&doc, &live);
         let l = d.layer(id).unwrap();
@@ -415,7 +439,7 @@ mod tests {
             LiveMesh { pos: vec![[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]], uv: vec![[0.0; 2]; 3], indices: vec![0, 1, 2, 7] },
             LiveMesh::default(),
         ] {
-            let live = LiveTransform { layer: LayerId(1), source: src.clone(), rest: None, mesh: Arc::new(mesh) };
+            let live = LiveTransform { layer: LayerId(1), source: src.clone(), rest: None, mesh: Arc::new(mesh), nearest: false };
             assert!(rasterize(&live, Rect::new(0, 0, 4, 4)).iter().all(|v| *v == 0.0));
             assert!(live.mesh.bounds().is_empty());
         }

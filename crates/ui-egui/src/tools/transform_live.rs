@@ -54,6 +54,8 @@ pub(crate) struct LiveSession {
     origin: Rect,
     /// The CPU composite's document for the current key (`cpu_doc`).
     applied: Option<(u64, Arc<Document>)>,
+    /// Preferences › Interpolation is Nearest: the mesh samples the nearest texel.
+    nearest: bool,
 }
 
 impl LiveSession {
@@ -83,6 +85,7 @@ impl LiveSession {
             shown: VecDeque::new(),
             origin,
             applied: None,
+            nearest: false,
         };
         s.base = Arc::new(live::prepare(doc, &s.live(Arc::new(LiveMesh::default()))));
         Some(s)
@@ -101,7 +104,7 @@ impl LiveSession {
     }
 
     fn live(&self, mesh: Arc<LiveMesh>) -> LiveTransform {
-        LiveTransform { layer: self.layer, source: self.source.clone(), rest: self.rest.clone(), mesh }
+        LiveTransform { layer: self.layer, source: self.source.clone(), rest: self.rest.clone(), mesh, nearest: self.nearest }
     }
 
     /// The live transform as the box has it now, if a mesh was built.
@@ -252,7 +255,7 @@ pub(crate) fn mesh(t: &TransformSession) -> LiveMesh {
 
 /// What the box is now, as far as the mesh goes.
 fn box_key(t: &TransformSession) -> String {
-    format!("{:?}{:?}{}", t.rect, t.quad, t.warp.as_ref().map_or_else(String::new, |w| serde_json::to_string(w).unwrap_or_default()))
+    format!("{:?}{:?}{}{}", t.rect, t.quad, t.interpolation, t.warp.as_ref().map_or_else(String::new, |w| serde_json::to_string(w).unwrap_or_default()))
 }
 
 /// The document the canvas shows for document `idx` while a box is open on one of its layers:
@@ -264,7 +267,9 @@ pub(crate) fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Do
     let key = box_key(t);
     let built = app.transform_preview.as_ref().and_then(|pv| pv.live.as_ref()).is_some_and(|s| s.shows(&key));
     let fresh = (!built).then(|| mesh(t));
+    let nearest = t.interpolation == "nearest";
     let s = app.transform_preview.as_mut()?.live.as_mut()?;
+    s.nearest = nearest;
     show(s, &doc, revision, key, fresh)
 }
 
@@ -458,6 +463,22 @@ mod tests {
         let from_doc = damage(&app, doc, rev, 0, k2).unwrap();
         assert!(from_doc.contains(10, 10) && from_doc.contains(49, 25), "{from_doc:?}");
         assert!(damage(&app, doc, rev, 12345, k2).is_none());
+    }
+
+    /// Preferences › Interpolation: Nearest reaches the live transform, and changing it is a new
+    /// preview key.
+    #[test]
+    fn the_interpolation_choice_reaches_the_mesh_pass() {
+        let mut app = app_with_layer("Normal");
+        let ctx = egui::Context::default();
+        crate::transform_tool::begin(&mut app, &ctx).unwrap();
+        let (_, k1) = crate::canvas::display_doc(&mut app, 0);
+        let doc = app.session.active().unwrap().doc.id;
+        assert!(!current(&app, doc).unwrap().1.nearest);
+        app.ui.transform.as_mut().unwrap().interpolation = "nearest".into();
+        let (_, k2) = crate::canvas::display_doc(&mut app, 0);
+        assert_ne!(k1, k2, "a new key redraws the canvas");
+        assert!(current(&app, doc).unwrap().1.nearest);
     }
 
     /// A box past the horizon or a degenerate one draws only what's in front; a linked mask moves

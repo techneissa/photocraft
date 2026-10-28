@@ -23,6 +23,8 @@ pub(crate) struct MeshKit {
     pub(crate) pipeline: wgpu::RenderPipeline,
     bgl: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
+    /// Picks the nearest texel (Preferences › Interpolation: Nearest).
+    nearest: wgpu::Sampler,
 }
 
 /// A live transform's source texture and mesh on the GPU, rebuilt when either changes.
@@ -30,6 +32,7 @@ pub(crate) struct LiveGpu {
     /// What they were built from (identity: the `Arc`s are replaced, never mutated).
     source: Arc<Surface>,
     mesh: Arc<photocraft_compose::live::LiveMesh>,
+    nearest: bool,
     _tex: wgpu::Texture,
     pub(crate) group: wgpu::BindGroup,
     pub(crate) vertices: Option<wgpu::Buffer>,
@@ -157,7 +160,15 @@ pub(crate) fn mesh_kit(device: &wgpu::Device, bgl0: &wgpu::BindGroupLayout, form
         min_filter: wgpu::FilterMode::Linear,
         ..Default::default()
     });
-    Some(MeshKit { pipeline, bgl, sampler })
+    let nearest = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("pc_live_nearest"),
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Nearest,
+        min_filter: wgpu::FilterMode::Nearest,
+        ..Default::default()
+    });
+    Some(MeshKit { pipeline, bgl, sampler, nearest })
 }
 
 impl Compositor {
@@ -180,7 +191,7 @@ impl Compositor {
     /// Upload `live`'s source and mesh where they changed.
     pub(crate) fn sync_live(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, live: &photocraft_compose::live::LiveTransform) -> Result<(), Unsupported> {
         let kit = self.kit.mesh.clone().ok_or_else(|| Unsupported("no live transform pipeline on this device".into()))?;
-        let same_source = self.live_gpu.as_ref().is_some_and(|g| Arc::ptr_eq(&g.source, &live.source));
+        let same_source = self.live_gpu.as_ref().is_some_and(|g| Arc::ptr_eq(&g.source, &live.source) && g.nearest == live.nearest);
         if !same_source {
             self.live_gpu = None;
             // The texels the mesh can read, with a transparent texel around them.
@@ -229,11 +240,11 @@ impl Compositor {
                 layout: &kit.bgl,
                 entries: &[
                     wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&view) },
-                    wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&kit.sampler) },
+                    wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(if live.nearest { &kit.nearest } else { &kit.sampler }) },
                     wgpu::BindGroupEntry { binding: 2, resource: ubuf.as_entire_binding() },
                 ],
             });
-            self.live_gpu = Some(LiveGpu { source: live.source.clone(), mesh: Arc::new(Default::default()), _tex: tex, group, vertices: None, count: 0 });
+            self.live_gpu = Some(LiveGpu { source: live.source.clone(), mesh: Arc::new(Default::default()), nearest: live.nearest, _tex: tex, group, vertices: None, count: 0 });
         }
         let Some(g) = self.live_gpu.as_mut() else { return Ok(()) };
         if !Arc::ptr_eq(&g.mesh, &live.mesh) {

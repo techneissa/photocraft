@@ -106,7 +106,7 @@ fn a_moving_layer_composites_in_place_with_its_blend_mode() {
         top.opacity = 0.6;
         d.layers.push(top);
         let mesh = Arc::new(grid(Rect::new(20, 14, 60, 50), 8, turn(23.0, 1.3, [40.0, 32.0], [7.5, -4.0])));
-        let live = LiveTransform { layer: id, source, rest: None, mesh };
+        let live = LiveTransform { layer: id, source, rest: None, mesh, nearest: false };
         check(&mut g, &d, &live, &format!("{depth:?} difference, clipped and covered"));
     }
 }
@@ -132,7 +132,7 @@ fn a_selection_moves_over_the_pixels_that_stay_and_an_unlinked_mask_stays_put() 
     rest.write_region(Rect::new(40, 10, 70, 50), &full.read_region(Rect::new(40, 10, 70, 50)));
     d.layers.push(l);
     let mesh = Arc::new(grid(Rect::new(10, 10, 40, 50), 4, turn(-12.0, 0.8, [25.0, 30.0], [22.0, 3.0])));
-    let live = LiveTransform { layer: id, source: Arc::new(source), rest: Some(Arc::new(rest)), mesh };
+    let live = LiveTransform { layer: id, source: Arc::new(source), rest: Some(Arc::new(rest)), mesh, nearest: false };
     check(&mut g, &d, &live, "selection over the rest, unlinked mask");
 }
 
@@ -151,9 +151,29 @@ fn a_plain_layer_moves_too() {
         let source = Arc::new(l.surface().unwrap().clone());
         d.layers.push(l);
         let mesh = Arc::new(grid(Rect::new(8, 8, 40, 32), 4, turn(10.0, 1.1, [24.0, 20.0], [12.0, 6.0])));
-        let live = LiveTransform { layer: id, source, rest: None, mesh };
+        let live = LiveTransform { layer: id, source, rest: None, mesh, nearest: false };
         check(&mut g, &d, &live, &format!("{depth:?} plain"));
     }
+}
+
+/// Preferences › Interpolation: Nearest: a layer scaled up 3× shows hard texels on the GPU as on
+/// the CPU, and differs from the bilinear preview of the same box.
+#[test]
+fn nearest_sampling_matches_the_cpu() {
+    let _lock = crate::GPU_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let Some(mut g) = gpu() else { return };
+    let mut d = Document::with_background("nearest", Size::new(96, 72), ColorMode::Rgb, SampleType::U8, Color::WHITE);
+    let fmt = d.pixel_format();
+    let l = ramp("small", fmt, Rect::new(4, 4, 20, 16));
+    let id = l.id;
+    let source = Arc::new(l.surface().unwrap().clone());
+    d.layers.push(l);
+    let mesh = Arc::new(grid(Rect::new(4, 4, 20, 16), 4, |x, y| [x * 3.0 + 4.0, y * 3.0 + 4.0]));
+    let live = LiveTransform { layer: id, source, rest: None, mesh, nearest: true };
+    check(&mut g, &d, &live, "nearest 3x");
+    let bilinear = LiveTransform { nearest: false, ..live.clone() };
+    let (a, b) = (photocraft_compose::flatten(&live::apply(&d, &live)), photocraft_compose::flatten(&live::apply(&d, &bilinear)));
+    assert!(a.px.iter().zip(&b.px).any(|(x, y)| (x[0] - y[0]).abs() > 0.01), "nearest and bilinear differ");
 }
 
 #[test]
@@ -166,7 +186,7 @@ fn a_styled_layer_or_pass_through_group_is_left_to_the_cpu() {
     let id = l.id;
     let source = Arc::new(l.surface().unwrap().clone());
     d.layers.push(l);
-    let live = LiveTransform { layer: id, source, rest: None, mesh: Arc::new(grid(Rect::new(4, 4, 20, 20), 2, turn(0.0, 1.0, [0.0; 2], [3.0, 3.0]))) };
+    let live = LiveTransform { layer: id, source, rest: None, mesh: Arc::new(grid(Rect::new(4, 4, 20, 20), 2, turn(0.0, 1.0, [0.0; 2], [3.0, 3.0]))), nearest: false };
     let prepared = live::prepare(&d, &live);
     assert!(photocraft_gpu::plan::plan_with(&prepared, Some(&live)).is_err());
     assert!(photocraft_gpu::plan::plan_with(&prepared, None).is_ok());
@@ -196,7 +216,7 @@ fn live_bench() {
     for k in 0..n {
         let t0 = std::time::Instant::now();
         let mesh = Arc::new(grid(Rect::new(0, 0, w as i32, h as i32), 32, turn(0.2 * k as f32, 1.0, [3000.0, 2000.0], [0.0, 0.0])));
-        let live = LiveTransform { layer: id, source: source.clone(), rest: None, mesh };
+        let live = LiveTransform { layer: id, source: source.clone(), rest: None, mesh, nearest: false };
         let prepared = live::prepare(&d, &live);
         let prep = t0.elapsed().as_secs_f64() * 1e3;
         g.2.set_live(Some((prepared.id, live.clone())));
