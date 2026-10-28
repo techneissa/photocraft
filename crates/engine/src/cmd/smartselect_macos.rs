@@ -1,12 +1,16 @@
-//! Select ▸ Subject's engine choice: macOS's own subject cutout (Apple's Vision framework, through
-//! `photocraft_macvision`) or PhotoCraft's own Classic one (`photocraft_algo::segment::subject`).
+//! Select ▸ Subject's first engine: macOS's own subject cutout (Apple's Vision framework, through
+//! `photocraft_macvision`). It is the first step of the chain in
+//! [`super::smartselect_cmds::find_subject_region`], which tries the optional AI model
+//! (`photocraft_ml`) and then PhotoCraft's own Classic finder (`photocraft_algo::segment::subject`).
 //!
 //! The preference `tools.selectSubjectEngine` ([`SubjectEngine`]) picks:
 //!
-//! - `auto`: the Mac's cutout where there is one; Classic where there is none, or where the cutout
-//!   finds no subject or fails;
+//! - `auto`: the Mac's cutout where there is one; where there is none, or it finds no subject or
+//!   fails, the AI model when it is installed; then Classic;
 //! - `macos`: the Mac's cutout. No subject found means nothing is selected; no cutout on this system
-//!   (or Vision failing) means Classic, with a note for the status bar;
+//!   (or Vision failing) means Classic (never the model), with a note for the status bar;
+//! - `model`: the AI model (no cutout step); Classic with a note when it is not installed, the
+//!   computer lacks the memory or it fails;
 //! - `classic`: Classic, as before.
 //!
 //! The cutout sees the pixels the command samples (the active layer or the composite), shrunk to
@@ -14,10 +18,13 @@
 //! whole), and its soft mask is scaled back up to the canvas (bilinear) and becomes the region the
 //! caller stores exactly like Classic's: soft edges stay partial selection.
 //!
-//! It runs inline on the command like Classic does: Vision takes about a second at most, and Select
-//! Subject has no job path (its result is the selection, which scripts read right after).
+//! Select Subject runs the whole chain as a background job when the shell starts it
+//! (`Session::start`; Esc cancels), and inline for scripts and the control channel, which read the
+//! selection right after. This step itself is short: Vision takes about a second at most.
 
-use photocraft_algo::segment::{Sampler, scale_for, subject};
+#[cfg(test)]
+use photocraft_algo::segment::subject;
+use photocraft_algo::segment::{Sampler, scale_for};
 use photocraft_algo::selection::Region;
 use photocraft_geom::Rect;
 use photocraft_macvision::{self as macvision, Error, Mask};
@@ -32,10 +39,14 @@ pub(crate) const UNAVAILABLE: &str = "macOS cutout unavailable, used Classic";
 /// The note for a cutout that failed (Vision reported an error).
 pub(crate) const FAILED: &str = "macOS cutout failed, used Classic";
 
-/// Where the subject is, and what to tell the user about how it was found.
-pub(crate) struct Found {
-    pub region: Option<Region>,
-    pub note: Option<&'static str>,
+/// What the Mac's cutout step of the chain came to (see [`step`]).
+pub(crate) enum Step {
+    /// The cutout found the subject.
+    Found(Region),
+    /// An explicit `macos` choice and the cutout found nothing: nothing is selected.
+    NoSubject,
+    /// The next finder takes over (the AI model, then Classic), with a note for the status bar.
+    Fallback(Option<&'static str>),
 }
 
 #[cfg(not(test))]
@@ -54,22 +65,42 @@ fn cutout() -> Option<CutoutFn> {
     TEST_CUTOUT.with(std::cell::Cell::get)
 }
 
-/// The subject of `canvas` as seen by `smp`, found with the engine the preference chose.
-pub(crate) fn subject_region(engine: SubjectEngine, smp: &dyn Sampler, canvas: Rect) -> Found {
-    pick(engine, cutout(), smp, canvas)
+/// The Mac's cutout step for `engine`, with the cutout this system has.
+pub(crate) fn current_step(engine: SubjectEngine, smp: &dyn Sampler, canvas: Rect) -> Step {
+    step(engine, cutout(), smp, canvas)
 }
 
-fn pick(engine: SubjectEngine, cutout: Option<CutoutFn>, smp: &dyn Sampler, canvas: Rect) -> Found {
-    let classic = |note| Found { region: subject::select_subject(smp, canvas), note };
-    let Some(cut) = cutout.filter(|_| engine != SubjectEngine::Classic) else {
-        return classic((engine == SubjectEngine::MacOs).then_some(UNAVAILABLE));
-    };
+/// The cutout step of [`super::smartselect_cmds::find_subject_region`]'s chain. Only `auto` and
+/// `macos` use the cutout: `auto` falls through on nothing found or a failure (the failure with a
+/// note), `macos` selects nothing when the cutout finds nothing and falls back with a note when
+/// there is no cutout or it fails.
+fn step(engine: SubjectEngine, cutout: Option<CutoutFn>, smp: &dyn Sampler, canvas: Rect) -> Step {
+    if !matches!(engine, SubjectEngine::Auto | SubjectEngine::MacOs) {
+        return Step::Fallback(None);
+    }
+    let Some(cut) = cutout else { return Step::Fallback((engine == SubjectEngine::MacOs).then_some(UNAVAILABLE)) };
     match macos_region(cut, smp, canvas) {
-        Ok(Some(region)) => Found { region: Some(region), note: None },
-        // Nothing found: Auto lets Classic try; an explicit macOS choice says so.
-        Ok(None) | Err(Error::NoSubject) if engine == SubjectEngine::MacOs => Found { region: None, note: None },
-        Ok(None) | Err(Error::NoSubject) => classic(None),
-        Err(_) => classic(Some(FAILED)),
+        Ok(Some(region)) => Step::Found(region),
+        Ok(None) | Err(Error::NoSubject) if engine == SubjectEngine::MacOs => Step::NoSubject,
+        Ok(None) | Err(Error::NoSubject) => Step::Fallback(None),
+        Err(_) => Step::Fallback(Some(FAILED)),
+    }
+}
+
+/// Where the subject is, and what to tell the user about how it was found (the cutout step, then
+/// Classic; the tests of the step).
+#[cfg(test)]
+pub(crate) struct Found {
+    pub region: Option<Region>,
+    pub note: Option<&'static str>,
+}
+
+#[cfg(test)]
+fn pick(engine: SubjectEngine, cutout: Option<CutoutFn>, smp: &dyn Sampler, canvas: Rect) -> Found {
+    match step(engine, cutout, smp, canvas) {
+        Step::Found(region) => Found { region: Some(region), note: None },
+        Step::NoSubject => Found { region: None, note: None },
+        Step::Fallback(note) => Found { region: subject::select_subject(smp, canvas), note },
     }
 }
 

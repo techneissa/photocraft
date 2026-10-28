@@ -14,6 +14,7 @@ mod automation;
 mod batch;
 mod document;
 mod error;
+mod models;
 mod output;
 
 pub use actions::{ActionsError, Steps, load_actions, load_actions_file, parse_actions};
@@ -22,6 +23,7 @@ use automation::{commands, mcp, serve};
 use batch::{batch, droplet};
 use document::{convert, info, run_cmds};
 pub(crate) use error::{CliError, Result};
+use models::models;
 
 /// The command line's clap definition, for generating shell completions and man pages
 /// (`examples/man-and-completions.rs`).
@@ -56,6 +58,7 @@ where
         Command::Batch(a) => batch(a, out, err),
         Command::Droplet(a) => droplet(a, out, err),
         Command::Commands(a) => commands(a, out),
+        Command::Models(a) => models(a, out),
         Command::Mcp(a) => mcp(a, err),
         Command::Serve(a) => serve(a, err),
     };

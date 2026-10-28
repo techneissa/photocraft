@@ -22,9 +22,24 @@ use crate::PhotocraftApp;
 use crate::state::DialogKind;
 use crate::theme::{ThemeKind, Tokens};
 
+#[cfg(not(target_arch = "wasm32"))]
+mod ai_models;
+
+/// Shell-only sections have runtime actions rather than saved preference fields.
+const SHELL_SECTIONS: &[(&str, &str)] = &[
+    #[cfg(not(target_arch = "wasm32"))]
+    ("aiModels", "AI Models"),
+];
+
+fn sections() -> impl Iterator<Item = (&'static str, &'static str)> {
+    SECTIONS.iter().chain(SHELL_SECTIONS).copied()
+}
+
 /// Shell runtime state for preferences, autosave and snapping (not serialised).
 #[derive(Default)]
 pub struct Runtime {
+    #[cfg(not(target_arch = "wasm32"))]
+    ai_models: ai_models::Runtime,
     loaded: bool,
     /// Preferences revision last written to storage (or loaded from it).
     saved_rev: u64,
