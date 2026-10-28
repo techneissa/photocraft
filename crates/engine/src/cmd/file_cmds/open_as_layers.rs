@@ -43,10 +43,15 @@ fn parse(p: &Value) -> Result<(Vec<String>, String)> {
     if list.len() > MAX_FILES {
         return Err(bad(format!("{} files is too many (the most is {MAX_FILES})", list.len())));
     }
-    let paths = list.iter().map(|v| v.as_str().filter(|s| !s.is_empty()).map(str::to_string).ok_or_else(|| bad("every path must be a non-empty string"))).collect::<Result<Vec<_>>>()?;
+    let paths = list
+        .iter()
+        .map(|v| v.as_str().filter(|s| !s.is_empty()).map(str::to_string).ok_or_else(|| bad("every path must be a non-empty string")))
+        .collect::<Result<Vec<_>>>()?;
     let name = match p.get("name") {
         None | Some(Value::Null) => None,
-        Some(v) => Some(v.as_str().ok_or_else(|| bad("\"name\" must be a string"))?.trim().chars().filter(|c| !c.is_control()).take(MAX_NAME_CHARS).collect::<String>()),
+        Some(v) => Some(
+            v.as_str().ok_or_else(|| bad("\"name\" must be a string"))?.trim().chars().filter(|c| !c.is_control()).take(MAX_NAME_CHARS).collect::<String>(),
+        ),
     };
     let first = paths.first().map(|p| stem(p)).unwrap_or_default();
     let name = name.filter(|n| !n.is_empty()).unwrap_or(first);
@@ -132,7 +137,8 @@ fn build(ctx: &JobCtx, paths: &[String], name: &str, raw_ppi: f64, intent: Inten
         }
     }
     let Some(head) = head else {
-        let why = skips.iter().take(3).filter_map(|s| Some(format!("{} ({})", file_name(s["path"].as_str()?), s["error"].as_str()?))).collect::<Vec<_>>().join(", ");
+        let why =
+            skips.iter().take(3).filter_map(|s| Some(format!("{} ({})", file_name(s["path"].as_str()?), s["error"].as_str()?))).collect::<Vec<_>>().join(", ");
         return Err(EngineError::Other(format!("no file could be opened: {why}")));
     };
     let width = layers.iter().map(|l| l.2.width).max().unwrap_or(1).max(1);
