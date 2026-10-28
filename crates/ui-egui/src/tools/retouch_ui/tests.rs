@@ -283,6 +283,18 @@ fn empty_smart_result_is_reported_without_error() {
 }
 
 #[test]
+fn a_smart_result_note_reaches_the_status_bar() {
+    // Select Subject's fallback from the macOS cutout to Classic says so (and an empty result says
+    // what to try, not the note).
+    let mut app = app();
+    report_smart_result(&mut app, Ok(json!({"selected": true, "changed": true, "note": "macOS cutout unavailable, used Classic"})), "nothing there");
+    assert_eq!(app.ui.status.as_str(), "macOS cutout unavailable, used Classic");
+    assert!(!app.ui.status_error);
+    report_smart_result(&mut app, Ok(json!({"selected": false, "changed": false, "note": "x"})), "nothing there");
+    assert_eq!(app.ui.status.as_str(), "nothing there");
+}
+
+#[test]
 fn mixer_brush_is_selectable_and_paints_only_inside_the_selection_via_control() {
     use crate::control::{ControlRequest, Outcome, handle};
 

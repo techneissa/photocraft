@@ -83,6 +83,12 @@ choice!(
     /// platforms ignore it.
     LinuxDisplayServer { Auto = "auto", X11 = "x11" } default Auto
 );
+choice!(
+    /// What Select ▸ Subject cuts the subject out with: `auto` (the Mac's own cutout where there is
+    /// one, else Classic), `macos` (the Mac's own cutout; Classic with a note where there is none) or
+    /// `classic` (PhotoCraft's own, any system). A later AI model will be one more value.
+    SubjectEngine { Auto = "auto", MacOs = "macos", Classic = "classic" } default Auto
+);
 choice!(UiFontSize { Tiny = "tiny", Small = "small", Medium = "medium", Large = "large" } default Small);
 choice!(LogDestination { Metadata = "metadata", TextFile = "textFile", Both = "both" } default Metadata);
 choice!(LogDetail { SessionsOnly = "sessionsOnly", Concise = "concise", Detailed = "detailed" } default Concise);
@@ -405,6 +411,8 @@ pub struct Tools {
     /// The longest pause, in milliseconds, between two nudges that still bundle into one state.
     /// Longer than a key's auto-repeat delay (about half a second), so a held key is one state.
     pub nudge_bundle_pause_ms: u32,
+    /// What Select ▸ Subject cuts the subject out with ([`SubjectEngine`]).
+    pub select_subject_engine: SubjectEngine,
 }
 
 impl Default for Tools {
@@ -425,6 +433,7 @@ impl Default for Tools {
             pressure_curve: vec![[0.0, 0.0], [1.0, 1.0]],
             bundle_nudges: true,
             nudge_bundle_pause_ms: 1000,
+            select_subject_engine: SubjectEngine::Auto,
         }
     }
 }

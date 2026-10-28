@@ -447,6 +447,12 @@ pub fn report_smart_result(app: &mut PhotocraftApp, res: Result<Value, String>, 
     if matches!(res, Ok(ref v) if v.get("changed").and_then(Value::as_bool) == Some(false)) {
         app.ui.status = empty_msg.into();
         app.ui.status_error = false;
+    } else if let Ok(v) = &res
+        && let Some(note) = v.get("note").and_then(Value::as_str)
+    {
+        // Select Subject fell back from the macOS cutout to Classic.
+        app.ui.status = note.into();
+        app.ui.status_error = false;
     }
 }
 

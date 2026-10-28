@@ -103,7 +103,7 @@ pub fn subject_mask(rgba: &[u8], width: u32, height: u32) -> Result<Mask, Error>
     mask.resized(width, height).ok_or(Error::BadInput)
 }
 
-#[cfg(test)]
-mod tests;
 #[cfg(all(test, target_os = "macos"))]
 mod mac_tests;
+#[cfg(test)]
+mod tests;

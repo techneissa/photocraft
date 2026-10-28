@@ -134,6 +134,7 @@ pub mod selection_cmds;
 pub mod slice_cmds;
 pub mod smart_cmds;
 pub mod smartselect_cmds;
+mod smartselect_macos;
 pub mod solid_fill_cmds;
 pub mod stamp_cmds;
 pub mod style_asl_cmds;

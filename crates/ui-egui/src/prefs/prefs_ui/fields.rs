@@ -57,6 +57,10 @@ pub(super) fn humanize(key: &str) -> String {
     if key == "nudgeBundlePauseMs" {
         return "Nudge Bundle Pause (ms)".into();
     }
+    // Tools: what Select Subject cuts the subject out with.
+    if key == "selectSubjectEngine" {
+        return "Select Subject Engine".into();
+    }
     // Performance: presentation without vsync (#1343); like the other graphics settings, it
     // takes effect when the window next opens.
     // File Handling: Photoshop's wording (#8080).
@@ -99,6 +103,7 @@ pub(super) fn choice_label(v: &str) -> String {
         "exr" => "EXR".into(),
         "cm" => "Centimeters".into(),
         "mm" => "Millimeters".into(),
+        "macos" => "macOS (Apple Vision, Mac only)".into(),
         "75" | "80" | "85" | "90" | "95" | "100" | "105" | "110" | "115" | "120" | "125" | "150" | "175" | "200" | "250" | "300" => format!("{v}%"),
         "8" => "8 Bits/Channel".into(),
         "16" => "16 Bits/Channel".into(),

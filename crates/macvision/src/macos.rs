@@ -76,7 +76,8 @@ pub(crate) fn subject_mask(rgba: &[u8], width: u32, height: u32) -> Result<Mask,
         let image = image(rgba, width, height)?;
         // SAFETY: a plain `init` of a class whose existence `backend` checked, with an empty options
         // dictionary (generic types `NSString` keys and `AnyObject` values, as the header declares).
-        let handler = unsafe { VNImageRequestHandler::initWithCIImage_options(VNImageRequestHandler::alloc(), &image, &NSDictionary::<NSString, AnyObject>::new()) };
+        let handler =
+            unsafe { VNImageRequestHandler::initWithCIImage_options(VNImageRequestHandler::alloc(), &image, &NSDictionary::<NSString, AnyObject>::new()) };
         let mask = match backend {
             Backend::Foreground => foreground(&handler)?,
             Backend::People => people(&handler)?,

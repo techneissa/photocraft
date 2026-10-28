@@ -4,12 +4,13 @@
 //! composite), run them, and store the result as the selection (or a mask / new layer).
 
 use photocraft_algo::matting::{self, RefineParams};
-use photocraft_algo::segment::{Sampler, SurfaceSampler, focus, grabcut, quick, subject};
+use photocraft_algo::segment::{Sampler, SurfaceSampler, focus, grabcut, quick};
 use photocraft_algo::selection::{Region, SelectionMode, combine_region};
 use photocraft_doc::{Document, Layer, LayerContent, LayerId, LayerMask};
 use photocraft_geom::Rect;
 use serde_json::{Value, json};
 
+use super::smartselect_macos;
 use crate::commands::CommandSpec;
 use crate::select_mask_edits;
 use crate::{EngineError, Result, Session};
@@ -291,6 +292,8 @@ pub struct SubjectCache {
     /// The sampled layer; `None` = the composite.
     target: Option<LayerId>,
     region: Option<std::sync::Arc<Region>>,
+    /// The engine that found it ([`crate::prefs::SubjectEngine`]): a changed choice is a miss.
+    engine: crate::prefs::SubjectEngine,
 }
 
 impl SubjectCache {
@@ -307,17 +310,24 @@ fn select_subject(s: &mut Session, p: &Value) -> Result<Value> {
     let d = s.active().ok_or(EngineError::NoDocument)?;
     // What `with_doc_sampler` samples: the active layer's pixels, else the composite.
     let target = d.active_layer.filter(|id| !all_layers && d.doc.layer(*id).and_then(Layer::surface).is_some());
+    let engine = s.prefs().tools.select_subject_engine;
     let c = &s.subject_cache;
-    let hit = c.target == target && c.doc.upgrade().is_some_and(|old| crate::layer_multi_cmds::same_pixels(&old, &d.doc));
+    let hit = c.target == target && c.engine == engine && c.doc.upgrade().is_some_and(|old| crate::layer_multi_cmds::same_pixels(&old, &d.doc));
+    let mut note = None;
     let region = if hit {
         c.region.clone()
     } else {
         let doc = std::sync::Arc::clone(&d.doc);
-        let region = with_doc_sampler(&doc, d.active_layer, all_layers, |smp, doc| subject::select_subject(smp, doc.bounds())).map(std::sync::Arc::new);
-        s.subject_cache = SubjectCache { doc: std::sync::Arc::downgrade(&doc), doc_id: Some(doc.id), target, region: region.clone() };
+        let found = with_doc_sampler(&doc, d.active_layer, all_layers, |smp, doc| smartselect_macos::subject_region(engine, smp, doc.bounds()));
+        note = found.note;
+        let region = found.region.map(std::sync::Arc::new);
+        s.subject_cache = SubjectCache { doc: std::sync::Arc::downgrade(&doc), doc_id: Some(doc.id), target, region: region.clone(), engine };
         region
     };
-    let out = apply(s, "Select Subject", region.as_deref(), mode(p, "replace"))?;
+    let mut out = apply(s, "Select Subject", region.as_deref(), mode(p, "replace"))?;
+    if let (Some(note), Some(o)) = (note, out.as_object_mut()) {
+        o.insert("note".into(), note.into());
+    }
     // Follow the document past the selection edit just made (same pixels), so a short history
     // dropping the older state doesn't turn the next repeat into a miss.
     if let Some(d) = s.active()
