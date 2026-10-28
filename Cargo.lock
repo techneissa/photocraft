@@ -5176,6 +5176,7 @@ dependencies = [
  "photocraft-geom",
  "photocraft-io",
  "photocraft-ipp",
+ "photocraft-macvision",
  "photocraft-ops",
  "photocraft-paint",
  "photocraft-plugins",
