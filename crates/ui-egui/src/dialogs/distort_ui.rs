@@ -138,11 +138,15 @@ pub fn cancel_stale(app: &mut PhotocraftApp) {
     }
 }
 
-/// The document shown on the canvas while Puppet or Perspective Warp previews a layer, or
-/// Vanishing Point's Stamp has painted.
-pub fn display_doc(app: &PhotocraftApp, idx: usize) -> Option<(Arc<Document>, u64)> {
+/// The document shown on the canvas while Puppet or Perspective Warp previews a layer (the layer
+/// composited in its place through the tool's mesh, transform_live.rs, else the document without
+/// it, the mesh drawn over it), or Vanishing Point's Stamp has painted.
+pub fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Document>, u64)> {
     if app.session.active_index() != Some(idx) {
         return None;
+    }
+    if let Some(shown) = crate::transform_live::distort_display_doc(app, idx) {
+        return Some(shown);
     }
     let (id, revision) = app.session.documents().get(idx).map(|st| (st.doc.id, st.revision))?;
     if let Some(p) = &app.distort.puppet
@@ -411,7 +415,8 @@ mod tests {
         app.session.execute("layer.new.layer", json!({})).unwrap();
         app.sync_views();
         assert!(app.distort.puppet.is_none(), "puppet does not follow the new document");
-        assert!(display_doc(&app, app.session.active_index().unwrap()).is_none());
+        let active = app.session.active_index().unwrap();
+        assert!(display_doc(&mut app, active).is_none());
         let layers_before = app.session.active().unwrap().doc.layers.len();
         app.session.execute("layer.delete", json!({})).unwrap();
         assert_eq!(app.session.active().unwrap().doc.layers.len(), layers_before - 1);

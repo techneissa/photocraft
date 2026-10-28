@@ -16,6 +16,7 @@
 use photocraft_color::BlendMode;
 use photocraft_compose::adjust::{self, Transfer};
 use photocraft_compose::effects::has_effects;
+use photocraft_compose::live::LiveTransform;
 use photocraft_doc::adjust::{ToneSpace, lut3d_len};
 use photocraft_doc::{Adjustment, Document, Effect, Fill, FxPaint, GlobalLight, Glow, Gradient, Layer, LayerContent, LayerId, Pattern, StrokePosition};
 use photocraft_geom::Rect;
@@ -55,16 +56,47 @@ pub struct Plan<'a> {
 
 /// Build the pass list for `doc`.
 pub fn plan(doc: &Document) -> Result<Plan<'_>, Unsupported> {
+    plan_with(doc, None)
+}
+
+/// Build the pass list for `doc` with `live` (`photocraft_compose::live`) moving one of its
+/// layers: `doc` is [`photocraft_compose::live::prepare`]d for it, and the layer's content is its
+/// remaining pixels with the mesh drawn over them ([`Kernel::Mesh`]), composited in its place like
+/// any layer's. A moving layer with a style or a moving pass-through group is [`Unsupported`]: its
+/// effects follow its shape, which the GPU only has from the CPU, so the CPU composites it.
+pub fn plan_with<'a>(doc: &'a Document, live: Option<&'a LiveTransform>) -> Result<Plan<'a>, Unsupported> {
     if doc.mode == photocraft_color::ColorMode::Multichannel {
         return Err(Unsupported("Multichannel inks (printed on the CPU)".into()));
     }
+    // The root layer holding the moving one: stack reuse stops below it, since its pixels change
+    // every frame without the document changing.
+    let mut live_root = None;
+    if let Some(live) = live {
+        let layer = doc.layer(live.layer).ok_or_else(|| Unsupported("the moving layer is gone".into()))?;
+        if has_effects(layer) {
+            return Err(Unsupported(format!("live transform of `{}`, which has a style (composited on the CPU)", layer.name)));
+        }
+        if layer.is_group() && layer.blend == BlendMode::PassThrough {
+            return Err(Unsupported(format!("live transform of the pass-through group `{}` (composited on the CPU)", layer.name)));
+        }
+        live_root = doc.layers.iter().position(|l| holds(l, live.layer, 0));
+    }
     let mut p = Planner::new(DocCtx::of(doc));
+    p.live = live;
     let root = p.clear();
     // Start at the topmost layer that hides everything beneath it (an opaque fill layer): the
     // layers below can't change the result, so they cost no passes or uploads.
     let start = doc.layers.iter().rposition(|l| photocraft_compose::occludes_below(l, doc.mode)).unwrap_or(0);
     let root = p.stack_inner(doc.layers.get(start..).unwrap_or(&doc.layers), root, Some(start))?;
+    if let Some(r) = live_root {
+        p.retain_checkpoints(|c| c.layer_end <= r);
+    }
     Ok(p.finish(root))
+}
+
+/// Is `id` the layer `l` or inside it (at most 256 groups deep)?
+fn holds(l: &Layer, id: LayerId, depth: u32) -> bool {
+    l.id == id || (depth < 256 && matches!(&l.content, LayerContent::Group(g) if g.children.iter().any(|c| holds(c, id, depth + 1))))
 }
 
 #[cfg(test)]

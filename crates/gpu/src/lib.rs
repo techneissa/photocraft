@@ -60,7 +60,7 @@ use photocraft_raster::{Surface, Tile};
 
 pub use camera_raw::{CAMERA_RAW_SHADER, CameraRawDevelop};
 pub use health::{DeviceHealth, Fault};
-pub use plan::{Kernel, Plan, Role, Unsupported, plan};
+pub use plan::{Kernel, Plan, Role, Unsupported, plan, plan_with};
 pub use timing::{GpuTimer, GpuTiming};
 
 /// GPU compositor. Create once per device; call [`Compositor::render`] per refresh.
@@ -125,6 +125,9 @@ pub struct Compositor {
     /// Timestamp queries measuring how long the GPU spends on a refresh (see
     /// [`Compositor::measure_gpu_time`]); `None` = not measured.
     timer: Option<timing::GpuTimer>,
+    /// The live transform moving a layer of a document ([`Compositor::set_live`]).
+    live: Option<(DocId, photocraft_compose::live::LiveTransform)>,
+    live_gpu: Option<live::LiveGpu>,
 }
 use W::{F, I, U};
 
@@ -135,6 +138,7 @@ mod convert;
 mod encode;
 mod fx_passes;
 mod kit;
+mod live;
 mod paging;
 #[cfg(not(target_arch = "wasm32"))]
 mod readback;
@@ -152,6 +156,7 @@ use convert::{CONVERT_BATCH, colour_managed, convert_tile, convert_tiles, rgb_gr
 pub use convert::{f16_to_f32, f32_to_f16};
 pub use kit::SHADER;
 use kit::{Kit, tex_entry};
+pub use live::LIVE_SHADER;
 pub use paging::OVER_BUDGET;
 use paging::first_error;
 #[cfg(test)]

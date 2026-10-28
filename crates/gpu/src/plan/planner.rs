@@ -1,6 +1,8 @@
 use super::lower::{
     Paint, adjustment_on_gpu, adjustment_program, check_gradient_stops, gradient_rows, placement, single_content_pass, stroke_widths, style_index,
 };
+use photocraft_compose::live::LiveTransform;
+
 use super::types::{Checkpoint, DocCtx, FxLayer, Kernel, MapRef, MaskUse, Pass, Role, SurfaceRef, TexUse, Unsupported};
 use super::{Adjustment, BlendMode, Effect, Fill, FxPaint, Glow, Layer, LayerContent, LayerId, Plan, Rect, Slot, Surface, bounds, has_effects};
 
@@ -14,6 +16,8 @@ pub(super) struct Planner<'a> {
     /// Layers planned so far, counting a layer each time it is planned (a clipped pass-through
     /// group is planned twice).
     visits: usize,
+    /// The live transform moving one layer, if any.
+    pub(super) live: Option<&'a LiveTransform>,
 }
 
 /// Most layer plannings one document may take: a pass-through group with clipped layers is
@@ -178,7 +182,12 @@ fn check_effect_gradients(items: &[&Effect]) -> Result<(), Unsupported> {
 
 impl<'a> Planner<'a> {
     pub(super) fn new(cx: DocCtx<'a>) -> Self {
-        Planner { passes: Vec::new(), free: Vec::new(), refs: Vec::new(), cx, fx: Vec::new(), checkpoints: Vec::new(), visits: 0 }
+        Planner { passes: Vec::new(), free: Vec::new(), refs: Vec::new(), cx, fx: Vec::new(), checkpoints: Vec::new(), visits: 0, live: None }
+    }
+
+    /// Keep the checkpoints `keep` accepts.
+    pub(super) fn retain_checkpoints(&mut self, keep: impl FnMut(&Checkpoint) -> bool) {
+        self.checkpoints.retain(keep);
     }
 
     pub(super) fn finish(self, root: Slot) -> Plan<'a> {
@@ -520,8 +529,10 @@ impl<'a> Planner<'a> {
         }
         // A layer with nothing clipped to it whose content is one Content pass is blended
         // straight from its pixels (`Kernel::LayerBlend`): one pass instead of two, and no
-        // scratch chunk written and read back.
-        let mut p = if visible_clipped.is_empty() && single_content_pass(layer) {
+        // scratch chunk written and read back. Not the layer a live transform moves: its content
+        // is the mesh drawn over its remaining pixels (`live_content`).
+        let moving = self.live.is_some_and(|l| l.layer == layer.id);
+        let mut p = if visible_clipped.is_empty() && !moving && single_content_pass(layer) {
             let mut p = self.content_pass(layer)?;
             p.kernel = Kernel::LayerBlend;
             p
@@ -561,7 +572,17 @@ impl<'a> Planner<'a> {
     /// the canvas (beyond that, compositing everywhere costs less than the copy back).
     fn local_clip(&self, layer: &Layer) -> Option<Rect> {
         let canvas = self.cx.canvas;
-        let b = bounds::composite_bounds(layer, canvas)?;
+        let mut b = bounds::composite_bounds(layer, canvas);
+        // A moving layer also covers where the mesh puts its pixels.
+        if let Some(live) = self.live.filter(|l| l.layer == layer.id) {
+            let m = live.mesh.bounds().inflate(1).intersect(&canvas);
+            b = Some(match b {
+                Some(b) if !b.is_empty() && !m.is_empty() => b.union(&m),
+                Some(b) if !b.is_empty() => b,
+                _ => m,
+            });
+        }
+        let b = b?;
         (b.width() as u64 * b.height() as u64 * 2 <= canvas.width() as u64 * canvas.height() as u64).then_some(b)
     }
 
@@ -603,6 +624,9 @@ impl<'a> Planner<'a> {
 
     /// render_content for non-adjustment layers.
     fn content(&mut self, layer: &'a Layer) -> Result<Slot, Unsupported> {
+        if self.live.is_some_and(|l| l.layer == layer.id) {
+            return Ok(self.live_content(layer));
+        }
         match &layer.content {
             LayerContent::Group(g) => {
                 let empty = self.clear();
@@ -648,6 +672,29 @@ impl<'a> Planner<'a> {
                 Ok(self.emit(p))
             }
         }
+    }
+
+    /// The moving layer's content (`photocraft_compose::live::apply`): its remaining pixels (the
+    /// layer is prepared as a raster layer holding them) with the mesh drawn over them, then its
+    /// unlinked masks.
+    fn live_content(&mut self, layer: &'a Layer) -> Slot {
+        let mut s = self.emit(Pass::new(Kernel::Mesh, 0));
+        if let Some(rest) = layer.surface().filter(|r| r.tile_count() > 0) {
+            let mut p = Pass::new(Kernel::Content, 0);
+            self.surface_tex(&mut p, layer.id, rest);
+            let rest = self.emit(p);
+            let mut p = Pass::new(Kernel::Blend, 0);
+            p.a = Some(rest);
+            p.b = Some(s);
+            s = self.emit(p);
+        }
+        if let Some(m) = self.mask_use(layer) {
+            let mut p = Pass::new(Kernel::Mask, 0);
+            p.a = Some(s);
+            p.mask = Some(m);
+            s = self.emit(p);
+        }
+        s
     }
 
     /// The Content pass of a raster / text / shape / smart / fill layer.

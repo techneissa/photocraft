@@ -125,6 +125,8 @@ pub(crate) fn ensure_texture_in_view(
         (st.revision, st.last_damage.map(|r| if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) }), st.doc.id)
     };
     let (mut doc, mut preview_key) = display_doc(app, idx);
+    // Drawn on the CPU: a transform box's moving pixels in place.
+    doc = crate::transform_live::cpu_doc(app, doc, preview_key);
     // A filter dialog's live preview: the GPU canvas draws it from its own texture, but this CPU
     // canvas (no usable GPU, a flipped or pixel-aspect-corrected view, a GPU fallback) showed the
     // document unfiltered. Its result is drawn here instead, as the channel views draw it.
@@ -382,6 +384,13 @@ pub(crate) fn damage_since(app: &PhotocraftApp, idx: usize, seen: (u64, u64), no
     {
         return Some(if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) });
     }
+    // Between a transform box's previews (and the document): where the moving layer was and is.
+    if seen.0 == now.0
+        && let Some(st) = app.session.documents().get(idx)
+        && let Some(r) = crate::transform_live::damage(app, st.doc.id, now.0, seen.1 ^ display_key, now.1)
+    {
+        return Some(if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) });
+    }
     // Between hovered blend modes (and the document): where the layer's blending shows.
     if seen.0 == now.0
         && let Some(st) = app.session.documents().get(idx)
@@ -459,6 +468,8 @@ pub(super) fn ensure_gpu(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
         return false;
     };
     let (doc, raw_key) = display_doc(app, idx);
+    // A transform box's moving layer: the compositor draws it through the mesh.
+    gpu.set_live(crate::transform_live::current(app, id));
     let (display, _) = canvas_display(app, &doc, None);
     // Repeated pattern tiles sample the same texture, including pixels outside the unwrapped
     // viewport. Refresh the affected document region while Pattern Preview is enabled.

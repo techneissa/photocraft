@@ -282,10 +282,10 @@ fn session_is_dropped_when_another_document_becomes_active() {
     let active = app.session.active_index().unwrap();
     // The session stays until drop_foreign; the preview must not follow this document (#5115).
     assert!(app.distort.puppet.is_some());
-    assert!(crate::distort_ui::display_doc(&app, active).is_none());
+    assert!(crate::distort_ui::display_doc(&mut app, active).is_none());
     crate::distort_ui::drop_foreign(&mut app);
     assert!(app.distort.puppet.is_none());
-    assert!(crate::distort_ui::display_doc(&app, active).is_none());
+    assert!(crate::distort_ui::display_doc(&mut app, active).is_none());
     // Closing the document it was started on drops it too.
     assert!(app.session.set_active(0));
     crate::distort_ui::menu(&mut app, &ctx, "edit.puppetWarp", &json!({})).unwrap().unwrap();
@@ -353,6 +353,39 @@ fn pin_edits_undo_and_redo_inside_the_session() {
     }
     assert!(pins(&app).is_empty());
     assert_eq!(app.session.active().unwrap().history.past_len(), past);
+}
+
+/// The pinned layer previews in its place with its blend mode (transform_live.rs): red in
+/// Difference over white shows cyan where the pins moved it, and the canvas is that.
+#[test]
+fn the_preview_keeps_the_layers_blend_mode() {
+    let ctx = egui::Context::default();
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    app.session.execute("file.new", json!({"width": 100, "height": 80, "background": "white"})).unwrap();
+    app.session.execute("layer.new.layer", json!({})).unwrap();
+    app.session
+        .edit("paint", |doc, active| {
+            doc.layer_mut(active.unwrap()).unwrap().surface_mut().unwrap().fill_rect(Rect::new(20, 30, 80, 50), &[1.0, 0.0, 0.0, 1.0]);
+            Ok(())
+        })
+        .unwrap();
+    app.session.execute("layer.setProps", json!({"blend": "Difference"})).unwrap();
+    app.sync_views();
+    crate::distort_ui::menu(&mut app, &ctx, "edit.puppetWarp", &json!({})).unwrap().unwrap();
+    let ev = |app: &mut PhotocraftApp, e| crate::distort_ui::pointer(app, e, egui::Modifiers::NONE);
+    ev(&mut app, ToolEvent::Down { x: 25.0, y: 40.0, pressure: 1.0 });
+    ev(&mut app, ToolEvent::Up { x: 25.0, y: 40.0 });
+    ev(&mut app, ToolEvent::Down { x: 75.0, y: 40.0, pressure: 1.0 });
+    ev(&mut app, ToolEvent::Up { x: 75.0, y: 15.0 });
+    let (shown, key) = crate::canvas::display_doc(&mut app, 0);
+    let id = app.session.active().unwrap().active_layer.unwrap();
+    assert_eq!(shown.layer(id).unwrap().blend, photocraft_color::BlendMode::Difference);
+    assert!(crate::transform_live::current(&app, shown.id).is_some(), "the GPU gets the live mesh");
+    let moved = crate::transform_live::cpu_doc(&mut app, shown, key);
+    let px = |x: i32, y: i32| photocraft_compose::render(&moved, Rect::new(x, y, x + 1, y + 1)).px[0];
+    let p = px(75, 15);
+    assert!(p[0] < 0.05 && p[1] > 0.95 && p[2] > 0.95, "red in Difference over white is cyan where the pin went: {p:?}");
+    assert!(px(75, 45)[0] > 0.95, "white where it left: {:?}", px(75, 45));
 }
 
 #[test]

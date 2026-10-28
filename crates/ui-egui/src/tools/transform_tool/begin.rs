@@ -54,21 +54,29 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String>
     }
     // egui reports the renderer's limit in the app; offscreen harnesses only through the device.
     let max_side = ctx.input(|i| i.max_texture_side).max(app.gpu.as_ref().map_or(1, |g| g.max_texture_side()));
-    // The layers covering the moving pixels draw over them instead of under them.
-    let above = Above::new(ctx, format!("transform-{session}-above"), &doc, id, max_side);
-    above.hide_in(&mut pd.layers);
-    // A style is drawn again from the pixels as the box moves them, so they are read without it.
-    // Not for the selected part of a layer: its style belongs to that part and the rest together.
-    let styled = lifted.is_none() && photocraft_compose::effects::has_effects(layer);
-    let (image, uv) = preview_image(&doc, id, lifted.as_ref(), b, max_side, styled);
+    // The canvas composites the moving pixels in the layer's place, with the layers above it on
+    // top (transform_live.rs).
+    let rest = lifted.as_ref().and_then(|_| pd.layer(id)).and_then(|l| l.surface()).cloned();
+    let live = crate::transform_live::LiveSession::start(&doc, revision, id, lifted.as_ref(), rest.as_ref());
+    // Otherwise (an adjustment layer's mask) the layers covering the moving pixels draw over them
+    // instead of under them.
+    let above = live.is_none().then(|| Above::new(ctx, format!("transform-{session}-above"), &doc, id, max_side));
+    if let Some(a) = &above {
+        a.hide_in(&mut pd.layers);
+    }
+    // The texels drawn over the canvas when nothing composites the layer live (the canvas does
+    // for a live preview, which needs none).
+    let (image, uv) = match live {
+        Some(_) => (egui::ColorImage::new([1, 1], vec![Color32::TRANSPARENT]), [1.0, 1.0]),
+        None => preview_image(&doc, id, lifted.as_ref(), b, max_side, false),
+    };
     let texture = crate::transform_tex::PreviewTextures::new(ctx, format!("transform-{session}"), image, uv);
     app.transform_preview = Some(TransformPreview {
         session,
         doc: Arc::new(pd),
         texture,
         opacity: layer.opacity * layer.fill_opacity,
-        above: Some(above),
-        styled: styled.then(|| crate::transform_fx::StyledPreview::new(format!("transform-{session}-styled"))),
+        above,
         follow: Some(Follow { revision, hidden: lifted.is_none() }),
         committing: None,
         gesture: None,
@@ -81,6 +89,7 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String>
         tool: app.ui.tool,
         path: None,
         content_aware: None,
+        live,
     });
     app.ui.transform = Some(TransformSession {
         session,
@@ -181,7 +190,7 @@ pub(crate) fn begin_content_aware(
         tool: app.ui.tool,
         path: None,
         content_aware: Some(live),
-        styled: None,
+        live: None,
     });
     app.ui.transform = Some(TransformSession {
         session,
@@ -295,7 +304,6 @@ fn begin_lone(
         texture,
         opacity: 0.6,
         above: None,
-        styled: None,
         follow: None,
         committing: None,
         gesture: None,
@@ -308,6 +316,7 @@ fn begin_lone(
         tool: app.ui.tool,
         path: None,
         content_aware: None,
+        live: None,
     });
     app.ui.transform = Some(TransformSession {
         session,
@@ -347,7 +356,6 @@ fn begin_path(app: &mut PhotocraftApp, ctx: &egui::Context, params: serde_json::
         doc,
         texture,
         opacity: 1.0,
-        styled: None,
         gesture: None,
         warp_drag: None,
         split_tool: None,
@@ -358,6 +366,7 @@ fn begin_path(app: &mut PhotocraftApp, ctx: &egui::Context, params: serde_json::
         tool: app.ui.tool,
         path: Some(path),
         content_aware: None,
+        live: None,
         above: None,
         follow: None,
         committing: None,
@@ -433,7 +442,6 @@ pub fn begin_selection(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(
         texture,
         opacity: 1.0,
         above: None,
-        styled: None,
         follow: None,
         committing: None,
         gesture: None,
@@ -446,6 +454,7 @@ pub fn begin_selection(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(
         tool: app.ui.tool,
         path: None,
         content_aware: None,
+        live: None,
     });
     app.ui.transform = Some(TransformSession {
         session,
@@ -558,9 +567,12 @@ fn enter_type_warp(app: &mut PhotocraftApp, ctx: &egui::Context) {
         && let Some(pv) = app.transform_preview.as_mut()
     {
         let max_side = ctx.input(|i| i.max_texture_side).max(app.gpu.as_ref().map_or(1, |g| g.max_texture_side()));
-        // Read as the session's texels were: without the style when the box draws it itself.
-        let (image, uv) = preview_image(&plain, id, None, b, max_side, pv.styled.is_some());
+        let (image, uv) = preview_image(&plain, id, None, b, max_side, false);
         pv.texture = crate::transform_tex::PreviewTextures::new(ctx, format!("transform-{session}"), image, uv);
+        // The warp starts from the type without its Warp Text.
+        if let Some(live) = pv.live.as_mut() {
+            live.restart_from(&plain, id);
+        }
     }
     let warp =
         current.as_ref().and_then(|w| WarpStyle::parse(&w.style).filter(|s| s.is_preset()).map(|s| (w, s))).map_or(Warp::none(rect), |(w, style)| Warp {

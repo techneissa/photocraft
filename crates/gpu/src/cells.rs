@@ -222,6 +222,35 @@ impl Compositor {
                     None => Rect::new(0, 0, c.width() as i32, c.height() as i32),
                 };
                 match p.kernel {
+                    Kernel::Mesh => {
+                        // The moving pixels through the mesh, over transparency.
+                        self.recorded += 1;
+                        let Some((_, target)) = self.pool.get(p.dst as usize) else { continue };
+                        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: Some("pc_live_mesh"),
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: target,
+                                resolve_target: None,
+                                depth_slice: None,
+                                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
+                            })],
+                            depth_stencil_attachment: None,
+                            timestamp_writes: None,
+                            occlusion_query_set: None,
+                            multiview_mask: None,
+                        });
+                        if let (Some(kit), Some(g)) = (&self.kit.mesh, &self.live_gpu)
+                            && let Some(v) = g.vertices.as_ref().filter(|_| g.count > 0)
+                        {
+                            pass.set_pipeline(&kit.pipeline);
+                            pass.set_scissor_rect(scissor.x0 as u32, scissor.y0 as u32, scissor.width(), scissor.height());
+                            pass.set_bind_group(0, &bg0, &[(ci as u64 * STRIDE) as u32, (op_base + i as u64 * STRIDE) as u32]);
+                            pass.set_bind_group(1, &g.group, &[]);
+                            pass.set_vertex_buffer(0, v.slice(..));
+                            pass.draw(0..g.count, 0..1);
+                        }
+                        continue;
+                    }
                     Kernel::CopyRect | Kernel::CopyFull => {
                         // The planner always gives copies a source.
                         let Some(a) = p.a else { continue };

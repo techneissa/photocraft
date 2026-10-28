@@ -42,7 +42,7 @@ pub mod stroke_trace;
 pub mod stroke_trail;
 pub mod symmetry_ui;
 pub(super) mod tool_reset;
-pub mod transform_fx;
+pub(crate) mod transform_live;
 pub mod transform_tex;
 pub mod transform_tool;
 pub(super) mod type_font_preview;

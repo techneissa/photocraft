@@ -103,7 +103,7 @@ fn ctrl_drag_tears_off_a_wall_and_the_stamp_clones_in_one_step() {
     // The canvas shows the stroke; the document is untouched until OK.
     let layer = app.session.active().unwrap().active_layer.unwrap();
     let green = |d: &Document| d.layer(layer).unwrap().surface().unwrap().rgba(122, 100)[1];
-    let (shown, key) = crate::distort_ui::display_doc(&app, 0).expect("a stamp preview");
+    let (shown, key) = crate::distort_ui::display_doc(&mut app, 0).expect("a stamp preview");
     assert!(green(&shown) > 0.8, "{}", green(&shown));
     let st = app.session.active().unwrap();
     assert!(green(&st.doc) < 0.6);
@@ -137,12 +137,12 @@ fn undo_steps_back_through_clone_strokes_and_tear_offs() {
     control(&mut app, &json!({"tool": "stamp", "source": [120, 139]})).unwrap();
     drag(&mut app, [118.0, 100.0], [126.0, 100.0], egui::Modifiers::NONE);
     assert_eq!(app.distort.vanishing.as_ref().unwrap().strokes.len(), 1);
-    assert!(crate::distort_ui::display_doc(&app, 0).is_some());
+    assert!(crate::distort_ui::display_doc(&mut app, 0).is_some());
 
     // ⌘Z takes the stroke back (and its preview), then the source, then the torn-off wall.
     step(&mut app, Step::Undo);
     assert!(app.distort.vanishing.as_ref().unwrap().strokes.is_empty());
-    assert!(crate::distort_ui::display_doc(&app, 0).is_none(), "no stamp preview left");
+    assert!(crate::distort_ui::display_doc(&mut app, 0).is_none(), "no stamp preview left");
     step(&mut app, Step::Undo);
     assert_eq!(app.distort.vanishing.as_ref().unwrap().source, None);
     step(&mut app, Step::Undo);
@@ -155,7 +155,7 @@ fn undo_steps_back_through_clone_strokes_and_tear_offs() {
     let s = app.distort.vanishing.as_ref().unwrap();
     assert_eq!((s.planes.len(), s.strokes.len()), (2, 1));
     assert!(s.torn[1].is_some());
-    assert!(crate::distort_ui::display_doc(&app, 0).is_some(), "the stroke shows again");
+    assert!(crate::distort_ui::display_doc(&mut app, 0).is_some(), "the stroke shows again");
 }
 #[test]
 fn overlapping_stamp_preview_matches_commit_across_batches() {
@@ -230,17 +230,17 @@ fn moving_the_paste_repaints_the_stamp_preview() {
     crate::distort_ui::menu(&mut app, &ctx, VP, &json!({})).unwrap().unwrap();
     control(&mut app, &json!({"planes": [{"corners": [[10, 10], [230, 10], [230, 150], [10, 150]]}]})).unwrap();
     control(&mut app, &json!({"clone": [{"source": [200, 130], "points": [[30, 130]], "size": 8}]})).unwrap();
-    let red = |app: &PhotocraftApp, x: i32, y: i32| {
+    let red = |app: &mut PhotocraftApp, x: i32, y: i32| {
         let (shown, _) = app.distort.vanishing.as_ref().unwrap().shown().unwrap();
         let l = app.session.active().unwrap().active_layer.unwrap();
         shown.layer(l).unwrap().surface().unwrap().rgba(x, y)[0]
     };
-    assert!(red(&app, 100, 60) > 0.9);
+    assert!(red(&mut app, 100, 60) > 0.9);
     control(&mut app, &json!({"pasteAt": [0.0, 0.5]})).unwrap();
-    assert!(red(&app, 100, 60) < 0.5, "the paste left its old place");
-    assert!(red(&app, 30, 100) > 0.9, "and shows at the new one");
+    assert!(red(&mut app, 100, 60) < 0.5, "the paste left its old place");
+    assert!(red(&mut app, 30, 100) > 0.9, "and shows at the new one");
     control(&mut app, &json!({"paste": false})).unwrap();
-    assert!(red(&app, 30, 100) < 0.5, "paste off: gone from the preview");
+    assert!(red(&mut app, 30, 100) < 0.5, "paste off: gone from the preview");
     assert!(!app.distort.vanishing.as_ref().unwrap().preview_has_paste());
 }
 
@@ -252,27 +252,27 @@ fn dragging_the_paste_shows_it_once() {
     control(&mut app, &json!({"planes": [{"corners": [[10, 10], [230, 10], [230, 150], [10, 150]]}], "tool": "edit"})).unwrap();
     control(&mut app, &json!({"clone": [{"source": [200, 130], "points": [[30, 130]], "size": 8}]})).unwrap();
     let layer = app.session.active().unwrap().active_layer.unwrap();
-    let red = |app: &PhotocraftApp, x: i32, y: i32| {
+    let red = |app: &mut PhotocraftApp, x: i32, y: i32| {
         let (shown, _) = crate::distort_ui::display_doc(app, 0)?;
         Some(shown.layer(layer).unwrap().surface().unwrap().rgba(x, y)[0])
     };
-    assert!(red(&app, 100, 60).unwrap() > 0.9, "the paste is in the preview");
+    assert!(red(&mut app, 100, 60).unwrap() > 0.9, "the paste is in the preview");
     let ev = |app: &mut PhotocraftApp, e: ToolEvent| crate::distort_ui::pointer(app, e, egui::Modifiers::NONE);
     ev(&mut app, ToolEvent::Down { x: 100.0, y: 60.0, pressure: 1.0 });
     ev(&mut app, ToolEvent::Move { x: 60.0, y: 100.0, pressure: 1.0 });
     // Mid-drag: no copy left behind at the old place, only the overlay at the pointer.
-    assert!(red(&app, 100, 60).is_none_or(|r| r < 0.5), "{:?}", red(&app, 100, 60));
+    assert!(red(&mut app, 100, 60).is_none_or(|r| r < 0.5), "{:?}", red(&mut app, 100, 60));
     assert!(app.distort.vanishing.as_ref().unwrap().paste_overlay(), "the overlay draws the moving paste");
     ev(&mut app, ToolEvent::Up { x: 60.0, y: 100.0 });
-    assert!(red(&app, 100, 60).unwrap() < 0.5);
-    assert!(red(&app, 60, 100).unwrap() > 0.9, "released: the preview pastes at the new place");
+    assert!(red(&mut app, 100, 60).unwrap() < 0.5);
+    assert!(red(&mut app, 60, 100).unwrap() > 0.9, "released: the preview pastes at the new place");
     assert!(!app.distort.vanishing.as_ref().unwrap().paste_overlay());
     // A plane corner drag freezes the preview, paste included, until release: one copy.
     ev(&mut app, ToolEvent::Down { x: 230.0, y: 150.0, pressure: 1.0 });
     ev(&mut app, ToolEvent::Move { x: 236.0, y: 156.0, pressure: 1.0 });
-    let s = app.distort.vanishing.as_ref().unwrap();
-    assert!(matches!(s.drag, Some(Drag::Corner { .. })));
-    assert!(red(&app, 60, 100).unwrap() > 0.9 && !s.paste_overlay(), "frozen preview, no overlay on top");
+    assert!(matches!(app.distort.vanishing.as_ref().unwrap().drag, Some(Drag::Corner { .. })));
+    assert!(red(&mut app, 60, 100).unwrap() > 0.9, "frozen preview");
+    assert!(!app.distort.vanishing.as_ref().unwrap().paste_overlay(), "no overlay on top");
     ev(&mut app, ToolEvent::Up { x: 236.0, y: 156.0 });
     let s = app.distort.vanishing.as_ref().unwrap();
     assert!(s.preview_has_paste() && !s.paste_overlay());
@@ -303,13 +303,13 @@ fn deleting_the_last_plane_drops_the_stamp_preview() {
     crate::distort_ui::menu(&mut app, &ctx, VP, &json!({})).unwrap().unwrap();
     control(&mut app, &json!({"planes": [{"corners": [[70, 60], [170, 60], [220, 150], [20, 150]]}]})).unwrap();
     control(&mut app, &json!({"clone": [{"source": [120, 139], "points": [[118, 100], [126, 100]], "size": 12}]})).unwrap();
-    assert!(crate::distort_ui::display_doc(&app, 0).is_some());
+    assert!(crate::distort_ui::display_doc(&mut app, 0).is_some());
     let s = app.distort.vanishing.as_mut().unwrap();
     s.selected = Some(0);
     s.delete_selected();
     sync_preview(&mut app);
     assert!(app.distort.vanishing.as_ref().unwrap().planes.is_empty());
-    assert!(crate::distort_ui::display_doc(&app, 0).is_none(), "no strokes shown without a plane");
+    assert!(crate::distort_ui::display_doc(&mut app, 0).is_none(), "no strokes shown without a plane");
 }
 
 /// Opens the mode on the active layer of `app_with_layer` and stamps one stroke.
@@ -323,12 +323,12 @@ fn stamp_a_stroke(app: &mut PhotocraftApp, ctx: &egui::Context) {
 fn stamp_preview_is_not_shown_on_another_document() {
     let (ctx, mut app) = app_with_layer();
     stamp_a_stroke(&mut app, &ctx);
-    assert!(crate::distort_ui::display_doc(&app, 0).is_some());
+    assert!(crate::distort_ui::display_doc(&mut app, 0).is_some());
     app.session.execute("file.new", json!({"width": 32, "height": 32, "depth": 8})).unwrap();
     let active = app.session.active_index().unwrap();
     // The session stays until drop_foreign; the preview must not follow this document (#5115).
     assert!(app.distort.vanishing.is_some());
-    assert!(crate::distort_ui::display_doc(&app, active).is_none());
+    assert!(crate::distort_ui::display_doc(&mut app, active).is_none());
 }
 
 #[test]
@@ -349,7 +349,7 @@ fn ok_paints_the_layer_the_mode_was_opened_on() {
         app.session.execute("layer.new.layer", json!({"name": "other"})).unwrap();
         let other = app.session.active().unwrap().active_layer.unwrap();
         sync_preview(&mut app);
-        let expected = photocraft_compose::flatten(&crate::distort_ui::display_doc(&app, 0).unwrap().0).px;
+        let expected = photocraft_compose::flatten(&crate::distort_ui::display_doc(&mut app, 0).unwrap().0).px;
         commit(&mut app).unwrap();
         let d = &app.session.active().unwrap().doc;
         assert!(d.layer(other).unwrap().surface().unwrap().content_bounds().is_empty(), "newLayer={new_layer}");
@@ -372,7 +372,7 @@ fn an_edit_under_the_mode_shows_on_the_canvas() {
         })
         .unwrap();
     stamp_a_stroke(&mut app, &ctx);
-    let before = crate::distort_ui::display_doc(&app, 0).unwrap();
+    let before = crate::distort_ui::display_doc(&mut app, 0).unwrap();
     app.session
         .edit("edit", |doc, active| {
             doc.layer_mut(active.unwrap()).unwrap().surface_mut().unwrap().fill_rect(Rect::new(200, 20, 220, 40), &[0.0, 1.0, 0.0, 1.0]);
@@ -380,7 +380,7 @@ fn an_edit_under_the_mode_shows_on_the_canvas() {
         })
         .unwrap();
     // Not the stale preview, even before the mode catches up.
-    assert!(crate::distort_ui::display_doc(&app, 0).is_none_or(|(d, _)| !Arc::ptr_eq(&d, &before.0)));
+    assert!(crate::distort_ui::display_doc(&mut app, 0).is_none_or(|(d, _)| !Arc::ptr_eq(&d, &before.0)));
     // The canvas catches up before it draws: the strokes over the edit, no frame without them.
     let (shown, key) = crate::canvas::display_doc(&mut app, 0);
     assert_ne!(key, before.1);
