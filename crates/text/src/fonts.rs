@@ -280,7 +280,7 @@ impl FontDb {
             for path in files {
                 let key = path.canonicalize().unwrap_or_else(|_| path.clone());
                 if seen.insert(key) {
-                    self.fcx.collection.load_fonts_from_paths([path]);
+                    big_collection::register_file(&mut self.fcx.collection, &path);
                 }
             }
             self.ps_cache.clear();
@@ -1170,5 +1170,7 @@ mod tests {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+mod big_collection;
 #[cfg(test)]
 mod font_names_tests;
