@@ -306,6 +306,8 @@ pub struct Interface {
     pub notification_auto_hide: bool,
     /// Seconds a notice stays on screen before it hides itself (Auto Hide Notifications).
     pub notification_duration_seconds: u32,
+    /// Which items of the top bar are shown (Preferences › Interface › Top Bar).
+    pub top_bar: TopBar,
 }
 
 impl Default for Interface {
@@ -335,6 +337,7 @@ impl Default for Interface {
             show_file_name_in_title: true,
             notification_auto_hide: true,
             notification_duration_seconds: 6,
+            top_bar: TopBar::default(),
         }
     }
 }
@@ -439,6 +442,7 @@ mod customize;
 mod files;
 mod shortcuts;
 mod store;
+mod top_bar;
 mod validate;
 
 pub use cmds::specs;
@@ -450,6 +454,7 @@ pub use shortcuts::{
 };
 use store::read_lenient;
 pub use store::{InvalidPref, PREFS_VERSION, PrefsStore};
+pub use top_bar::TopBar;
 pub use validate::{HIDDEN_UNTIL_IMPLEMENTED, LINUX_ONLY, SECTIONS, choices, gpu_adapter_matches, is_color, is_hidden, parse_hex, range};
 use validate::{check_value, get_path, keyed, set_path};
 
