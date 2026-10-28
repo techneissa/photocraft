@@ -18,8 +18,9 @@ fn backend<E: std::fmt::Display>(e: E) -> MlError {
     MlError::Backend(e.to_string())
 }
 
-/// The optimised plan of `model`, loaded on first use (a few seconds) and kept for the process
-/// while the file stays installed: a removed or disabled model is dropped, not served from cache.
+/// The optimised plan of `model`, loaded when asked for (a few seconds) and kept while a run uses
+/// it (see [`run_with`], which forgets it afterwards): a removed or disabled model is dropped, not
+/// served from cache.
 fn plan(model: Model) -> Result<Plan, MlError> {
     let mut plans = PLANS.lock().unwrap_or_else(PoisonError::into_inner);
     let Some(path) = model_path(model) else {
@@ -61,7 +62,14 @@ pub(crate) fn run_with(model: Model, inputs: &[(&[usize], Vec<f32>)], cancel: Ca
     let out = plan.run(feed).map_err(backend)?;
     let first = out.first().ok_or_else(|| MlError::Backend("the model returned no output".into()))?;
     let view = first.to_plain_array_view::<f32>().map_err(backend)?;
-    Ok(view.iter().copied().collect())
+    let result: Vec<f32> = view.iter().copied().collect();
+    // Fork: forget the plan after the run. Kept, it holds about 6 GB of the process (measured with
+    // BiRefNet-lite on a 24 MP photo: 6.7 GB resident after the run, 2.2 GB without the plan) for
+    // a repeat that is only 4 s faster, and a repeat on the same pixels answers from the cache.
+    drop(out);
+    drop(_one);
+    PLANS.lock().unwrap_or_else(PoisonError::into_inner).retain(|(m, _)| *m != model);
+    Ok(result)
 }
 
 #[cfg(test)]

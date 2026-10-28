@@ -461,7 +461,7 @@ fn smart_note(note: &str) -> &str {
     match note {
         "macOS cutout unavailable, used Classic" => tl!("macOS cutout unavailable, used Classic"),
         "macOS cutout failed, used Classic" => tl!("macOS cutout failed, used Classic"),
-        photocraft_engine::smartselect_cmds::MODEL_MISSING => tl!("AI model not installed, used Classic (Preferences \u{25B8} AI Models)"),
+        photocraft_engine::smartselect_cmds::MODEL_MISSING => tl!("AI model not installed, used Classic (Preferences › AI Models)"),
         photocraft_engine::smartselect_cmds::MODEL_FAILED => tl!("AI model failed, used Classic"),
         other => tl!(other),
     }

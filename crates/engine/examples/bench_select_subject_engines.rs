@@ -18,7 +18,7 @@ fn main() {
         let bytes = std::fs::read(file).unwrap_or_else(|e| panic!("{file}: {e}"));
         let name = std::path::Path::new(file).file_name().and_then(|n| n.to_str()).unwrap_or("image");
         let imported = photocraft_io::import(name, &bytes).unwrap_or_else(|e| panic!("{file}: {e}"));
-        for engine in ["classic", "macos"] {
+        for engine in std::env::var("ENGINES").unwrap_or_else(|_| "classic,macos,model".into()).split(',') {
             let mut s = Session::new();
             s.add_document(imported.document.clone(), None);
             s.execute("prefs.set", json!({"path": "tools.selectSubjectEngine", "value": engine})).unwrap();
@@ -34,7 +34,19 @@ fn main() {
             }
             let mp = f64::from(bounds.width()) * f64::from(bounds.height()) / 1e6;
             let note = r.get("note").and_then(|n| n.as_str()).unwrap_or("");
-            println!("{name} {}×{} ({mp:.1} MP)  {engine:>7}: {took:.2?}  selected {:.1} %  {note}", bounds.width(), bounds.height(), covered * 100.0);
+            println!(
+                "{name} {}×{} ({mp:.1} MP)  {engine:>7}: {took:.2?}  selected {:.1} %  now {} MB resident  {note}",
+                bounds.width(),
+                bounds.height(),
+                covered * 100.0,
+                resident_mb()
+            );
         }
     }
+}
+
+/// This process's resident memory in MB now (`ps`; 0 where there is none), to see what stays after a run.
+fn resident_mb() -> u64 {
+    let out = std::process::Command::new("ps").args(["-o", "rss=", "-p", &std::process::id().to_string()]).output().ok();
+    out.and_then(|o| String::from_utf8(o.stdout).ok()).and_then(|s| s.trim().parse::<u64>().ok()).map_or(0, |kb| kb / 1024)
 }

@@ -378,7 +378,7 @@ fn model_subject(smp: &dyn Sampler, canvas: Rect, ctl: &photocraft_raster::Inter
 }
 
 /// The note for a `model` choice (or a model-only job) with no model installed.
-pub const MODEL_MISSING: &str = "AI model not installed, used Classic (Preferences \u{25B8} AI Models)";
+pub const MODEL_MISSING: &str = "AI model not installed, used Classic (Preferences › AI Models)";
 /// The note for a model that could not run.
 pub const MODEL_FAILED: &str = "AI model failed, used Classic";
 

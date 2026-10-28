@@ -104,7 +104,7 @@ pub(super) fn choice_label(v: &str) -> String {
         "cm" => "Centimeters".into(),
         "mm" => "Millimeters".into(),
         "macos" => "macOS (Apple Vision, Mac only)".into(),
-        "model" => "AI Model (download in Preferences \u{25B8} AI Models)".into(),
+        "model" => "AI Model (download in Preferences › AI Models)".into(),
         "75" | "80" | "85" | "90" | "95" | "100" | "105" | "110" | "115" | "120" | "125" | "150" | "175" | "200" | "250" | "300" => format!("{v}%"),
         "8" => "8 Bits/Channel".into(),
         "16" => "16 Bits/Channel".into(),

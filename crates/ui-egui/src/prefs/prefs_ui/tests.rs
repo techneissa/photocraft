@@ -122,7 +122,7 @@ fn the_nudge_pause_is_hidden_while_nudges_are_not_bundled() {
     assert_eq!(humanize("nudgeBundlePauseMs"), "Nudge Bundle Pause (ms)");
     assert_eq!(humanize("selectSubjectEngine"), "Select Subject Engine");
     assert_eq!(choice_label("macos"), "macOS (Apple Vision, Mac only)");
-    assert_eq!(choice_label("model"), "AI Model (download in Preferences \u{25B8} AI Models)");
+    assert_eq!(choice_label("model"), "AI Model (download in Preferences › AI Models)");
     assert_eq!(choice_label("classic"), "Classic");
 }
 
