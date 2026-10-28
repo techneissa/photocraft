@@ -1,7 +1,8 @@
+use super::dropdown_search;
 use super::panel::chevron_icon;
 use super::scrub::take_label_scrub_name;
 use super::slider::wheel_notches_of;
-use super::{Pos2, Rect, Response, Ui, Vec2, type_ahead};
+use super::{Pos2, Rect, Response, Ui, Vec2};
 
 /// A compact labelled dropdown in the studio style.
 pub fn dropdown<T: PartialEq + Clone>(ui: &mut Ui, id: &str, name: &str, current: &mut T, options: &[(T, &str)], width: f32) -> bool {
@@ -64,20 +65,22 @@ fn dropdown_with<T: PartialEq + Clone>(
     let (press, close) = crate::press_menu::PressCombo::before(ui, id);
     let texts: Vec<String> = options.iter().map(|(_, l)| shown(l)).collect();
     let list = list_height(ui);
+    let labels: Vec<&str> = texts.iter().map(|l| l.as_str()).collect();
+    let combo = craft_ui::ComboBox::from_id_salt(id).selected_text(label).width(width).height(list).icon(chevron_icon).close_behavior(close);
+    // Typing narrows the list (a field above the rows, `dropdown_search`), ↩ closes it (#1481).
+    let search = dropdown_search::before(ui, id, &labels, &[]);
+    #[rustfmt::skip]
     let response =
-        craft_ui::ComboBox::from_id_salt(id).selected_text(label).width(width).height(list).icon(chevron_icon).close_behavior(close).show_ui(ui, |ui| {
+        combo.show_ui_with_header(ui, |ui| search.header(ui), |ui, ()| {
             fit_widest_option(ui, texts.iter().map(|l| l.as_str()));
-            // A typed letter jumps to the next option starting with it, ↩ closes the list (#1481).
-            let labels: Vec<&str> = texts.iter().map(|l| l.as_str()).collect();
-            let shown = options.iter().position(|(v, _)| v == current);
-            if let Some((v, _)) = type_ahead::keys(ui, ui.make_persistent_id(id), shown, &labels).and_then(|i| options.get(i)) {
+            if let Some((v, _)) = search.picked(ui).and_then(|i| options.get(i)) {
                 *current = v.clone();
                 chosen.push(v.clone());
-                reveal = true;
                 keyed = true;
+                ui.close();
             }
             // Over the open list the wheel steps the value too, instead of scrolling the list.
-            over_list = wheel && ui.rect_contains_pointer(ui.clip_rect());
+            over_list = wheel && !search.filtering() && ui.rect_contains_pointer(ui.clip_rect());
             if over_list {
                 let stepped = wheel_steps(ui, wheel_id, true, current, options);
                 wheeled = !stepped.is_empty();
@@ -87,8 +90,9 @@ fn dropdown_with<T: PartialEq + Clone>(
             // The row nearest the pointer, by its distance to each row.
             let pointer = ui.ctx().pointer_hover_pos().filter(|_| ui.rect_contains_pointer(ui.clip_rect()));
             let mut nearest: Option<(f32, &T)> = None;
-            for ((v, _), text) in options.iter().zip(texts.iter()) {
+            for (i, ((v, _), text)) in search.rows(options.iter().zip(texts.iter())) {
                 let item = ui.selectable_label(v == current, text.as_str());
+                search.row(ui, i, &item);
                 if reveal && v == current {
                     item.scroll_to_me(None);
                 }
@@ -111,6 +115,11 @@ fn dropdown_with<T: PartialEq + Clone>(
             if hovered.is_none() {
                 hovered = nearest.map(|(_, v)| v.clone());
             }
+            // The row the keyboard highlights previews too, while a search is typed.
+            if hovered.is_none() && let Some((v, _)) = search.active_option().and_then(|i| options.get(i)) {
+                hovered = Some(v.clone());
+            }
+            search.no_match(ui);
         });
     // A scrubby caption drawn just before the dropdown names it; otherwise its own name does.
     let response = match take_label_scrub_name(ui, response.response.rect) {
@@ -277,22 +286,27 @@ pub fn dropdown_with_tooltips<T: PartialEq + Clone>(ui: &mut Ui, id: &str, name:
     let mut changed = false;
     let (press, close) = crate::press_menu::PressCombo::before(ui, id);
     let list = list_height(ui);
+    let labels: Vec<&str> = options.iter().map(|(_, l, _)| tl!(l)).collect();
+    let combo = craft_ui::ComboBox::from_id_salt(id).selected_text(label).width(width).height(list).icon(chevron_icon).close_behavior(close);
+    let search = dropdown_search::before(ui, id, &labels, &[]);
+    #[rustfmt::skip]
     let response =
-        craft_ui::ComboBox::from_id_salt(id).selected_text(label).width(width).height(list).icon(chevron_icon).close_behavior(close).show_ui(ui, |ui| {
+        combo.show_ui_with_header(ui, |ui| search.header(ui), |ui, ()| {
             fit_widest_option(ui, options.iter().map(|(_, l, _)| tl!(l)));
-            let labels: Vec<&str> = options.iter().map(|(_, l, _)| tl!(l)).collect();
-            let shown = options.iter().position(|(v, _, _)| v == current);
-            if let Some((v, _, _)) = type_ahead::keys(ui, ui.make_persistent_id(id), shown, &labels).and_then(|i| options.get(i)) {
+            if let Some((v, _, _)) = search.picked(ui).and_then(|i| options.get(i)) {
                 *current = v.clone();
                 changed = true;
+                ui.close();
             }
-            for (v, l, tip) in options {
+            for (i, (v, l, tip)) in search.rows(options.iter()) {
                 let item = ui.selectable_label(v == current, tl!(l)).on_hover_text(tl!(tip));
+                search.row(ui, i, &item);
                 if press.chosen(ui, &item) {
                     *current = v.clone();
                     changed = true;
                 }
             }
+            search.no_match(ui);
         });
     let response = match take_label_scrub_name(ui, response.response.rect) {
         Some(label) => response.response.labelled_by(label),

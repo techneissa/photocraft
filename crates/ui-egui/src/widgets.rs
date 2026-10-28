@@ -15,6 +15,7 @@ pub use type_ahead::list_open as dropdown_list_open;
 mod buttons;
 mod color;
 mod dropdown;
+mod dropdown_search;
 pub mod field_tab;
 pub mod field_wheel;
 mod fields;
