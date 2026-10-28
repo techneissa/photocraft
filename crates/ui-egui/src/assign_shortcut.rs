@@ -39,7 +39,8 @@ fn pending_id() -> Id {
     Id::unique("assign-shortcut-pending")
 }
 
-/// Offer the menu for `command` at `pos`.
+/// Offer the menu for `command` at `pos` (tests; a widget goes through [`on`]).
+#[cfg(test)]
 pub(crate) fn offer(ctx: &egui::Context, command: &str, pos: Pos2) {
     offer_from(ctx, command, pos, false);
 }
