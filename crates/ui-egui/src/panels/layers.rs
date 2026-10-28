@@ -482,6 +482,14 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 None => actions.push((cmd.into(), json!({}))),
             }
         }
+        if app.session.prefs().interface.show_double_exposure_button {
+            let enabled = app.session.is_enabled(crate::double_exposure::COMMAND);
+            let button = ui.add_enabled_ui(enabled, |ui| icons::button(ui, "double-exposure", 26.0, false, tl!("Double Exposure"))).inner;
+            // Null params: the click takes the menu's path, which also sets up the brush.
+            if button.clicked() {
+                actions.push((crate::double_exposure::COMMAND.into(), Value::Null));
+            }
+        }
         let fx = fx_button(ui, 26.0, tl!("Add a layer style"));
         crate::press_menu::show(&fx, |ui, menu| {
             ui.set_min_width(180.0);

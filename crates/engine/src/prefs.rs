@@ -286,6 +286,8 @@ pub struct Interface {
     /// Layers panel thumbnails frame the layer's own pixels instead of the whole canvas, so small
     /// objects in a large document stay visible (Photoshop's Clip Thumbnails to Layer Bounds; #4281).
     pub clip_thumbnails_to_layer_bounds: bool,
+    /// The Layers panel's Double Exposure button, after Add Layer Mask (the Layer menu item stays).
+    pub show_double_exposure_button: bool,
     pub show_tooltips: bool,
     /// Menus, popups and collapsing sections fade and slide, and scroll areas glide to a new
     /// position. Off, everything changes at once (a reduced-motion mode; #1218, #3273).
@@ -328,6 +330,7 @@ impl Default for Interface {
             dynamic_color_sliders: true,
             show_menu_colors: true,
             clip_thumbnails_to_layer_bounds: false,
+            show_double_exposure_button: true,
             show_tooltips: true,
             enable_animations: true,
             show_bounding_box_when_dragging_layer: false,

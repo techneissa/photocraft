@@ -151,3 +151,56 @@ fn the_menu_item_sits_in_the_layer_menu_and_the_search_finds_it() {
     let off = menu_items(&app).into_iter().find(|i| i.id == CMD).unwrap();
     assert!(!off.enabled, "greyed with one pixel layer");
 }
+
+/// The Layers panel with `layers` pixel layers (the first being the Background).
+fn panel(layers: usize) -> egui_kittest::Harness<'static, PhotocraftApp> {
+    let mut s = photocraft_engine::Session::new();
+    s.execute("file.new", json!({"width": 80, "height": 64})).unwrap();
+    for n in 1..layers {
+        s.execute("layer.new.layer", json!({"name": format!("L{n}")})).unwrap();
+    }
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(|cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        let mut app = PhotocraftApp::new(s, crate::Services::default());
+        crate::tool_memory::select(&mut app, Tool::Move);
+        app
+    });
+    h.run_steps(4);
+    h
+}
+
+#[test]
+fn the_panel_button_runs_the_command_as_the_menu_does() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = panel(3);
+    h.get_by_label("Double Exposure").click();
+    h.run_steps(4);
+    let app = h.state();
+    assert_eq!(app.ui.tool, Tool::Brush, "the brush is set up too");
+    assert!(app.layer_mask_targeted());
+    assert_eq!(app.session.tools.brush.hardness, 0.0);
+    let st = app.session.active().unwrap();
+    assert_eq!(st.doc.layers.iter().filter(|l| l.mask.is_some()).count(), 1);
+}
+
+#[test]
+fn the_panel_button_is_greyed_with_one_pixel_layer() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = panel(1);
+    h.get_by_label("Double Exposure").click();
+    h.run_steps(4);
+    assert_eq!(h.state().ui.tool, Tool::Move);
+    assert!(h.state().session.active().unwrap().doc.layers.iter().all(|l| l.mask.is_none()));
+}
+
+#[test]
+fn the_panel_button_can_be_switched_off_in_the_preferences() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = panel(3);
+    assert!(h.query_by_label("Double Exposure").is_some());
+    h.state_mut().run("prefs.set", json!({"path": "interface.showDoubleExposureButton", "value": false})).unwrap();
+    h.run_steps(4);
+    assert!(h.query_by_label("Double Exposure").is_none());
+    // The Layer menu item stays.
+    assert!(menu_items(h.state()).iter().any(|i| i.id == CMD && i.enabled));
+}

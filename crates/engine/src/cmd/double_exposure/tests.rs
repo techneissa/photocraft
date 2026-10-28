@@ -322,3 +322,21 @@ fn an_artboard_with_one_pixel_layer_is_greyed_while_it_is_active() {
     assert!(s.disabled_reason(CMD).is_none(), "outside it the document's layers count");
     let _ = p;
 }
+
+#[test]
+fn the_panel_button_setting_defaults_on_and_is_checked_like_its_neighbours() {
+    const PATH: &str = "interface.showDoubleExposureButton";
+    let mut s = Session::new();
+    assert_eq!(s.execute("prefs.get", json!({"path": PATH})).unwrap(), json!(true));
+    assert!(s.prefs().interface.show_double_exposure_button);
+    s.execute("prefs.set", json!({"path": PATH, "value": false})).unwrap();
+    assert!(!s.prefs().interface.show_double_exposure_button);
+    assert!(s.execute("prefs.set", json!({"path": PATH, "value": "no"})).is_err());
+    assert!(s.execute("prefs.set", json!({"path": PATH, "value": 3})).is_err());
+    assert!(!s.prefs().interface.show_double_exposure_button, "a bad value changes nothing");
+    s.execute("prefs.reset", json!({"path": PATH})).unwrap();
+    assert!(s.prefs().interface.show_double_exposure_button);
+    // Settings saved before the option existed read as on.
+    let old: crate::prefs::Interface = serde_json::from_value(json!({"showTooltips": false})).unwrap();
+    assert!(old.show_double_exposure_button);
+}
