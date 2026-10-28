@@ -70,6 +70,7 @@ pub mod contour_lib_cmds;
 pub mod cutout_cmds;
 pub mod distort_cmds;
 pub mod document_preset_cmds;
+pub(crate) mod double_exposure;
 pub mod edit_cmds;
 pub mod edit_menu_cmds;
 mod enabled;
@@ -1283,6 +1284,7 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::channel_cmds::specs());
     v.extend(crate::adjust_cmds::specs());
     v.extend(crate::layer_menu_cmds::specs());
+    v.extend(double_exposure::specs());
     v.extend(crate::layer_label_cmds::specs());
     v.extend(crate::layer_xmp_cmds::specs());
     v.extend(crate::mode_cmds::specs());

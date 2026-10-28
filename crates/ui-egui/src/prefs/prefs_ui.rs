@@ -55,6 +55,8 @@ pub struct Runtime {
     pub(crate) selected_tool: Option<crate::state::Tool>,
     /// The tool owning the session brush and the other tools' brushes, as last remembered.
     pub(crate) tool_brushes: Option<crate::tool_memory::ToolBrushes>,
+    /// The Brush's own brush while Double Exposure's soft one stands in for it.
+    pub(crate) double_exposure_brush: Option<crate::double_exposure::Stash>,
 }
 
 // ------------------------------------------------------------------ shortcuts

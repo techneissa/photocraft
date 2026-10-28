@@ -52,6 +52,8 @@ pub static ICONS: &[(&str, &[u8])] = &[
     ("crop", include_bytes!("../../../assets/icons/crop.svg")),
     ("diamond", include_bytes!("../../../assets/icons/diamond.svg")),
     ("direct-select", include_bytes!("../../../assets/icons/direct-select.svg")),
+    // PhotoCraft original: the Layers panel's Double Exposure button (two overlapping circles).
+    ("double-exposure", include_bytes!("../../../assets/icons/double-exposure.svg")),
     ("droplet", include_bytes!("../../../assets/icons/droplet.svg")),
     // Original: a dashed horizontal ellipse (Elliptical Marquee), on Lucide's grid and stroke.
     ("ellipse-dashed", include_bytes!("../../../assets/icons/ellipse-dashed.svg")),

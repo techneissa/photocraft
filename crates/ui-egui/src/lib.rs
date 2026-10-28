@@ -17,6 +17,7 @@ pub mod canvas;
 pub mod control;
 pub mod dialogs;
 pub mod dock;
+mod double_exposure;
 pub mod file_dialog;
 pub mod file_open;
 pub mod gpu_status;

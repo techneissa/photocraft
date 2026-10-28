@@ -70,6 +70,7 @@ impl Session {
                 restore_target(st, layers);
                 st.bump_revision(keep_clean);
                 st.last_damage = damage;
+                crate::cmd::double_exposure::after_redo(self);
                 true
             }
             None => false,
