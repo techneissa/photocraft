@@ -48,6 +48,8 @@ pub const TABLE: &[(&str, Class)] = &[
     ("adobe-assets", Class::Standalone),
     // Pen tablet input (the one isolated `unsafe` helper: AppKit interop on macOS).
     ("tablet", Class::Standalone),
+    // macOS subject cutout (Vision; the second isolated `unsafe` helper: Objective-C interop on macOS).
+    ("macvision", Class::Standalone),
     ("doc", Class::Layer(1)),
     ("ops", Class::Layer(2)),
     ("paint", Class::Layer(2)),

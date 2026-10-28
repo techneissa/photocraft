@@ -1,0 +1,35 @@
+[package]
+name = "photocraft-macvision"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "macOS's own subject cutout (Apple's Vision framework, the one Photos and Preview use to lift a subject) as a soft mask; a stub that reports itself unavailable elsewhere"
+
+# The fork's second isolated `unsafe` helper crate (after photocraft-tablet; AGENTS.md "No unsafe"):
+# the Objective-C calls into Vision need it. Only `src/macos.rs` allows `unsafe`; everything else is
+# denied, and every other crate keeps the workspace's `unsafe_code = "forbid"`.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+ cognitive_complexity = "deny"
+ too_many_arguments = "deny"
+ wildcard_imports = "deny"
+ dbg_macro = "warn"
+ todo = "warn"
+
+# Pure-Rust bindings, no C code. No `exception` feature of objc2: it compiles an Objective-C helper
+# with `cc` (see README.md for how Vision is never given a reason to throw). Pinned exactly, as in
+# photocraft-tablet: review the diff before bumping.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.6.5"
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSArray", "NSData", "NSDictionary", "NSError", "NSIndexSet", "NSProcessInfo", "NSString", "NSValue", "NSObject", "NSEnumerator", "NSAutoreleasePool"] }
+objc2-core-foundation = { version = "=0.3.2", default-features = false, features = ["std", "objc2", "CFCGTypes"] }
+objc2-core-graphics = { version = "=0.3.2", default-features = false, features = ["std", "objc2", "CGColorSpace"] }
+objc2-core-image = { version = "=0.3.2", default-features = false, features = ["std", "objc2-core-foundation", "objc2-core-graphics", "CIImage"] }
+objc2-core-video = { version = "=0.3.2", default-features = false, features = ["std", "objc2", "CVBase", "CVBuffer", "CVImageBuffer", "CVPixelBuffer", "CVReturn"] }
+objc2-vision = { version = "=0.3.2", default-features = false, features = ["std", "objc2-core-image", "objc2-core-video", "VNRequest", "VNObservation", "VNRequestHandler", "VNTypes", "VNDefines", "VNGenerateForegroundInstanceMaskRequest", "VNGeneratePersonSegmentationRequest", "VNStatefulRequest", "VNTargetedImageRequest"] }
+
+# The Mac tests read a real portrait (`PHOTOCRAFT_MACVISION_IMAGE`) and write a mask picture.
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+image = { workspace = true, features = ["png", "jpeg"] }
