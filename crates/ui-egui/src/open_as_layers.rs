@@ -121,7 +121,8 @@ pub(crate) fn finished(app: &mut PhotocraftApp, v: &Value) {
     app.sync_views();
     let name = v.get("name").and_then(Value::as_str).unwrap_or_default();
     let layers = v.get("layers").and_then(Value::as_u64).unwrap_or(0);
-    app.ui.status = crate::i18n::fmt(&crate::i18n::trn(crate::i18n::current(), layers, "Opened {name}: {n} layer", "Opened {name}: {n} layers"), &[("name", name)]);
+    app.ui.status =
+        crate::i18n::fmt(&crate::i18n::trn(crate::i18n::current(), layers, "Opened {name}: {n} layer", "Opened {name}: {n} layers"), &[("name", name)]);
     app.ui.status_error = false;
     let skipped = v.get("skipped").and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
     if skipped.is_empty() {
