@@ -66,6 +66,7 @@ mod dialogs;
 mod fields;
 mod graphics;
 mod save;
+mod shortcut_target;
 mod shortcuts;
 mod startup;
 
@@ -87,6 +88,9 @@ use fields::{
 use graphics::{gpu_status_rows, rendering_mode_value};
 use save::SaveRetry;
 pub(crate) use save::save_preferences;
+// Called by Assign Shortcut… (right-click, palette) once that lands; unused until then.
+#[allow(unused_imports)]
+pub(crate) use shortcut_target::open_shortcuts_for;
 #[cfg(test)]
 use save::{SAVE_RETRY_MAX_S, SAVE_RETRY_S, merge_changes, persist};
 pub use save::{autosave_now, tick};

@@ -325,6 +325,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
         }
     }
     let needle = filter.to_ascii_lowercase();
+    let reveal = f.remove("reveal").is_some();
     egui::ScrollArea::vertical().max_height(420.0).id_salt("shortcuts-scroll").show(ui, |ui| {
         let mut last_top = String::new();
         egui::Grid::new("shortcut-grid").num_columns(3).spacing([12.0, 3.0]).striped(true).show(ui, |ui| {
@@ -361,6 +362,9 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                 let name_row = ui.selectable_label(sel, RichText::new(format!("   {name}")).color(t.text_dim));
                 if name_row.clicked() {
                     selected = id.clone();
+                }
+                if sel && reveal {
+                    name_row.scroll_to_me(Some(egui::Align::Center));
                 }
                 if tab == 0 {
                     let text = if sel && capture && !capture_alt {
