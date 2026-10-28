@@ -1,6 +1,6 @@
 use super::*;
-use crate::prefs::{InvalidPref, Preferences};
 use crate::Session;
+use crate::prefs::{InvalidPref, Preferences};
 use serde_json::json;
 
 #[test]
@@ -17,7 +17,10 @@ fn every_item_is_shown_by_default_and_ids_match_the_fields() {
     let mut ids = TopBar::IDS.to_vec();
     ids.sort_unstable();
     assert_eq!(keys, ids);
-    assert_eq!(Preferences::default().get("interface.topBar"), Some(json!({"brand": true, "title": true, "workspace": true, "search": true, "appearance": true})));
+    assert_eq!(
+        Preferences::default().get("interface.topBar"),
+        Some(json!({"brand": true, "title": true, "workspace": true, "search": true, "appearance": true}))
+    );
 }
 
 #[test]

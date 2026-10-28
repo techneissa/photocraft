@@ -97,7 +97,10 @@ pub fn bar_menu(app: &mut PhotocraftApp, response: &egui::Response) {
 
 /// Whether a Preferences search (`query`, lowercased; empty matches everything) shows the group.
 pub fn group_matches(query: &str) -> bool {
-    query.is_empty() || "top bar".contains(query) || tl!("Top Bar").to_lowercase().contains(query) || ITEMS.iter().any(|i| tl!(i.label).to_lowercase().contains(query))
+    query.is_empty()
+        || "top bar".contains(query)
+        || tl!("Top Bar").to_lowercase().contains(query)
+        || ITEMS.iter().any(|i| tl!(i.label).to_lowercase().contains(query))
 }
 
 /// The Top Bar group of Preferences › Interface: a check box per item, on the dialog's working
