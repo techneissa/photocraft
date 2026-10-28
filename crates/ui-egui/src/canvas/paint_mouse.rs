@@ -25,6 +25,7 @@ pub fn sync_tool_brush(app: &mut PhotocraftApp) {
     if !has_brush_picker(tool) || app.ui.brush_tool == tool {
         return;
     }
+    crate::double_exposure::restore_brush(app);
     // The live brush is the outgoing tool's, so save it there before the new one takes over: any
     // edit it made since it was last active is in it, so its copy never goes stale.
     let current = app.session.tools.brush.clone();
