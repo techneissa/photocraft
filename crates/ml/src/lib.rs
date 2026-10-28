@@ -1,7 +1,9 @@
 //! # photocraft-ml
 //!
 //! Local neural-network inference for the editor, on [tract](https://github.com/sonos/tract)
-//! (pure Rust ONNX): no network, no native runtime, no `unsafe`.
+//! (pure Rust ONNX): no native runtime, no `unsafe`. Inference never touches the network; the only
+//! network access is the model download in `install.rs`, which runs when the user asks for it
+//! (Preferences › AI Models, `photocraft-cli models fetch`).
 //!
 //! * [`segment_subject`]: salient-object matte (BiRefNet-lite, MIT) with a guided-filter edge
 //!   refinement so hair and fur keep partial coverage at full resolution.
@@ -23,6 +25,7 @@ mod inpaint;
 mod inpaint_detail;
 #[cfg(not(target_arch = "wasm32"))]
 mod install;
+mod ram;
 mod resize;
 mod segment;
 mod store;
@@ -31,6 +34,7 @@ pub use guided::guided_filter;
 pub use inpaint::{INPAINT_SIZE, inpaint, inpaint_with};
 #[cfg(not(target_arch = "wasm32"))]
 pub use install::{download, remove};
+pub use ram::{check_memory, min_total_memory, physical_memory};
 pub use segment::{SEGMENT_SIZE, segment_subject, segment_subject_with};
 pub use store::{Model, disable_models, model_path, models_dir, models_disabled};
 
@@ -50,6 +54,8 @@ pub enum MlError {
     Cancelled,
     /// The model failed to load or run.
     Backend(String),
+    /// This computer has too little memory for the model (see [`check_memory`]); both in bytes.
+    LowMemory { have: u64, needs: u64 },
     /// Downloading, verifying or removing a model file failed.
     Download(String),
 }
@@ -62,6 +68,7 @@ impl fmt::Display for MlError {
             Self::BadInput(m) => write!(f, "bad input: {m}"),
             Self::Cancelled => f.write_str("cancelled"),
             Self::Backend(m) => write!(f, "model error: {m}"),
+            Self::LowMemory { have, needs } => write!(f, "not enough memory for the model ({} GB installed, {} GB needed)", have >> 30, needs >> 30),
             Self::Download(m) => write!(f, "model download failed: {m}"),
         }
     }

@@ -5436,6 +5436,7 @@ dependencies = [
  "reqwest",
  "sha2",
  "tract-onnx",
+ "winsafe",
 ]
 
 [[package]]
