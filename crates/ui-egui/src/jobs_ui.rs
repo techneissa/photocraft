@@ -525,6 +525,13 @@ fn on_event(app: &mut PhotocraftApp, ctx: &egui::Context, e: JobEvent) {
             app.sync_views();
             crate::file_ui::print_status(app, result);
         }
+        // Select Subject is a job: its status line (a fallback note, or no subject found) comes with the result.
+        JobOutcome::Done(v) if e.command == "select.subject" => {
+            app.sync_views();
+            app.ui.status = e.label;
+            app.ui.status_error = false;
+            crate::retouch_ui::report_smart_result(app, Ok(v), tl!("No subject found — try Object Selection or the Lasso"));
+        }
         JobOutcome::Done(_) => {
             app.sync_views();
             app.ui.status = e.label;

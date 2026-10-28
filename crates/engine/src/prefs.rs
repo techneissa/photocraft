@@ -85,9 +85,10 @@ choice!(
 );
 choice!(
     /// What Select ▸ Subject cuts the subject out with: `auto` (the Mac's own cutout where there is
-    /// one, else Classic), `macos` (the Mac's own cutout; Classic with a note where there is none) or
-    /// `classic` (PhotoCraft's own, any system). A later AI model will be one more value.
-    SubjectEngine { Auto = "auto", MacOs = "macos", Classic = "classic" } default Auto
+    /// one, else the AI model when it is installed, else Classic), `macos` (the Mac's own cutout;
+    /// Classic with a note where there is none), `model` (the AI model of Preferences ▸ AI Models;
+    /// Classic with a note while it is not installed) or `classic` (PhotoCraft's own, any system).
+    SubjectEngine { Auto = "auto", MacOs = "macos", Model = "model", Classic = "classic" } default Auto
 );
 choice!(UiFontSize { Tiny = "tiny", Small = "small", Medium = "medium", Large = "large" } default Small);
 choice!(LogDestination { Metadata = "metadata", TextFile = "textFile", Both = "both" } default Metadata);

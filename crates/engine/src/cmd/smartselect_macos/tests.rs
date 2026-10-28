@@ -89,23 +89,23 @@ fn set_engine(s: &mut Session, v: &str) {
 // ---- the preference ----
 
 #[test]
-fn the_engine_preference_defaults_to_auto_and_takes_its_three_values() {
+fn the_engine_preference_defaults_to_auto_and_takes_its_four_values() {
     let mut s = Session::new();
     assert_eq!(s.prefs().tools.select_subject_engine, SubjectEngine::Auto);
-    for (v, e) in [("macos", SubjectEngine::MacOs), ("classic", SubjectEngine::Classic), ("auto", SubjectEngine::Auto)] {
+    for (v, e) in [("macos", SubjectEngine::MacOs), ("model", SubjectEngine::Model), ("classic", SubjectEngine::Classic), ("auto", SubjectEngine::Auto)] {
         set_engine(&mut s, v);
         assert_eq!(s.prefs().tools.select_subject_engine, e);
     }
-    assert_eq!(crate::prefs::choices("tools.selectSubjectEngine"), Some(&["auto", "macos", "classic"][..]));
+    assert_eq!(crate::prefs::choices("tools.selectSubjectEngine"), Some(&["auto", "macos", "model", "classic"][..]));
 }
 
 #[test]
 fn the_engine_preference_refuses_other_values_and_keeps_the_old_one() {
     let mut s = Session::new();
     set_engine(&mut s, "classic");
-    for bad in ["model", "Auto", "", "mac"] {
+    for bad in ["classical", "Auto", "", "mac"] {
         let e = s.execute("prefs.set", json!({"path": "tools.selectSubjectEngine", "value": bad})).unwrap_err().to_string();
-        assert!(e.contains("auto") && e.contains("macos") && e.contains("classic"), "{bad}: {e}");
+        assert!(e.contains("auto") && e.contains("macos") && e.contains("model") && e.contains("classic"), "{bad}: {e}");
     }
     assert!(s.execute("prefs.set", json!({"path": "tools.selectSubjectEngine", "value": 3})).is_err());
     assert_eq!(s.prefs().tools.select_subject_engine, SubjectEngine::Classic);

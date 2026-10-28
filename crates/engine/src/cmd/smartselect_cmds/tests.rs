@@ -251,6 +251,96 @@ fn select_subject_centred_object() {
     assert!(s.active().unwrap().doc.selection.is_none());
 }
 
+#[derive(Default)]
+struct ModelSamplingCounter(std::sync::atomic::AtomicUsize);
+
+impl Sampler for ModelSamplingCounter {
+    fn rgba(&self, _: Rect) -> Vec<[f32; 4]> {
+        panic!("the model sampler uses rgb_scaled")
+    }
+
+    fn rgb_scaled(&self, _: Rect, _: usize) -> photocraft_algo::segment::RgbImage {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        // Invalid small input stops inference deterministically, even on a machine with models.
+        photocraft_algo::segment::RgbImage { w: 0, h: 0, px: Vec::new() }
+    }
+}
+
+#[test]
+fn model_subject_rejects_a_huge_sparse_canvas_before_sampling() {
+    let doc = Document::new("Sparse", photocraft_geom::Size::new(300_000, 300_000), photocraft_doc::ColorMode::Rgb, photocraft_color::SampleType::U8);
+    assert!(doc.layers.is_empty());
+    let sampler = ModelSamplingCounter::default();
+    let ctl = photocraft_raster::Interrupt::default();
+    let error = model_subject(&sampler, doc.bounds(), &ctl).unwrap_err().to_string();
+    assert!(error.contains("mask") && error.contains("budget"), "{error}");
+    assert_eq!(sampler.0.load(std::sync::atomic::Ordering::Relaxed), 0);
+}
+
+#[test]
+fn subject_cache_invalidates_when_model_availability_changes() {
+    let (s, _) = disc(8);
+    let doc = &s.active().unwrap().doc;
+    let target = s.active().unwrap().active_layer;
+    let mut cache = SubjectCache { doc: std::sync::Arc::downgrade(doc), doc_id: Some(doc.id), target, engine: SubjectEngine::Auto, ..SubjectCache::default() };
+    assert!(cache.valid(doc, target, SubjectEngine::Auto, false));
+    assert!(!cache.valid(doc, target, SubjectEngine::Auto, true), "installing a model reused a classical result");
+    cache.model_available = true;
+    cache.region = Some(std::sync::Arc::new(Region { bbox: Rect::new(0, 0, 1, 1), mask: vec![255] }));
+    assert!(cache.valid(doc, target, SubjectEngine::Auto, true));
+    assert!(!cache.valid(doc, target, SubjectEngine::Auto, false), "removing a model reused a neural result");
+    assert!(!cache.valid(doc, target, SubjectEngine::Model, true), "another engine reused the result");
+}
+
+/// The `model` choice without the model installed (no model ever runs in unit tests) gives
+/// Classic's selection and a note that names the missing model; `auto` and `classic` give no note.
+#[test]
+fn the_model_choice_without_the_model_selects_with_classic_and_says_so() {
+    let (mut s, inside) = disc(8);
+    let r = s.execute("select.subject", json!({"engine": "model"})).unwrap();
+    assert_eq!(r["note"], MODEL_MISSING);
+    assert!(sel_iou(&s, 200, 160, &inside) > 0.9);
+    // The preference does the same, and a repeat keeps the note.
+    s.execute("select.deselect", json!({})).unwrap();
+    s.execute("prefs.set", json!({"path": "tools.selectSubjectEngine", "value": "model"})).unwrap();
+    assert_eq!(s.execute("select.subject", json!({})).unwrap()["note"], MODEL_MISSING);
+    assert_eq!(s.execute("select.subject", json!({})).unwrap()["note"], MODEL_MISSING);
+    for engine in ["auto", "classic", "classical"] {
+        s.execute("select.deselect", json!({})).unwrap();
+        let r = s.execute("select.subject", json!({"engine": engine})).unwrap();
+        assert!(r.get("note").is_none(), "{engine}: {r}");
+    }
+}
+
+/// A finder that does not run (`classic`) never samples neural input.
+#[test]
+fn find_subject_region_reports_which_finder_found_the_subject() {
+    let (s, _) = disc(8);
+    let d = s.active().unwrap();
+    let ctl = photocraft_raster::Interrupt::default();
+    for (engine, note) in [(SubjectEngine::Classic, None), (SubjectEngine::Auto, None), (SubjectEngine::Model, Some(MODEL_MISSING))] {
+        let found = find_subject_region(&d.doc, d.active_layer, false, d.doc.bounds(), engine, &ctl).unwrap();
+        assert!(found.region.is_some() && found.used == "classic", "{engine:?}");
+        assert_eq!(found.note, note, "{engine:?}");
+    }
+}
+
+/// A matte shrunk by 2 (a 24 to 36 MP photo) is stretched back with bilinear taps at the pixel
+/// centres, not by repeating pixels: the outline has no 2 px stairs.
+#[test]
+fn model_matte_is_stretched_back_with_bilinear_taps() {
+    let taps = stretch_taps(5, 3, 2);
+    let expect = [(0, 1, 0.0), (0, 1, 0.25), (0, 1, 0.75), (1, 2, 0.25), (1, 2, 0.75)];
+    for (got, want) in taps.iter().zip(expect) {
+        assert_eq!((got.0, got.1), (want.0, want.1));
+        assert!((got.2 - want.2).abs() < 1e-6, "{got:?} vs {want:?}");
+    }
+    // Never past the matte, whatever the sizes.
+    for (len, small, step) in [(1, 1, 1), (7, 4, 2), (10, 4, 3), (3, 0, 2)] {
+        assert!(stretch_taps(len, small, step).iter().all(|&(a, b, w)| a.max(b) <= small.saturating_sub(1) && (0.0..=1.0).contains(&w)));
+    }
+}
+
 /// #2865: a repeat on unchanged pixels reuses the last mask (an identical selection, even
 /// after Deselect); sampling something else or a pixel edit computes it again.
 #[test]
@@ -268,8 +358,8 @@ fn select_subject_repeat_reuses_the_mask_until_pixels_change() {
     s.execute("select.subject", json!({})).unwrap();
     assert!(std::sync::Arc::ptr_eq(&mask, &cached(&s)), "the repeat recomputed the mask");
     assert_eq!(sel(&s), first);
-    // Another sampled target (the layer rather than the composite) is a miss.
-    s.execute("select.subject", json!({"sampleAllLayers": false})).unwrap();
+    // Another sampled target (the composite rather than the layer) is a miss.
+    s.execute("select.subject", json!({"sampleAllLayers": true})).unwrap();
     assert!(!std::sync::Arc::ptr_eq(&mask, &cached(&s)));
     // A pixel edit drops the entry; the next run recomputes it.
     s.edit("paint", |doc, _| {
@@ -282,6 +372,67 @@ fn select_subject_repeat_reuses_the_mask_until_pixels_change() {
     assert!(s.subject_cache.region.is_none());
     s.execute("select.subject", json!({})).unwrap();
     assert_eq!(sel(&s), first);
+    // Another engine is a miss too: the finders differ.
+    let mask = cached(&s);
+    s.execute("select.subject", json!({"engine": "model"})).unwrap();
+    assert!(!std::sync::Arc::ptr_eq(&mask, &cached(&s)));
+}
+
+/// The finder runs as a background job (the neural matte takes seconds): the selection lands
+/// as one undo step when it finishes, a cancelled job leaves the document alone, and a repeat
+/// on unchanged pixels answers at once from the cache.
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
+fn select_subject_runs_as_a_cancellable_background_job() {
+    let (mut s, inside) = disc(8);
+    let steps = s.active().unwrap().history.past_len();
+    let crate::jobs::Started::Job(job) = s.start("select.subject", json!({})).unwrap() else { panic!("expected a background job") };
+    s.wait_job(job).unwrap();
+    assert!(sel_iou(&s, 200, 160, &inside) > 0.9);
+    assert_eq!(s.active().unwrap().history.past_len(), steps + 1);
+    // Cached: no job needed.
+    s.execute("select.deselect", json!({})).unwrap();
+    assert!(matches!(s.start("select.subject", json!({})).unwrap(), crate::jobs::Started::Done(_)));
+    assert!(sel_iou(&s, 200, 160, &inside) > 0.9);
+    // A cancelled miss changes nothing.
+    s.execute("select.deselect", json!({})).unwrap();
+    let crate::jobs::Started::Job(job) = s.start("select.subject", json!({"sampleAllLayers": true})).unwrap() else { panic!("expected a background job") };
+    s.cancel_job(job);
+    let _ = s.wait_job(job);
+    assert!(s.active().unwrap().doc.selection.is_none());
+}
+
+/// Like Remove Background and Remove Subject, Select Subject reads the selected layer unless
+/// asked to sample all layers: an opaque plain layer above it doesn't hide its subject.
+#[test]
+fn select_subject_reads_the_selected_layer_by_default() {
+    let (mut s, inside) = disc(8);
+    let photo = s.active().unwrap().active_layer.unwrap();
+    s.execute("layer.new.layer", json!({})).unwrap();
+    s.edit("cover", |doc, _| {
+        let top = doc.layers.last_mut().unwrap().surface_mut().unwrap();
+        let n = top.channels();
+        let grey: Vec<f32> = [0.5, 0.5, 0.5, 1.0].iter().copied().take(n).cycle().take(200 * 160 * n).collect();
+        top.write_region(Rect::new(0, 0, 200, 160), &grey);
+        Ok(())
+    })
+    .unwrap();
+    s.execute("layer.select", json!({"layer": photo.0})).unwrap();
+    s.execute("select.subject", json!({})).unwrap();
+    assert!(sel_iou(&s, 200, 160, &inside) > 0.9, "the selected layer's subject");
+    // Sampling all layers sees only the grey cover.
+    s.execute("select.deselect", json!({})).unwrap();
+    let _ = s.execute("select.subject", json!({"sampleAllLayers": true}));
+    assert!(sel_iou(&s, 200, 160, &inside) < 0.5, "the composite has no disc");
+}
+
+#[test]
+fn select_subject_rejects_an_unknown_engine() {
+    let (mut s, _) = disc(8);
+    for engine in [json!("magic"), json!(false)] {
+        assert!(s.execute("select.subject", json!({"engine": engine})).is_err());
+    }
+    assert!(s.active().unwrap().doc.selection.is_none());
 }
 
 /// A vertical Gaussian-blurred edge at x = 40 (warm left, cool right) with the left half selected.

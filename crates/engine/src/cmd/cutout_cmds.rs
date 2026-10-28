@@ -4,13 +4,12 @@
 //! the Background layer into a normal layer first and has no menu item.
 
 use photocraft_algo::matting::{self, RefineParams};
-use photocraft_algo::segment::subject;
 use photocraft_doc::{Document, Layer, LayerContent, LayerMask};
 use photocraft_geom::Rect;
 use serde_json::{Value, json};
 
 use crate::commands::{CommandSpec, layer_param};
-use crate::smartselect_cmds::with_doc_sampler;
+use crate::smartselect_cmds::{engine_param, find_subject_region, with_doc_sampler};
 use crate::{EngineError, Result, Session};
 
 const CMD: &str = "layer.removeBackground";
@@ -55,19 +54,19 @@ fn run(s: &mut Session, p: &Value) -> Result<Value> {
     let sample_all = p.get("sampleAllLayers").and_then(Value::as_bool).unwrap_or(false);
     let refine = p.get("refine").and_then(Value::as_bool).unwrap_or(true);
     let area = subject_area(layer, doc.bounds(), sample_all);
+    let engine = engine_param(s, p)?;
     crate::jobs::edit_job(
         s,
         "Remove Background",
         move |doc, _, ctx| {
-            // Cancel reaches the min cuts inside Select Subject, so Esc doesn't wait for them.
-            let found = ctx
-                .stage(0.1, 0.6, "Finding subject", |ctl| with_doc_sampler(doc, Some(id), sample_all, |smp, _| subject::select_subject_with(smp, area, ctl)))
-                .map_err(|_| EngineError::Cancelled)?;
-            let mut region = found.ok_or_else(|| EngineError::Other("no subject found".into()))?;
+            // Cancel reaches the model and the min cuts inside Select Subject, so Esc doesn't wait.
+            let found = ctx.stage(0.1, 0.6, "Finding subject", |ctl| find_subject_region(doc, Some(id), sample_all, area, engine, ctl))?;
+            let (mut region, used) = (found.region.ok_or_else(|| EngineError::Other("no subject found".into()))?, found.used);
             if ctx.cancelled() {
                 return Err(EngineError::Cancelled);
             }
-            if refine {
+            // The Mac's cutout and the AI matte are soft and edge-refined already; only Classic needs it.
+            if refine && used == "classic" {
                 ctx.progress(0.6, "Refining edge");
                 let refined = with_doc_sampler(doc, Some(id), sample_all, |smp, _| {
                     matting::refine_mask(smp, &matting::region_reader(&region), region.bbox, area, &REFINE)
@@ -95,7 +94,7 @@ pub fn specs() -> Vec<CommandSpec> {
         label: "Remove Background",
         menu: &[],
         shortcut: None,
-        params: r##"{"layer":id?,"sampleAllLayers":bool=false,"refine":bool=true} → {layer,bounds} (adds a layer mask from Select Subject; the Background becomes a normal layer)"##,
+        params: r##"{"layer":id?,"sampleAllLayers":bool=false,"refine":bool=true,"engine":"auto|macos|model|classic"=the preference tools.selectSubjectEngine} → {layer,bounds} (adds a layer mask from Select Subject; the Background becomes a normal layer)"##,
         enabled,
         run,
         journal: true,
