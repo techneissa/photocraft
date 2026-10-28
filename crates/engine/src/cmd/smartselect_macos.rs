@@ -90,21 +90,17 @@ fn macos_region(cut: CutoutFn, smp: &dyn Sampler, canvas: Rect) -> Result<Option
 pub(crate) fn region_from_mask(mask: &Mask, canvas: Rect, step: usize) -> Option<Region> {
     let (cw, ch) = (usize::try_from(canvas.width()).ok()?, usize::try_from(canvas.height()).ok()?);
     let step = step.max(1);
-    let (fw, fh) = (mask.width as usize, mask.height as usize);
-    if cw == 0
-        || ch == 0
-        || fw.checked_mul(step)? < cw
-        || fh.checked_mul(step)? < ch
-        || fw.checked_mul(step)? >= cw + step
-        || fh.checked_mul(step)? >= ch + step
-    {
+    let (fw, fh) = (usize::try_from(mask.width).ok()?.checked_mul(step)?, usize::try_from(mask.height).ok()?.checked_mul(step)?);
+    // The mask's blocks cover the canvas, and the last block is partial by less than a step.
+    if cw == 0 || ch == 0 || fw < cw || fh < ch || fw >= cw.saturating_add(step) || fh >= ch.saturating_add(step) {
         return None;
     }
-    let full = if step == 1 { mask.clone() } else { mask.resized(u32::try_from(fw * step).ok()?, u32::try_from(fh * step).ok()?)? };
-    let stride = full.width as usize;
+    let full = if step == 1 { mask.clone() } else { mask.resized(u32::try_from(fw).ok()?, u32::try_from(fh).ok()?)? };
+    let stride = usize::try_from(full.width).ok()?;
     let (mut x0, mut y0, mut x1, mut y1) = (cw, ch, 0, 0);
     for y in 0..ch {
-        let row = full.data.get(y * stride..y * stride + cw)?;
+        let start = y.checked_mul(stride)?;
+        let row = full.data.get(start..start.checked_add(cw)?)?;
         if let (Some(first), Some(last)) = (row.iter().position(|v| *v > 0), row.iter().rposition(|v| *v > 0)) {
             (x0, x1) = (x0.min(first), x1.max(last + 1));
             (y0, y1) = (y0.min(y), y1.max(y + 1));
@@ -113,12 +109,13 @@ pub(crate) fn region_from_mask(mask: &Mask, canvas: Rect, step: usize) -> Option
     if x0 >= x1 || y0 >= y1 {
         return None;
     }
-    let mut data = Vec::with_capacity((x1 - x0) * (y1 - y0));
+    let mut data = Vec::with_capacity((x1 - x0).checked_mul(y1 - y0)?);
     for y in y0..y1 {
-        data.extend_from_slice(full.data.get(y * stride + x0..y * stride + x1)?);
+        let start = y.checked_mul(stride)?;
+        data.extend_from_slice(full.data.get(start.checked_add(x0)?..start.checked_add(x1)?)?);
     }
-    let (ox, oy) = (canvas.x0, canvas.y0);
-    let bbox = Rect::new(ox + i32::try_from(x0).ok()?, oy + i32::try_from(y0).ok()?, ox + i32::try_from(x1).ok()?, oy + i32::try_from(y1).ok()?);
+    let at = |origin: i32, offset: usize| origin.checked_add(i32::try_from(offset).ok()?);
+    let bbox = Rect::new(at(canvas.x0, x0)?, at(canvas.y0, y0)?, at(canvas.x0, x1)?, at(canvas.y0, y1)?);
     Some(Region { bbox, mask: data })
 }
 

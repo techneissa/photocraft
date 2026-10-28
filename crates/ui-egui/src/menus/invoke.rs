@@ -440,6 +440,12 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
             let kind = &ls["layer.layerStyle.".len()..];
             crate::layer_style::open(app, Some(kind)).map(|d| json!({"dialog": d})).ok_or_else(|| "no active layer".to_string())
         }
+        // Select › Subject: the status bar says when the macOS cutout fell back to Classic or found nothing.
+        "select.subject" => {
+            let result = app.run(id, params);
+            crate::retouch_ui::report_smart_result(app, result.clone(), tl!("No subject found — try Object Selection or the Lasso"));
+            result
+        }
         _ => app.run(id, params),
     }
 }

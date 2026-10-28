@@ -393,3 +393,90 @@ fn the_real_macos_cutout_selects_a_synthetic_figure_through_the_command() {
     assert!(cov(&s, 240, 400) > 0.9, "torso");
     assert!(cov(&s, 5, 5) < 0.1, "background");
 }
+
+/// A cutout that covers only the top 15 % of whatever it is given.
+fn top_strip(_rgba: &[u8], w: u32, h: u32) -> Result<Mask, Error> {
+    Ok(Mask { width: w, height: h, data: (0..w * h).map(|i| if i / w < h * 15 / 100 { 255 } else { 0 }).collect() })
+}
+
+/// The mask's rows are the document's rows in the same order: a cutout of the top is the top of the
+/// selection, for a document big enough to be shrunk too.
+#[test]
+fn the_cutouts_top_is_the_selections_top() {
+    for (w, h) in [(200u32, 160u32), (2600, 1700)] {
+        let mut s = session_with(w, h, Box::new(|x, _| [x as f32 / 3000.0, 0.4, 0.4]));
+        let r = with_cutout(Some(top_strip), || s.execute("select.subject", json!({})).unwrap());
+        let (top, bottom) = (h as i32 * 15 / 100, h as i32);
+        assert_eq!(r["bounds"][1], 0, "{w}×{h}: {r}");
+        assert!((i64::from(r["bounds"][3].as_i64().unwrap() as i32 - top)).abs() <= 3, "{w}×{h}: the selection ends near the top 15 %: {r}");
+        assert!(cov(&s, w as i32 / 2, 2) > 0.99, "{w}×{h}");
+        assert!(cov(&s, w as i32 / 2, bottom - 3) < 0.01 && cov(&s, w as i32 / 2, bottom * 6 / 10) < 0.01, "{w}×{h}");
+    }
+}
+
+#[test]
+fn a_repeat_on_unchanged_pixels_keeps_the_fallback_note() {
+    let mut s = disc_session();
+    set_engine(&mut s, "macos");
+    let first = with_cutout(None, || s.execute("select.subject", json!({})).unwrap());
+    let again = with_cutout(None, || s.execute("select.subject", json!({})).unwrap());
+    assert_eq!(first["note"], UNAVAILABLE);
+    assert_eq!(again["note"], UNAVAILABLE, "answered from the last result, with its note");
+    // A result that came without a note (Classic chosen) has none on the repeat either.
+    set_engine(&mut s, "classic");
+    s.execute("select.subject", json!({})).unwrap();
+    assert!(s.execute("select.subject", json!({})).unwrap().get("note").is_none());
+}
+
+/// The real Vision through the command: a figure only in the top 15 % of the document is selected
+/// there and nowhere near the bottom (a flipped mask would select the bottom).
+#[test]
+#[cfg(target_os = "macos")]
+fn the_real_macos_cutout_keeps_a_top_figure_at_the_top_through_the_command() {
+    if !macvision::available() {
+        eprintln!("skip: no Vision subject request on this Mac");
+        return;
+    }
+    let (w, h, bw, bh) = (640u32, 800u32, 300u32, 120u32);
+    let (bx, cx) = ((w - bw) / 2, w as f32 / 2.0);
+    let mut s = session_with(
+        w,
+        h,
+        Box::new(move |x, y| {
+            let (fx, fy) = (x as f32, y as f32);
+            let (head_cy, head_r) = (bh as f32 * 0.30, bw as f32 * 0.11);
+            let head = (fx - cx).powi(2) + (fy - head_cy).powi(2) < head_r * head_r;
+            let half_w = bw as f32 * (0.14 + 0.16 * ((fy - bh as f32 * 0.45) / (bh as f32 * 0.1)).clamp(0.0, 1.0));
+            let torso = fy >= bh as f32 * 0.45 && fy < bh as f32 * 0.95 && (fx - cx).abs() < half_w && x >= bx;
+            let fold = 0.08 * ((fx * 0.12).sin() + (fy * 0.05).cos());
+            if head {
+                [0.88, 0.68, 0.55]
+            } else if torso {
+                [0.16 + fold, 0.27 + fold, 0.5 + fold]
+            } else {
+                [0.78, 0.76, 0.72]
+            }
+        }),
+    );
+    set_engine(&mut s, "macos");
+    let cutout: CutoutFn = macvision::subject_mask;
+    let r = with_cutout(Some(cutout), || s.execute("select.subject", json!({})).unwrap());
+    assert_eq!(r["changed"], true, "{r}");
+    assert!(cov(&s, 320, 90) > 0.9, "the torso at the top");
+    assert!(cov(&s, 320, 760) < 0.01 && cov(&s, 320, 400) < 0.01 && cov(&s, 20, 790) < 0.01, "nothing below");
+}
+
+/// A strip too thin for Vision is "nothing found", not a failure with a note.
+#[test]
+#[cfg(target_os = "macos")]
+fn the_real_macos_cutout_on_a_thin_strip_finds_nothing_without_a_note() {
+    if !macvision::available() {
+        return;
+    }
+    let mut s = session_with(3000, 6, Box::new(|x, _| [x as f32 / 3000.0, 0.4, 0.4]));
+    set_engine(&mut s, "macos");
+    let cutout: CutoutFn = macvision::subject_mask;
+    let r = with_cutout(Some(cutout), || s.execute("select.subject", json!({})).unwrap());
+    assert_eq!(r["changed"], false, "{r}");
+    assert!(r.get("note").is_none(), "{r}");
+}

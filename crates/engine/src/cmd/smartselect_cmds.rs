@@ -294,6 +294,8 @@ pub struct SubjectCache {
     region: Option<std::sync::Arc<Region>>,
     /// The engine that found it ([`crate::prefs::SubjectEngine`]): a changed choice is a miss.
     engine: crate::prefs::SubjectEngine,
+    /// The note that came with it (a fallback from the macOS cutout), shown again on a repeat.
+    note: Option<&'static str>,
 }
 
 impl SubjectCache {
@@ -313,7 +315,7 @@ fn select_subject(s: &mut Session, p: &Value) -> Result<Value> {
     let engine = s.prefs().tools.select_subject_engine;
     let c = &s.subject_cache;
     let hit = c.target == target && c.engine == engine && c.doc.upgrade().is_some_and(|old| crate::layer_multi_cmds::same_pixels(&old, &d.doc));
-    let mut note = None;
+    let mut note = c.note.filter(|_| hit);
     let region = if hit {
         c.region.clone()
     } else {
@@ -321,7 +323,7 @@ fn select_subject(s: &mut Session, p: &Value) -> Result<Value> {
         let found = with_doc_sampler(&doc, d.active_layer, all_layers, |smp, doc| smartselect_macos::subject_region(engine, smp, doc.bounds()));
         note = found.note;
         let region = found.region.map(std::sync::Arc::new);
-        s.subject_cache = SubjectCache { doc: std::sync::Arc::downgrade(&doc), doc_id: Some(doc.id), target, region: region.clone(), engine };
+        s.subject_cache = SubjectCache { doc: std::sync::Arc::downgrade(&doc), doc_id: Some(doc.id), target, region: region.clone(), engine, note };
         region
     };
     let mut out = apply(s, "Select Subject", region.as_deref(), mode(p, "replace"))?;
