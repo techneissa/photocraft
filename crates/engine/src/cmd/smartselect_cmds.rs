@@ -381,6 +381,13 @@ fn model_subject(smp: &dyn Sampler, canvas: Rect, ctl: &photocraft_raster::Inter
 pub const MODEL_MISSING: &str = "AI model not installed, used Classic (Preferences › AI Models)";
 /// The note for a model that could not run.
 pub const MODEL_FAILED: &str = "AI model failed, used Classic";
+/// The note for a computer without the memory the model needs (its plan is built in about 9 GB).
+pub const MODEL_NO_MEMORY: &str = "Not enough memory for the AI model, used Classic";
+
+/// The status note for a model that could not run.
+fn model_failure_note(e: &photocraft_ml::MlError) -> &'static str {
+    if matches!(e, photocraft_ml::MlError::LowMemory { .. }) { MODEL_NO_MEMORY } else { MODEL_FAILED }
+}
 
 /// What [`find_subject_region`] found, which engine found it and what to tell the user about it.
 pub(crate) struct Subject {
@@ -421,7 +428,10 @@ pub(crate) fn find_subject_region(
     };
     if matches!(engine, SubjectEngine::Auto | SubjectEngine::Model) {
         if subject_model_available() {
-            match with_doc_sampler(doc, layer, all_layers, |smp, _| model_subject(smp, area, ctl)) {
+            // Refused before the photo is sampled: an out-of-memory in tract aborts the process.
+            let tried = photocraft_ml::check_memory(photocraft_ml::Model::BirefnetLite)
+                .and_then(|()| with_doc_sampler(doc, layer, all_layers, |smp, _| model_subject(smp, area, ctl)));
+            match tried {
                 Ok(Some(region)) => return Ok(Subject { region: Some(region), used: "model", note: None }),
                 Ok(None) if engine == SubjectEngine::Model => return Ok(Subject { region: None, used: "model", note: None }),
                 Ok(None) => {}
@@ -429,7 +439,7 @@ pub(crate) fn find_subject_region(
                 // A mask beyond the output budget (or a failed allocation) must not fall through to
                 // another finder that may allocate the same full-resolution area.
                 Err(photocraft_ml::MlError::BadInput(message)) => return Err(EngineError::Other(message)),
-                Err(_) => note = Some(MODEL_FAILED),
+                Err(e) => note = Some(model_failure_note(&e)),
             }
         } else if engine == SubjectEngine::Model {
             note = Some(MODEL_MISSING);

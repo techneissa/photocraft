@@ -312,6 +312,17 @@ fn the_model_choice_without_the_model_selects_with_classic_and_says_so() {
     }
 }
 
+/// A computer without the memory is told so, and any other failure says the model failed.
+#[test]
+fn a_model_that_cannot_run_names_why() {
+    use photocraft_ml::MlError;
+    assert_eq!(model_failure_note(&MlError::LowMemory { have: 8 << 30, needs: 12 << 30 }), MODEL_NO_MEMORY);
+    for e in [MlError::Backend("x".into()), MlError::Unsupported, MlError::Download("x".into())] {
+        assert_eq!(model_failure_note(&e), MODEL_FAILED);
+    }
+    assert_eq!(MODEL_NO_MEMORY, "Not enough memory for the AI model, used Classic");
+}
+
 /// A finder that does not run (`classic`) never samples neural input.
 #[test]
 fn find_subject_region_reports_which_finder_found_the_subject() {
