@@ -2,8 +2,9 @@ use egui::{Event, Key, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
 use serde_json::json;
 
-use super::nav::{self, Hit, MAX_ROWS, PAGE};
-use super::{all_hits, scroll_id, sel_id};
+use super::super::nav::{self, Hit, MAX_ROWS, PAGE};
+use super::super::scroll_id;
+use super::all_hits;
 use crate::PhotocraftApp;
 
 fn app_harness() -> Harness<'static, PhotocraftApp> {
@@ -23,6 +24,10 @@ fn open_palette() -> Harness<'static, PhotocraftApp> {
     crate::menus::invoke(h.state_mut(), &ctx, "edit.search", json!({})).unwrap();
     h.run_steps(3);
     h
+}
+
+fn sel_id() -> egui::Id {
+    egui::Id::unique("palette-sel")
 }
 
 fn sel(h: &Harness<'_, PhotocraftApp>) -> usize {
@@ -203,4 +208,34 @@ fn label_word_starts_rank_before_looser_matches_and_disabled_rows_come_last() {
     // "Zoom" finds Zoom Tool and View ▸ Zoom In before a command that only has the letters.
     let zoom = hits_for(&app, "zoom");
     assert!(zoom[0].2.to_lowercase().contains("zoom"), "{:?}", labels(&zoom[..3]));
+}
+
+#[test]
+fn a_palette_opened_under_a_resting_pointer_keeps_the_highlight_on_the_first_row() {
+    let mut h = app_harness();
+    // The pointer rests where a lower row will be.
+    h.event(egui::Event::PointerMoved(egui::pos2(700.0, 330.0)));
+    h.run_steps(2);
+    let ctx = h.ctx.clone();
+    crate::menus::invoke(h.state_mut(), &ctx, "edit.search", json!({})).unwrap();
+    h.run_steps(4);
+    assert_eq!(sel(&h), 0, "the row under a pointer that hasn't moved isn't highlighted");
+    // Moving it does.
+    h.event(egui::Event::PointerMoved(egui::pos2(702.0, 331.0)));
+    h.run_steps(3);
+    assert!(sel(&h) > 0);
+}
+
+#[test]
+fn a_list_of_one_row_wraps_and_pages_in_place() {
+    let mut h = open_palette();
+    let all = hits(&h, "");
+    let q = all.iter().map(|x| x.2.clone()).find(|l| l.len() > 12 && hits(&h, l).len() == 1).expect("a label that matches only itself");
+    h.event(Event::Text(q));
+    h.run_steps(3);
+    for key in [Key::ArrowDown, Key::ArrowUp, Key::PageDown, Key::PageUp] {
+        press(&mut h, key);
+        assert_eq!(sel(&h), 0, "{key:?} on a one-row list stays on it");
+    }
+    assert!(h.state().ui.palette_open);
 }

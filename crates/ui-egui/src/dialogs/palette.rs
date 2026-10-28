@@ -2,8 +2,11 @@
 
 use egui::{Align2, Color32, CornerRadius, RichText, Sense, Stroke, vec2};
 
-use crate::theme::{self, Tokens};
+use crate::theme::Tokens;
 use crate::{PhotocraftApp, icons};
+
+mod list;
+mod nav;
 
 /// Case-insensitive subsequence match score (higher is better); None = no match.
 pub fn fuzzy_score(query: &str, text: &str) -> Option<i32> {
@@ -117,6 +120,11 @@ fn menu_hits(menus: Vec<crate::menus::MenuItem>, q: &str, lang: crate::i18n::Lan
         .collect()
 }
 
+/// How far the list is scrolled (egui temp data, like the query).
+fn scroll_id() -> egui::Id {
+    egui::Id::unique("palette-scroll")
+}
+
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if !app.ui.palette_open {
         return;
@@ -148,6 +156,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     ui.set_width(width);
                     let qid = egui::Id::unique("palette-query");
                     let mut q: String = ui.data_mut(|d| d.get_temp(qid).unwrap_or_default());
+                    let keys = list::take_keys(ctx);
                     ui.horizontal(|ui| {
                         let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
                         icons::paint(ui, r, "search", 16.0, t.text_dim);
@@ -167,63 +176,16 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     crate::widgets::hairline(ui);
                     ui.add_space(6.0);
                     let lang = crate::i18n::Lang::from_pref(&app.session.prefs().interface.language);
-                    let menus = crate::menus::menu_items(app);
                     let recents: Vec<String> = ui.data(|d| d.get_temp(recent_id()).unwrap_or_default());
-                    let empty = q.trim().is_empty();
-                    // An empty query lists the recently run commands (UI-217-7); with none (or a
-                    // fresh session) it falls back to the full fuzzy list, as before.
-                    let mut hits: Vec<(i32, String, String, Option<String>, bool)> = if empty { recent_hits(&recents, &menus, lang) } else { Vec::new() };
-                    if !empty || hits.is_empty() {
-                        hits.extend(menu_hits(menus, &q, lang));
-                        for tool in crate::state::Tool::ALL {
-                            if let Some(s) = fuzzy_score(&q, &format!("{} {}", tl!(tool.label()), tool.label())) {
-                                let s = s + exact_bonus(&q, &[tl!(tool.label()).as_ref(), tool.label()]);
-                                hits.push((
-                                    s + 2,
-                                    format!("tool:{tool:?}"),
-                                    tl!(tool.label()).into(),
-                                    Some(format!("{}   {}", crate::i18n::tr(lang, "Tool"), tool.key())),
-                                    true,
-                                ));
-                            }
-                        }
-                    }
-                    hits.sort_by(|a, b| b.0.cmp(&a.0).then(a.2.cmp(&b.2)));
-                    hits.truncate(12);
+                    let hits = list::all_hits(app, &q, &recents, lang);
                     let sel_id = egui::Id::unique("palette-sel");
                     let mut sel: usize = ui.data_mut(|d| d.get_temp(sel_id).unwrap_or(0));
-                    let (down, up, enter, esc) = ui.input(|i| {
-                        (
-                            i.key_pressed(egui::Key::ArrowDown),
-                            i.key_pressed(egui::Key::ArrowUp),
-                            i.key_pressed(egui::Key::Enter),
-                            i.key_pressed(egui::Key::Escape),
-                        )
-                    });
-                    if down {
-                        sel = (sel + 1).min(hits.len().saturating_sub(1));
-                    }
-                    if up {
-                        sel = sel.saturating_sub(1);
-                    }
-                    sel = sel.min(hits.len().saturating_sub(1));
+                    let (enter, esc) = list::enter_esc(ctx);
+                    list::navigate(ctx, keys, &q, hits.len(), &mut sel);
                     if hits.is_empty() {
                         ui.label(RichText::new(tl!("No matching commands")).color(t.text_faint));
                     }
-                    for (i, (_, id, label, detail, enabled)) in hits.iter().enumerate() {
-                        let (rect, resp) = ui.allocate_exact_size(vec2(width, 32.0), Sense::click());
-                        if i == sel || resp.hovered() {
-                            ui.painter().rect_filled(rect, t.radius_sm, if i == sel { t.accent_soft } else { t.hover });
-                        }
-                        let color = if *enabled { t.text } else { t.text_faint };
-                        ui.painter().text(rect.left_center() + vec2(12.0, 0.0), Align2::LEFT_CENTER, label, theme::medium(13.0), color);
-                        if let Some(d) = detail {
-                            ui.painter().text(rect.right_center() - vec2(12.0, 0.0), Align2::RIGHT_CENTER, d, egui::FontId::proportional(11.5), t.text_faint);
-                        }
-                        if resp.clicked() && *enabled {
-                            run = Some(id.clone());
-                        }
-                    }
+                    list::rows(ui, &t, &hits, &mut sel, width, &mut run);
                     if enter && let Some(h) = hits.get(sel).filter(|h| h.4) {
                         run = Some(h.1.clone());
                         // dialogs::show runs later in the same frame and would read this Enter as

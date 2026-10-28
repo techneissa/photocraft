@@ -94,3 +94,12 @@ fn a_command_palette_shortcut_cmd_p_opens_the_palette_and_print_has_no_key() {
     assert_eq!(menus.iter().find(|m| m.id == "file.print").map(|m| m.shortcut.clone()), Some(None));
     assert_eq!(crate::shortcuts::default_shortcut("edit.search").as_deref(), Some("Cmd+F"), "⌘F still opens it");
 }
+
+#[test]
+fn cmd_f_opens_the_palette_too() {
+    let mut h = app_harness();
+    h.key_combination_modifiers(Modifiers::COMMAND, &[Key::F]);
+    h.run_steps(3);
+    assert!(h.state().ui.palette_open, "⌘F opens the palette");
+    assert!(h.state().ui.dialogs.is_empty());
+}
