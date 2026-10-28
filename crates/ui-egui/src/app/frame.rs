@@ -305,6 +305,7 @@ impl PhotocraftApp {
         timeline_ui::windows(self, &ctx);
         workspace_ui::windows(self, &ctx);
         palette::show(self, &ctx);
+        crate::assign_shortcut::show(self, &ctx);
         dialogs::show(self, &ctx);
         layers_panel_ui::show_dialog(self, &ctx);
         rasterize_prompt::run_pending(self, &ctx);

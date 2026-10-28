@@ -67,6 +67,7 @@ mod fields;
 mod graphics;
 mod save;
 mod shortcuts;
+mod shortcuts_open;
 mod startup;
 
 #[cfg(test)]
@@ -93,6 +94,7 @@ pub use save::{autosave_now, tick};
 #[cfg(test)]
 pub(crate) use shortcuts::capture_key_press;
 pub use shortcuts::{is_modifier_key, reserved_shortcut, shortcut_items, shortcut_text};
+pub(crate) use shortcuts_open::open_shortcuts_for;
 pub use startup::load;
 pub(crate) use startup::{on_recovery_event, remember_rulers};
 

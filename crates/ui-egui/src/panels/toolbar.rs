@@ -166,6 +166,9 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                                         icons::button_with_icon_size_tip(ui, icons::tool_icon(tool), bx, toolbar_icon_size(bx, t.pro), sel, &tip, tool_tips);
                                     if slot.len() > 1 {
                                         paint_toolbar_flyout_indicator(ui, &t, &resp);
+                                    } else {
+                                        // A right-click opens the flyout of a tool with company; a lone tool offers its shortcut.
+                                        crate::assign_shortcut::on(ui, &resp, &crate::tool_shortcuts::id(tool));
                                     }
                                     if resp.clicked() && ui.data(|d| d.get_temp::<egui::Id>(held_id)) != Some(key) {
                                         crate::tool_memory::select(app, tool);
@@ -276,6 +279,9 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                                                             ui.input(|i| i.pointer.primary_released()),
                                                             ui.data(|d| d.get_temp::<egui::Id>(held_id)) == Some(key),
                                                         );
+                                                        if crate::assign_shortcut::on(ui, &ir, &crate::tool_shortcuts::id(item)) {
+                                                            ui.data_mut(|d| d.remove::<(egui::Id, Rect)>(flyout_id));
+                                                        }
                                                         if ir.clicked() || drag_release {
                                                             crate::tool_memory::select(app, item);
                                                             ui.data_mut(|d| d.remove::<(egui::Id, Rect)>(flyout_id));
@@ -298,7 +304,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                             });
                         }
                     }
-                    if icons::button(ui, "ellipsis", bx, false, tl!("Edit Toolbar…")).clicked() {
+                    if crate::assign_shortcut::button(ui, "ellipsis", bx, false, tl!("Edit Toolbar…"), "edit.toolbar").clicked() {
                         let _ = crate::menus::invoke(app, &ctx, "edit.toolbar", json!({}));
                     }
                     reveal_focused_control(ui);
@@ -313,7 +319,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 
             ui.with_layout(layout, |ui| {
                 let quick_mask = app.session.active().is_some_and(|s| s.doc.quick_mask.is_some());
-                if icons::button_with_icon_size_tip(
+                let quick = icons::button_with_icon_size_tip(
                     ui,
                     "square-dashed",
                     bx,
@@ -321,9 +327,9 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                     quick_mask,
                     if quick_mask { tl!("Edit in Standard Mode  (Q)") } else { tl!("Edit in Quick Mask Mode  (Q)") },
                     tool_tips,
-                )
-                .clicked()
-                {
+                );
+                crate::assign_shortcut::on(ui, &quick, "select.editInQuickMaskMode");
+                if quick.clicked() {
                     let _ = crate::menus::invoke(app, &ctx, "select.editInQuickMaskMode", json!({}));
                 }
                 let sm = icons::button_with_icon_size_tip(ui, "app-window", bx, (bx * 0.52).round(), false, tl!("Change Screen Mode  (F)"), tool_tips);
