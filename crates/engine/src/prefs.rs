@@ -287,6 +287,10 @@ pub struct Interface {
     /// objects in a large document stay visible (Photoshop's Clip Thumbnails to Layer Bounds; #4281).
     pub clip_thumbnails_to_layer_bounds: bool,
     pub show_tooltips: bool,
+    /// The scroll wheel over a blend mode box (the Layers panel's, the options bar's Mode) steps
+    /// the mode, as in Photoshop. Off (the default), the wheel scrolls the panel or the open list
+    /// instead and never changes the mode by accident.
+    pub scroll_wheel_changes_blend_mode: bool,
     /// Menus, popups and collapsing sections fade and slide, and scroll areas glide to a new
     /// position. Off, everything changes at once (a reduced-motion mode; #1218, #3273).
     pub enable_animations: bool,
@@ -329,6 +333,7 @@ impl Default for Interface {
             show_menu_colors: true,
             clip_thumbnails_to_layer_bounds: false,
             show_tooltips: true,
+            scroll_wheel_changes_blend_mode: false,
             enable_animations: true,
             show_bounding_box_when_dragging_layer: false,
             system_title_bar: false,

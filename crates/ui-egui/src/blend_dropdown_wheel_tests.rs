@@ -10,16 +10,23 @@ use serde_json::json;
 
 use crate::PhotocraftApp;
 
-/// The app with a new document after `setup` (its last layer is the active one).
+/// The app with a new document after `setup` (its last layer is the active one), with the wheel
+/// stepping blend modes on (Preferences › Interface; off by default).
 fn harness(setup: impl FnOnce(&mut PhotocraftApp) + 'static) -> Harness<'static, PhotocraftApp> {
     harness_sized(vec2(1440.0, 900.0), setup)
 }
 
 /// [`harness`] in a window of `size`.
 fn harness_sized(size: egui::Vec2, setup: impl FnOnce(&mut PhotocraftApp) + 'static) -> Harness<'static, PhotocraftApp> {
+    harness_with(size, true, setup)
+}
+
+/// [`harness`] in a window of `size`, the wheel preference `wheel_steps`.
+pub(crate) fn harness_with(size: egui::Vec2, wheel_steps: bool, setup: impl FnOnce(&mut PhotocraftApp) + 'static) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(size).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.session.edit_prefs(|p| p.interface.scroll_wheel_changes_blend_mode = wheel_steps);
         app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
         setup(&mut app);
         app
@@ -29,27 +36,27 @@ fn harness_sized(size: egui::Vec2, setup: impl FnOnce(&mut PhotocraftApp) + 'sta
 }
 
 /// A filled pixel layer above the Background, active.
-fn pixel_layer(app: &mut PhotocraftApp) {
+pub(crate) fn pixel_layer(app: &mut PhotocraftApp) {
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("edit.fill", json!({"color": "#cc3366"})).unwrap();
 }
 
-fn blend(h: &Harness<'_, PhotocraftApp>) -> BlendMode {
+pub(crate) fn blend(h: &Harness<'_, PhotocraftApp>) -> BlendMode {
     let st = h.state().session.active().unwrap();
     st.doc.layer(st.active_layer.unwrap()).unwrap().blend
 }
 
-fn steps(h: &Harness<'_, PhotocraftApp>) -> usize {
+pub(crate) fn steps(h: &Harness<'_, PhotocraftApp>) -> usize {
     h.state().session.active().unwrap().history.past_len()
 }
 
 /// The Layers panel's dropdown: the lowest one (the options bar and the title bar have some too).
-fn dropdown(h: &Harness<'_, PhotocraftApp>) -> Rect {
+pub(crate) fn dropdown(h: &Harness<'_, PhotocraftApp>) -> Rect {
     h.query_all_by_role(Role::ComboBox).map(|n| n.rect()).max_by(|a, b| a.top().total_cmp(&b.top())).unwrap()
 }
 
 /// `lines` wheel lines at `at` in one event: negative is down.
-fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, lines: f32) {
+pub(crate) fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, lines: f32) {
     h.hover_at(at);
     h.run_steps(1);
     h.event(egui::Event::MouseWheel {
@@ -138,7 +145,7 @@ fn the_wheel_leaves_the_greyed_background_blend_mode_alone() {
     assert_eq!((blend(&h), steps(&h)), (BlendMode::Normal, undo));
 }
 
-fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2) {
+pub(crate) fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2) {
     h.hover_at(at);
     h.run_steps(1);
     for pressed in [true, false] {
@@ -156,7 +163,7 @@ fn open_list(h: &Harness<'_, PhotocraftApp>) -> Rect {
 }
 
 /// Where the entry `label` of the open list is (also when it is scrolled out of sight).
-fn entry(h: &Harness<'_, PhotocraftApp>, label: &str) -> Rect {
+pub(crate) fn entry(h: &Harness<'_, PhotocraftApp>, label: &str) -> Rect {
     h.get_by_label(label).rect()
 }
 
