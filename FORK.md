@@ -89,6 +89,7 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
 | Keyboard Shortcuts upgrade in the existing window: chords (⌘K then C) with a keycap hint, When conditions per command (autocomplete, `!`, + builder; keys only: menus and the palette still run the command), a clash icon on the row, export/import JSON icons; shortcut sets carry chords and When (`.kys` stays keys-only) | `feat/shortcut-upgrade` | engine `when/`, `prefs/chords.rs`, `prefs/chord_cmds.rs`, `shortcut_backup.rs` (+ tests); ui-egui `keybinds.rs` + `keybinds/`, `prefs/prefs_ui/shortcut_target.rs` (`open_shortcuts_for`, the one entry point Assign Shortcut… uses), `shortcuts_when.rs`, `shortcuts_chord.rs`, `shortcuts_backup.rs`, `shortcuts_upgrade_tests.rs`; `assets/icons/download.svg`, `upload.svg` (Lucide) | engine `lib.rs`, `prefs.rs` (`chords`, `shortcut_when`), `prefs/validate.rs`, `prefs/customize.rs`, `shortcut_sets.rs`; ui-egui `lib.rs`, `app.rs`, `app/frame.rs`, `input/shortcuts.rs` (chord poll, `tool_on`), `input/shortcut_dispatch.rs` (When-false → no key), `prefs/prefs_ui.rs`, `prefs_ui/dialogs.rs` (width up to 1000), `prefs_ui/shortcuts.rs` (column, chips, icons, clash icon), `file_dialog.rs` (`pick_file_bytes_limited`), `icon_data.rs`, `prefs_ui/tests.rs` + `shortcut_set_tests.rs`, `ATTRIBUTION.md` (Lucide count) | engine `when chords chord_cmds shortcut_backup shortcut_sets`, ui-egui `keybinds shortcuts_upgrade shortcut_capture shortcut_set` |
 | Crop W×H with Delete Cropped Pixels off no longer aborts the app: upstream PR #9213 taken early (a real merge; nothing to do when upstream merges it) | upstream `pr-9213` | none | engine `cmd/image_cmds.rs`, `mode_cmds.rs`, `analysis_cmds.rs` + tests | engine `image_cmds mode_cmds` |
 | Undo/redo stress test: hundreds of random edits, undos and redos (65 commands, 8/16/32-bit RGB, Gray, CMYK) must restore exact states, never panic or hang; `-- --ignored` for the long run, `PHOTOCRAFT_UNDO_STRESS_*` env vars | `test/undo-redo-stress` | `crates/engine/tests/undo_redo_stress.rs` | none | `cargo test -p photocraft-engine --test undo_redo_stress` |
+| No "Join us on Discord" button on the start screen or in About (the Discord link in the link row stays) | `feat/hide-discord-button` | none | ui-egui `canvas/start_screen.rs`, `dialogs.rs` (2 lines removed each), `links.rs` (`#[allow(dead_code)]` on `discord_button`), `canvas/tests.rs` (1 test appended) | `start_screen` |
 
 Every feature also has a row in `docs/parity-checklist.md` when it adds commands; clashes there are fixed by the
 update script (both sides kept).
@@ -105,7 +106,7 @@ cargo test -p photocraft-ml
 cargo test -p photocraft-text --lib -- big_collection
 cargo test -p photocraft-engine --lib -- when chords chord_cmds shortcut_backup shortcut_sets image_cmds mode_cmds
 cargo test -p photocraft-engine --test undo_redo_stress
-cargo test -p photocraft-ui-egui --lib -- title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
+cargo test -p photocraft-ui-egui --lib -- start_screen title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
 cargo test -p photocraft-gpu --test it live_transform
 ```
 
