@@ -1,7 +1,8 @@
 //! The presets control of Preferences › Context Menus: one small dropdown showing the active preset
 //! (a dot after its name when the menus changed since it was saved), then the Export and Import
 //! icon buttons for the backup file. The dropdown's menu switches presets, saves the menus to one,
-//! clears one and undoes the last switch.
+//! clears one and undoes the last switch. The dropdown itself shows the state (the active preset, a
+//! dot when it changed, empty presets greyed), so no action says anything on the status line.
 
 use egui::{Rect, Sense, Stroke, pos2, vec2};
 
@@ -9,20 +10,6 @@ use super::presets::COUNT;
 use super::{Custom, backup};
 use crate::PhotocraftApp;
 use crate::theme::Tokens;
-
-/// Say how an action went, on the status line.
-fn report(app: &mut PhotocraftApp, result: Result<(), String>, done: String) {
-    match result {
-        Ok(()) => {
-            app.ui.status = done;
-            app.ui.status_error = false;
-        }
-        Err(e) => {
-            app.ui.status = e;
-            app.ui.status_error = true;
-        }
-    }
-}
 
 /// A small icon button: a tray with an arrow out of it (`up`, Export) or into it (Import).
 fn tray_button(ui: &mut egui::Ui, t: &Tokens, up: bool, tip: &str) -> bool {
@@ -50,9 +37,9 @@ fn label(custom: &Custom) -> (String, bool) {
     }
 }
 
-/// A menu entry; a check mark at its right end when `checked`. True when clicked.
-fn entry(ui: &mut egui::Ui, text: &str, checked: bool) -> bool {
-    let r = ui.button(text);
+/// A menu entry; a check mark at its right end when `checked`, greyed when not `enabled`. True when clicked.
+fn entry(ui: &mut egui::Ui, text: &str, checked: bool, enabled: bool) -> bool {
+    let r = ui.add_enabled(enabled, egui::Button::new(text));
     if checked {
         let t = Tokens::get(ui.ctx());
         crate::icons::paint(ui, Rect::from_center_size(pos2(r.rect.right() - 12.0, r.rect.center().y), vec2(13.0, 13.0)), "check", 13.0, t.text);
@@ -74,12 +61,11 @@ fn dropdown_button(ui: &mut egui::Ui, t: &Tokens, text: &str) -> egui::Response 
 }
 
 /// The Save to Preset and Clear Preset submenus.
-fn manage(app: &mut PhotocraftApp, ui: &mut egui::Ui, custom: &mut Custom) {
+fn manage(ui: &mut egui::Ui, custom: &mut Custom) {
     ui.menu_button(tl!("Save to Preset"), |ui| {
         for n in 1..=COUNT {
-            if entry(ui, &n.to_string(), false) {
-                let done = format!("{} {n}", tl!("Saved the menus to Preset"));
-                report(app, custom.save_to(n - 1), done);
+            if entry(ui, &n.to_string(), false, true) {
+                let _ = custom.save_to(n - 1);
                 ui.close();
             }
         }
@@ -88,9 +74,8 @@ fn manage(app: &mut PhotocraftApp, ui: &mut egui::Ui, custom: &mut Custom) {
     if states.iter().any(|s| s.saved) {
         ui.menu_button(tl!("Clear Preset"), |ui| {
             for n in (1..=COUNT).filter(|n| states[n - 1].saved) {
-                if entry(ui, &format!("{} {n}", tl!("Preset")), false) {
-                    let done = format!("{} {n}", tl!("Cleared Preset"));
-                    report(app, custom.clear(n - 1), done);
+                if entry(ui, &format!("{} {n}", tl!("Preset")), false, true) {
+                    let _ = custom.clear(n - 1);
                     ui.close();
                 }
             }
@@ -117,19 +102,18 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, custom: &mut Custom, t: 
             let s = states[n - 1];
             let name = format!("{} {n}", tl!("Preset"));
             let text = if s.saved { name } else { format!("{name} ({})", tl!("Empty")) };
-            if entry(ui, &text, s.active) {
-                let done = format!("{} {n}", tl!("Switched to Preset"));
-                report(app, custom.switch_to(n - 1), done);
+            // an empty preset has nothing to switch to
+            if entry(ui, &text, s.active, s.saved) {
+                let _ = custom.switch_to(n - 1);
                 ui.close();
             }
         }
         ui.separator();
-        manage(app, ui, custom);
+        manage(ui, custom);
         if custom.can_undo() {
             ui.separator();
-            if ui.button(tl!("Undo")).on_hover_text(tl!("Bring back the menus you had before switching")).clicked() {
-                let done = tl!("Undid the switch").to_string();
-                report(app, custom.undo(), done);
+            if ui.button(tl!("Undo")).on_hover_text(tl!("Undo Switch")).clicked() {
+                let _ = custom.undo();
                 ui.close();
             }
         }

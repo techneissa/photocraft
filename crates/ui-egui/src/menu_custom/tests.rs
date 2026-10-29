@@ -125,12 +125,35 @@ fn separators_never_start_end_or_double() {
 }
 
 #[test]
-fn hiding_everything_gives_the_default_menu_back() {
+fn hiding_everything_leaves_an_empty_menu_and_not_arranged_leaves_the_default() {
     let mut app = app();
     let all: Vec<&str> = menus::universe(CANVAS_NONE);
-    save(&mut app, CANVAS_NONE, arrangement(&[], &all));
     let default = menus::rows(CANVAS_NONE);
+    // nothing arranged: the menu as built
     assert_eq!(arranged(&app.session.prefs().context_menus, CANVAS_NONE, default.clone()), default);
+    // arranged, every row out: no row (the menu does not open)
+    save(&mut app, CANVAS_NONE, arrangement(&[], &all));
+    assert!(arranged(&app.session.prefs().context_menus, CANVAS_NONE, default.clone()).is_empty());
+    app.ui.tool = Tool::RectMarquee;
+    assert!(canvas_tool_menu::open(&mut app, &egui::Context::default(), Tool::RectMarquee, [10.0, 10.0]));
+    let menu = app.ui.canvas_tool_menu.clone().unwrap();
+    assert!(canvas_rows(&app, &menu).is_empty() && closed(&app, &menu) && !canvas_has(&app, &menu, "select.all"));
+    // the editor shows the same: nothing in Shown, everything offered
+    let custom = load(&app);
+    assert!(editor::slots(&custom, CANVAS_NONE).is_empty());
+    assert_eq!(editor::available(CANVAS_NONE, &[], "").iter().filter(|a| a.group == "This Menu").count(), all.len());
+    // the layers menu: its rows go, the rest of the menu stays the panel's
+    save(&mut app, LAYERS_ROW, arrangement(&[], &menus::universe(LAYERS_ROW)));
+    let layer = layer_of(&app, app.session.active().unwrap().active_layer.unwrap());
+    assert!(layer_rows(&app, crate::layer_menu_ui::entries(&layer, false, false)).is_empty());
+    // Reset (the editor's default slots) clears the key: the default menu again
+    let mut custom = load(&app);
+    editor::set_slots(&mut custom, CANVAS_NONE, &editor::default_slots(CANVAS_NONE));
+    store(&mut app, &custom);
+    assert_eq!(arranged(&app.session.prefs().context_menus, CANVAS_NONE, default.clone()), default);
+    assert!(!closed(&app, &menu));
+    // an arrangement left with nothing in it is no arrangement
+    assert!(Custom::from_value(&json!({"menus": {"canvas.noSelection": {"items": [], "hidden": []}}})).menus.is_empty());
 }
 
 #[test]
@@ -219,9 +242,49 @@ fn every_layer_row_the_menu_builds_is_known_to_the_editor() {
 
 #[test]
 fn every_tab_row_the_menu_builds_is_known_to_the_editor() {
-    // `canvas/tests.rs` pins tab_context_items; here the editor's list is what must match it
-    let known = menus::universe(TAB);
-    assert_eq!(known, ["file.close", "file.closeOthers", "file.closeAll", "file.revealInFinder"]);
+    // what the tab menu builds (`tab_context_items`, the one `tab_context_menu` draws) against the editor's list
+    let built: Vec<(&str, &str)> = crate::canvas::built_tab_items(0, 2, true).iter().map(|(label, id, ..)| (*label, *id)).collect();
+    let known: Vec<(&str, &str)> = menus::rows(TAB).into_iter().flatten().collect();
+    assert_eq!(built, known, "a tab menu row changed: update menu_custom::menus::TAB_ROWS");
+}
+
+/// The rows of the canvas selection menus as the editor was written for. A row upstream adds or
+/// renames fails here: add it to the arrangement tests' expectations, and check it makes sense
+/// in the editor.
+#[test]
+fn the_canvas_selection_menus_have_the_rows_the_editor_knows() {
+    let ids = |rows: &[Row]| -> Vec<&'static str> { rows.iter().map(|r| r.map_or("---", |(_, id)| id)).collect() };
+    assert_eq!(
+        ids(&menus::rows(CANVAS_SELECTION)),
+        [
+            "select.deselect",
+            "select.inverse",
+            "select.modify.feather",
+            "select.selectAndMask",
+            "---",
+            "select.saveSelection",
+            "select.toWorkPath",
+            "---",
+            "layer.new.layerViaCopy",
+            "layer.new.layerViaCut",
+            "layer.new.layer",
+            "---",
+            "edit.freeTransform",
+            "select.transformSelection",
+            "edit.transform.distort",
+            "edit.transform.perspective",
+            "---",
+            "edit.deleteAndFillSelection",
+            "edit.fill",
+            "edit.stroke",
+            "edit.contentAwareFill",
+            "---",
+            "filter.lastFilter",
+            "---",
+            "edit.fade",
+        ]
+    );
+    assert_eq!(ids(&menus::rows(CANVAS_NONE)), ["select.all", "select.reselect", "select.colorRange", "---", "select.loadSelection"]);
 }
 
 #[test]
@@ -243,6 +306,37 @@ fn the_layer_menu_keeps_the_rows_of_its_layer_kind() {
             assert!(built.iter().flatten().any(|r| r.1 == *id) || ["layer.mergeVisible", "layer.rasterize.type"].contains(id));
         }
     }
+}
+
+#[test]
+fn a_command_of_the_shell_added_to_the_layers_menu_is_drawn_and_runs() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let mut app = app();
+    // Arrange Panels is a shell command (menus::UI_COMMANDS), not in the engine's registry or the catalogue tree
+    assert!(photocraft_engine::commands::find("ui.dock").is_none() && catalog::find("ui.dock").is_some());
+    assert!(!crate::menu_catalog::CATALOG.iter().any(|m| m.3 == "ui.dock"));
+    assert!(crate::menus::is_enabled(&app, "ui.dock"));
+    save(&mut app, LAYERS_ROW, only(LAYERS_ROW, &["cmd:ui.dock", "cmd:layer.delete"]));
+    app.run("layer.new.layer", json!({})).unwrap();
+    let layer = layer_of(&app, app.session.active().unwrap().active_layer.unwrap());
+    let mut h = Harness::builder().with_size(egui::vec2(400.0, 400.0)).build_ui_state(
+        |ui, (app, actions): &mut (PhotocraftApp, Vec<(String, Value)>)| {
+            let layer = app.session.active().and_then(|s| s.active_layer.and_then(|id| s.doc.layer(id))).cloned().unwrap();
+            egui::CentralPanel::default().show(ui, |ui| {
+                crate::layer_menu_ui::show(app, ui, &layer, false, actions);
+            });
+        },
+        (app, Vec::new()),
+    );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    h.run_steps(3);
+    h.get_by_label("Delete Layer");
+    h.get_by_label("Arrange Panels").click();
+    h.run_steps(2);
+    let actions = &h.state().1;
+    assert!(actions.iter().any(|(id, params)| id == "ui.dock" && params.is_null()), "{actions:?}");
+    assert!(actions.iter().any(|(id, _)| id == "layer.select"), "the clicked layer is selected first, like every row");
+    let _ = layer;
 }
 
 #[test]
@@ -297,7 +391,7 @@ fn the_editor_lists_and_commits_by_menu() {
     shown.retain(|s| *s != Slot::Cmd("layer.exportAs".into()));
     editor::set_slots(&mut custom, key, &shown);
     assert_eq!(custom.menus[key].hidden, ["layer.exportAs"]);
-    assert!(editor::available(key, &shown, "").iter().any(|a| a.id == "layer.exportAs" && a.path == "Menu row"));
+    assert!(editor::available(key, &shown, "").iter().any(|a| a.id == "layer.exportAs" && a.group == "This Menu"));
     // that row first among the offers, then the menu bar's commands; a search narrows both
     assert_eq!(editor::available(key, &shown, "export as").first().map(|a| a.id), Some("layer.exportAs"));
     assert!(editor::available(key, &shown, "zzzz nothing").is_empty());
@@ -305,7 +399,7 @@ fn the_editor_lists_and_commits_by_menu() {
     editor::set_slots(&mut custom, key, &editor::default_slots(key));
     assert!(custom.menus.is_empty());
     // the tab menu offers only its own rows
-    assert!(editor::available(TAB, &[], "").iter().all(|a| a.path == "Menu row"));
+    assert!(editor::available(TAB, &[], "").iter().all(|a| a.group == "This Menu"));
 }
 
 #[test]
@@ -337,17 +431,13 @@ mod page {
 
     use super::*;
 
-    fn harness(app: PhotocraftApp, height: f32) -> Harness<'static, PhotocraftApp> {
-        let mut h = Harness::builder().with_size(egui::vec2(900.0, height + 40.0)).build_ui_state(
-            move |ui, app: &mut PhotocraftApp| {
-                if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
-                    return;
-                }
-                egui::CentralPanel::default().show(ui, |ui| editor::page(app, ui, height));
-            },
-            app,
-        );
-        PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    /// The app with Preferences open on the Context Menus page, drawn as the app draws it.
+    fn harness(mut app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
+        crate::prefs_ui::open_preferences(&mut app, "contextMenus");
+        let mut h = Harness::builder().with_size(egui::vec2(1280.0, 860.0)).build_eframe(move |cc| {
+            PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+            app
+        });
         h.run_steps(4);
         h
     }
@@ -357,77 +447,171 @@ mod page {
         h.run_steps(3);
     }
 
+    /// The arrangement being edited in the open dialog.
+    fn draft(h: &Harness<'static, PhotocraftApp>) -> Custom {
+        Custom::from_value(&h.state().ui.dialogs.iter().find_map(|d| d.fields.get(DRAFT)).cloned().unwrap_or(Value::Null))
+    }
+
     #[test]
     fn the_page_takes_a_row_out_adds_a_command_and_resets() {
-        let mut h = harness(app(), 520.0);
+        let mut h = harness(app());
         click(&mut h, "Deselect");
         click(&mut h, "Take out of the menu");
-        let custom = load(h.state());
-        let a = &custom.menus[CANVAS_SELECTION];
+        let a = draft(&h).menus[CANVAS_SELECTION].clone();
         assert_eq!(a.hidden, ["select.deselect"]);
         assert!(!a.items.contains(&"cmd:select.deselect".to_string()) && a.items.contains(&"cmd:select.inverse".to_string()));
-        // the right-click menu follows at once
-        let menu = selection_menu(h.state_mut());
-        assert!(!canvas_has(h.state(), &menu, "select.deselect") && canvas_has(h.state(), &menu, "select.inverse"));
         // + on the first offer (the row taken out) puts it back, below the picked row ...
         h.get_all_by_label("Add to the menu").next().unwrap().click();
         h.run_steps(3);
-        assert!(load(h.state()).menus[CANVAS_SELECTION].items.contains(&"cmd:select.deselect".to_string()));
+        assert!(draft(&h).menus[CANVAS_SELECTION].items.contains(&"cmd:select.deselect".to_string()));
         // ... and the next offer is a command of the menu bar, the first of its File menu
         h.get_all_by_label("Add to the menu").next().unwrap().click();
         h.run_steps(3);
-        assert!(load(h.state()).menus[CANVAS_SELECTION].items.contains(&"cmd:file.new".to_string()));
+        assert!(draft(&h).menus[CANVAS_SELECTION].items.contains(&"cmd:file.new".to_string()));
         click(&mut h, "Add Separator");
-        assert!(load(h.state()).menus[CANVAS_SELECTION].items.iter().any(|i| i == "---"));
+        assert!(draft(&h).menus[CANVAS_SELECTION].items.iter().any(|i| i == "---"));
         // Reset puts the menu back as it came
         click(&mut h, "Reset");
-        assert!(load(h.state()).menus.is_empty());
+        assert!(draft(&h).menus.is_empty());
+    }
+
+    #[test]
+    fn cancel_reverts_and_nothing_is_written_until_ok() {
+        let mut h = harness(app());
+        let rev = h.state().session.prefs.rev();
+        click(&mut h, "Deselect");
+        click(&mut h, "Take out of the menu");
+        assert!(draft(&h).menus.contains_key(CANVAS_SELECTION));
+        // the page edits the dialog's draft: the saved preferences are untouched
+        assert!(h.state().session.prefs().context_menus.is_null());
+        assert_eq!(h.state().session.prefs.rev(), rev, "nothing was written");
+        click(&mut h, "Cancel");
+        assert!(h.state().ui.dialogs.is_empty());
+        assert!(h.state().session.prefs().context_menus.is_null());
+        assert_eq!(h.state().session.prefs.rev(), rev);
+        // the next right-click shows the row, and the page opens without the change
+        let menu = selection_menu(h.state_mut());
+        assert!(canvas_has(h.state(), &menu, "select.deselect"));
+        let app = std::mem::replace(h.state_mut(), PhotocraftApp::new(photocraft_engine::Session::new(), Default::default()));
+        let h = harness(app);
+        assert!(draft(&h).menus.is_empty());
+    }
+
+    #[test]
+    fn ok_and_apply_save_the_draft() {
+        let mut h = harness(app());
+        click(&mut h, "Deselect");
+        click(&mut h, "Take out of the menu");
+        // Apply saves and keeps the dialog
+        click(&mut h, "Apply");
+        assert_eq!(load(h.state()).menus[CANVAS_SELECTION].hidden, ["select.deselect"]);
+        assert!(!h.state().ui.dialogs.is_empty());
+        // more edits, then OK
+        click(&mut h, "Select Inverse");
+        click(&mut h, "Take out of the menu");
+        click(&mut h, "OK");
+        assert!(h.state().ui.dialogs.is_empty());
+        let saved = load(h.state()).menus[CANVAS_SELECTION].hidden.clone();
+        assert_eq!(saved, ["select.deselect", "select.inverse"]);
+        let menu = selection_menu(h.state_mut());
+        assert!(!canvas_has(h.state(), &menu, "select.deselect") && !canvas_has(h.state(), &menu, "select.inverse"));
+    }
+
+    #[test]
+    fn a_preset_switch_and_an_import_are_part_of_the_draft_too() {
+        let mut app = app();
+        let mut c = Custom::default();
+        c.menus.insert(TAB.into(), arrangement(&[], &["file.closeAll"]));
+        c.save_to(0).unwrap();
+        c.menus.clear();
+        store(&mut app, &c);
+        let mut h = harness(app);
+        let rev = h.state().session.prefs.rev();
+        click(&mut h, "Preset 1 •");
+        click(&mut h, "Preset 1");
+        assert!(draft(&h).menus.contains_key(TAB), "switched in the draft");
+        assert!(load(h.state()).menus.is_empty() && h.state().session.prefs.rev() == rev, "not saved");
+        // an import fills the draft as well
+        let file = backup::render(&with_menu(LAYERS_ROW, arrangement(&["cmd:layer.delete"], &["layer.exportAs"]))).unwrap();
+        backup::import_bytes(h.state_mut(), file.into_bytes()).unwrap();
+        h.run_steps(2);
+        assert!(draft(&h).menus.contains_key(LAYERS_ROW) && !draft(&h).menus.contains_key(TAB));
+        assert!(load(h.state()).menus.is_empty() && h.state().session.prefs.rev() == rev);
+        click(&mut h, "Cancel");
+        assert!(load(h.state()).menus.is_empty() && h.state().session.prefs.rev() == rev);
+    }
+
+    fn with_menu(key: &str, a: Arrangement) -> Custom {
+        Custom { menus: [(key.to_string(), a)].into(), ..Default::default() }
     }
 
     #[test]
     fn the_preset_dropdown_saves_switches_clears_and_undoes() {
-        let mut h = harness(app(), 520.0);
+        let mut h = harness(app());
         click(&mut h, "Deselect");
         click(&mut h, "Take out of the menu");
-        let arranged = load(h.state()).menus;
+        let arranged = draft(&h).menus;
         assert!(!arranged.is_empty());
         click(&mut h, "Presets");
         click(&mut h, "Save to Preset");
         click(&mut h, "1");
-        assert!(load(h.state()).presets.get(0).is_some());
-        assert_eq!(load(h.state()).menus, arranged, "saving changes no menu");
+        assert!(draft(&h).presets.get(0).is_some());
+        assert_eq!(draft(&h).menus, arranged, "saving changes no menu");
         // the label names the active preset
         h.get_by_label("Preset 1");
         // back to the default menus, then switch to Preset 1 and undo the switch
         click(&mut h, "Reset");
-        assert!(load(h.state()).menus.is_empty());
+        assert!(draft(&h).menus.is_empty());
         click(&mut h, "Preset 1 •");
         click(&mut h, "Preset 1");
-        assert_eq!(load(h.state()).menus, arranged);
+        assert_eq!(draft(&h).menus, arranged);
         click(&mut h, "Preset 1");
         click(&mut h, "Undo");
-        assert!(load(h.state()).menus.is_empty());
+        assert!(draft(&h).menus.is_empty());
         // clear the slot
         click(&mut h, "Preset 1 •");
         click(&mut h, "Clear Preset");
         // the switch entry and the submenu's entry are both called Preset 1: the submenu's is last
         h.get_all_by_label("Preset 1").last().unwrap().click();
         h.run_steps(3);
-        assert!(load(h.state()).presets.is_empty());
+        assert!(draft(&h).presets.is_empty());
+        // nothing of it was saved, and no sentence went to the status line
+        assert!(h.state().session.prefs().context_menus.is_null());
+        assert!(h.state().ui.status.is_empty(), "{}", h.state().ui.status);
     }
 
     #[test]
     fn the_presets_control_is_one_line_with_the_heading_and_the_lists_fill_the_height() {
-        let tall = harness(app(), 700.0);
-        let title = tall.get_by_label("Context Menus").rect();
-        let presets = tall.get_by_label("Presets").rect();
-        let export = tall.get_by_label("Export Context Menus…").rect();
-        let import = tall.get_by_label("Import Context Menus…").rect();
+        let h = harness(app());
+        let title = h.get_all_by_label("Context Menus").next().unwrap().rect();
+        let presets = h.get_by_label("Presets").rect();
+        let export = h.get_by_label("Export Context Menus…").rect();
+        let import = h.get_by_label("Import Context Menus…").rect();
         assert!((title.center().y - presets.center().y).abs() < 6.0, "{title:?} {presets:?}");
         assert!((export.center().y - presets.center().y).abs() < 6.0 && (import.center().y - presets.center().y).abs() < 6.0);
         assert!(presets.left() < export.left() && export.left() < import.left(), "dropdown, export, import from the left");
+        // the picker, the separator and reset buttons share one line
+        let picker = h.get_by_label("Menu").rect();
+        for tip in ["Add Separator", "Reset"] {
+            let b = h.get_by_label(tip).rect();
+            assert!((b.center().y - picker.center().y).abs() < 6.0, "{tip}");
+            assert!(b.width() < 40.0, "{tip} is an icon button");
+        }
         // the lists grow with the room the page has
         assert!(editor::list_height(700.0, 80.0) > editor::list_height(400.0, 80.0));
         assert_eq!(editor::list_height(100.0, 80.0), 160.0, "never under the least height");
+    }
+
+    #[test]
+    fn the_available_list_is_grouped_under_headers_with_single_line_rows() {
+        let h = harness(app());
+        // group headers, no subtitle under each row
+        for group in ["File", "Edit"] {
+            assert!(h.query_by_label(group).is_some(), "{group}");
+        }
+        assert!(h.query_by_label("Menu row").is_none());
+        let a = h.get_all_by_label("Add to the menu").next().unwrap().rect();
+        let b = h.get_all_by_label("Add to the menu").nth(1).unwrap().rect();
+        assert!((b.center().y - a.center().y).abs() <= 27.0 + 26.0, "rows are one line tall");
     }
 }

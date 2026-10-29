@@ -9,12 +9,8 @@ pub const LAYERS_ROW: &str = "layers.row";
 pub const TAB: &str = "tab.document";
 
 /// The menus in the order the page lists them: (key, title).
-pub const MENUS: [(&str, &str); 4] = [
-    (CANVAS_SELECTION, "Canvas, Selection Tools with a Selection"),
-    (CANVAS_NONE, "Canvas, Selection Tools without a Selection"),
-    (LAYERS_ROW, "Layers Panel Row"),
-    (TAB, "Document Tab"),
-];
+pub const MENUS: [(&str, &str); 4] =
+    [(CANVAS_SELECTION, "Canvas · Selection"), (CANVAS_NONE, "Canvas · No Selection"), (LAYERS_ROW, "Layers Row"), (TAB, "Document Tab")];
 
 pub fn is_key(key: &str) -> bool {
     MENUS.iter().any(|(k, _)| *k == key)

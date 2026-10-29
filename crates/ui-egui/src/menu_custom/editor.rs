@@ -4,15 +4,20 @@
 //!
 //! - Drag a row up or down to move it; drag an item from the right into the list to put it there.
 //! - ↑ ↓ on the picked row move it, × takes it out; + on the right (or a double-click) adds the item
-//!   below the picked row, or at the end. Add Separator does the same with a line.
+//!   below the picked row, or at the end. The separator button above does the same with a line.
 //! - Keys, with a row picked and no text box in use: ↑ / ↓ pick another, ⌥↑ / ⌥↓ move it, Delete or
 //!   Backspace takes it out. Opening the page picks nothing.
-//! - Reset puts the menu back as it came.
+//! - The reset button puts the menu back as it came.
 //!
-//! Changes apply at once: the menus are the next right-click. The search text and the picked row
-//! live in egui's memory: they are the page's, not settings.
+//! The page edits a draft held by the Preferences dialog ([`super::DRAFT`]): OK and Apply save it,
+//! Cancel drops it. The search text and the picked row live in egui's memory: they are the page's,
+//! not settings.
+
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 
 use egui::{Color32, Key, Modifiers, Rect, Sense, Stroke, pos2, vec2};
+use serde_json::Value;
 
 use super::menus::{self, MENUS};
 use super::{Arrangement, Custom, Slot, catalog, presets_ui};
@@ -51,6 +56,16 @@ struct View {
     list_h: f32,
     /// The pass the page was last drawn in: when the page opens again nothing is picked.
     drawn: u64,
+    /// The offers last built, for the menu, search and shown rows they were built for.
+    offers: Option<OffersCache>,
+}
+
+#[derive(Clone, Debug)]
+struct OffersCache {
+    key: &'static str,
+    query: String,
+    shown: u64,
+    offers: Arc<Vec<Offer>>,
 }
 
 /// One thing the right-hand list offers.
@@ -58,8 +73,17 @@ struct View {
 pub struct Available {
     pub id: &'static str,
     pub label: &'static str,
-    /// Where it comes from: `Menu row`, or the menu-bar path (`Layer › Layer Style`).
+    /// The group it is listed under: `This Menu`, or the menu bar's menu (`Layer`).
+    pub group: String,
+    /// Where the menu bar has it (`Layer › Layer Style`), for its tooltip; empty for the menu's own rows.
     pub path: String,
+}
+
+/// A line of the right-hand list: a group's name, or one offer.
+#[derive(Clone, Debug)]
+enum Offer {
+    Header(String),
+    Item(Available),
 }
 
 /// The slots menu `key` shows now: the arrangement, or all its rows when it has none.
@@ -88,30 +112,53 @@ pub fn set_slots(custom: &mut Custom, key: &str, slots: &[Slot]) {
 }
 
 /// What can be added to menu `key` showing `shown`, matching `query` (every word in the label or
-/// path, any case): the menu's own rows not in it, then the menu-bar commands not in it.
+/// group or path, any case): the menu's own rows not in it, then the menu-bar commands not in it.
 pub fn available(key: &str, shown: &[Slot], query: &str) -> Vec<Available> {
     let in_menu: std::collections::HashSet<&str> = shown.iter().filter_map(|s| if let Slot::Cmd(id) = s { Some(id.as_str()) } else { None }).collect();
     let own = menus::universe(key);
     let mut out: Vec<Available> = own
         .iter()
         .filter(|id| !in_menu.contains(**id))
-        .filter_map(|id| Some(Available { id, label: menus::label(key, id)?, path: tl!("Menu row").to_string() }))
+        .filter_map(|id| Some(Available { id, label: menus::label(key, id)?, group: THIS_MENU.to_string(), path: String::new() }))
         .collect();
     if menus::can_add(key) {
         out.extend(catalog::all().iter().filter(|c| !in_menu.contains(c.id) && !own.contains(&c.id)).map(|c| Available {
             id: c.id,
             label: c.label,
+            group: c.path.split(" › ").next().filter(|g| !g.is_empty()).unwrap_or(OTHER).to_string(),
             path: c.path.clone(),
         }));
     }
     let words: Vec<String> = query.to_lowercase().split_whitespace().map(str::to_string).collect();
     if !words.is_empty() {
         out.retain(|a| {
-            let hay = format!("{} {} {}", a.label, tl!(a.label), a.path).to_lowercase();
+            let hay = format!("{} {} {} {}", a.label, tl!(a.label), a.group, a.path).to_lowercase();
             words.iter().all(|w| hay.contains(w.as_str()))
         });
     }
     out
+}
+
+const THIS_MENU: &str = "This Menu";
+const OTHER: &str = "Other";
+
+/// `items` under their group's header, groups in the order they first appear, at most
+/// [`MAX_AVAILABLE`] items.
+fn grouped(items: Vec<Available>) -> Vec<Offer> {
+    let mut groups: Vec<(String, Vec<Available>)> = Vec::new();
+    for item in items.into_iter().take(MAX_AVAILABLE) {
+        match groups.iter_mut().find(|(g, _)| *g == item.group) {
+            Some((_, list)) => list.push(item),
+            None => groups.push((item.group.clone(), vec![item])),
+        }
+    }
+    groups.into_iter().flat_map(|(group, list)| std::iter::once(Offer::Header(group)).chain(list.into_iter().map(Offer::Item))).collect()
+}
+
+fn shown_hash(shown: &[Slot]) -> u64 {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    shown.hash(&mut h);
+    h.finish()
 }
 
 /// A row's label in the list: the menu's own, else the menu bar's, else the id (a command this
@@ -143,8 +190,27 @@ pub fn list_height(height: f32, used: f32) -> f32 {
     (height - used - BELOW_LIST).clamp(MIN_LIST_H, MAX_LIST_H)
 }
 
-/// The page, `height` points tall (what the Preferences dialog gives its content).
-pub fn page(app: &mut PhotocraftApp, ui: &mut egui::Ui, height: f32) {
+/// A small icon button for the page's tool row; true when clicked. A disabled one is dimmed.
+fn tool_button(ui: &mut egui::Ui, t: &Tokens, icon: &str, tip: &str, enabled: bool) -> bool {
+    let (rect, r) = ui.allocate_exact_size(vec2(26.0, 24.0), if enabled { Sense::click() } else { Sense::hover() });
+    r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, tip));
+    if enabled && r.hovered() {
+        ui.painter().rect_filled(rect, t.radius_sm, t.hover);
+    }
+    let color = if !enabled {
+        t.text_faint
+    } else if r.hovered() {
+        t.text
+    } else {
+        t.icon
+    };
+    crate::icons::paint(ui, rect, icon, 16.0, color);
+    r.on_hover_text(tip).clicked()
+}
+
+/// The page, `height` points tall (what the Preferences dialog gives its content), editing `draft`
+/// (the dialog's copy of the arrangement).
+pub fn page(app: &mut PhotocraftApp, ui: &mut egui::Ui, height: f32, draft: &mut Value) {
     let t = Tokens::get(ui.ctx());
     let origin = ui.cursor().top();
     let view_id = egui::Id::unique("context-menus-page");
@@ -154,7 +220,7 @@ pub fn page(app: &mut PhotocraftApp, ui: &mut egui::Ui, height: f32) {
         view.picked = None;
     }
     view.menu = view.menu.min(MENUS.len() - 1);
-    let mut custom = super::load(app);
+    let mut custom = Custom::from_value(draft);
     let before = custom.clone();
     let mut key = MENUS[view.menu].0;
     let mut menu = slots(&custom, key);
@@ -172,16 +238,13 @@ pub fn page(app: &mut PhotocraftApp, ui: &mut egui::Ui, height: f32) {
     let mut chosen = view.menu;
     ui.horizontal(|ui| {
         let options: Vec<(usize, &str)> = MENUS.iter().enumerate().map(|(i, (_, title))| (i, *title)).collect();
-        crate::widgets::dropdown(ui, "context-menus-menu", tl!("Menu"), &mut chosen, &options, 330.0);
+        crate::widgets::dropdown(ui, "context-menus-menu", tl!("Menu"), &mut chosen, &options, 170.0);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let customised = custom.menus.contains_key(key);
-            ui.add_enabled_ui(customised, |ui| {
-                if crate::widgets::secondary_button(ui, tl!("Reset"), 60.0).clicked() {
-                    menu = default_slots(key);
-                    view.picked = None;
-                }
-            });
-            if crate::widgets::secondary_button(ui, tl!("Add Separator"), 110.0).clicked() {
+            if tool_button(ui, &t, "undo-2", tl!("Reset"), custom.menus.contains_key(key)) {
+                menu = default_slots(key);
+                view.picked = None;
+            }
+            if tool_button(ui, &t, "minus", tl!("Add Separator"), true) {
                 insert(&mut menu, &mut view, Slot::Separator);
             }
         });
@@ -219,7 +282,7 @@ pub fn page(app: &mut PhotocraftApp, ui: &mut egui::Ui, height: f32) {
         set_slots(&mut custom, key, &menu);
     }
     if custom != before {
-        super::store(app, &custom);
+        *draft = custom.to_value();
     }
     view.drawn = pass;
     ui.ctx().data_mut(|d| d.insert_temp(view_id, view));
@@ -464,10 +527,18 @@ fn drop_into(ui: &mut egui::Ui, t: &Tokens, key: &str, menu: &mut Vec<Slot>, vie
 }
 
 /// The list to add from, `width` wide, ending where the shown list (which starts at `left_top`) ends.
-fn add_list(ui: &mut egui::Ui, t: &Tokens, key: &str, menu: &mut Vec<Slot>, view: &mut View, (width, left_top): (f32, f32)) {
+fn add_list(ui: &mut egui::Ui, t: &Tokens, key: &'static str, menu: &mut Vec<Slot>, view: &mut View, (width, left_top): (f32, f32)) {
     crate::widgets::text_field(ui, egui::Id::unique("context-menus-search"), &mut view.query, tl!("Search commands"), width, false);
-    let mut offered = available(key, menu, &view.query);
-    offered.truncate(MAX_AVAILABLE);
+    // The offers are built again only when the menu, the search or the shown rows changed.
+    let shown = shown_hash(menu);
+    let offers = match view.offers.as_ref().filter(|c| c.key == key && c.shown == shown && c.query == view.query) {
+        Some(c) => c.offers.clone(),
+        None => {
+            let offers = Arc::new(grouped(available(key, menu, &view.query)));
+            view.offers = Some(OffersCache { key, query: view.query.clone(), shown, offers: offers.clone() });
+            offers
+        }
+    };
     let mut add: Option<Slot> = None;
     let right_top = ui.cursor().top();
     frame(t).show(ui, |ui| {
@@ -477,26 +548,33 @@ fn add_list(ui: &mut egui::Ui, t: &Tokens, key: &str, menu: &mut Vec<Slot>, view
         let h = (view.list_h - (right_top - left_top)).max(60.0);
         egui::ScrollArea::vertical().id_salt("context-menu-add").max_height(h).min_scrolled_height(h).auto_shrink([false, false]).show_rows(
             ui,
-            ROW_H + 8.0,
-            offered.len(),
+            ROW_H,
+            offers.len(),
             |ui, range| {
-                if offered.is_empty() {
+                if offers.is_empty() {
                     ui.label(egui::RichText::new(tl!("Nothing matches")).color(t.text_dim));
                 }
-                for a in offered.get(range).unwrap_or_default() {
-                    let (rect, r) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_H + 8.0), Sense::click_and_drag());
+                for offer in offers.get(range).unwrap_or_default() {
+                    let (rect, r) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_H), Sense::click_and_drag());
+                    let a = match offer {
+                        Offer::Header(group) => {
+                            let g = truncated(ui, tl!(group).to_string(), egui::FontId::proportional(10.5), t.text_faint, rect.width() - 12.0);
+                            ui.painter().galley(pos2(rect.left() + 6.0, rect.bottom() - g.size().y - 3.0), g, t.text_faint);
+                            continue;
+                        }
+                        Offer::Item(a) => a,
+                    };
                     let slot_key = Slot::Cmd(a.id.to_string()).key();
                     if r.hovered() && !egui::DragAndDrop::has_any_payload(ui.ctx()) {
                         ui.painter().rect_filled(rect, 4.0, t.hover);
                     }
                     let plus = Rect::from_center_size(pos2(rect.right() - 12.0, rect.center().y), vec2(18.0, 18.0));
-                    let max = (plus.left() - rect.left() - 12.0).max(10.0);
-                    let g1 = truncated(ui, tl!(a.label).to_string(), egui::FontId::proportional(12.5), t.text, max);
-                    let g2 = truncated(ui, a.path.clone(), egui::FontId::proportional(10.5), t.text_dim, max);
-                    ui.painter().galley(pos2(rect.left() + 6.0, rect.top() + 3.0), g1, t.text);
-                    ui.painter().galley(pos2(rect.left() + 6.0, rect.top() + 19.0), g2, t.text_dim);
+                    let g = truncated(ui, tl!(a.label).to_string(), egui::FontId::proportional(12.5), t.text, (plus.left() - rect.left() - 18.0).max(10.0));
+                    ui.painter().galley(pos2(rect.left() + 12.0, rect.center().y - g.size().y / 2.0), g, t.text);
                     let clicked = icon_button(ui, t, plus, ui.scope_id().with(("add", a.id)), "plus", tl!("Add to the menu"));
                     r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, a.label));
+                    // where the menu bar has it
+                    let r = if a.path.is_empty() { r } else { r.on_hover_text(a.path.as_str()) };
                     if clicked || r.double_clicked() {
                         add = Some(Slot::Cmd(a.id.to_string()));
                     }
