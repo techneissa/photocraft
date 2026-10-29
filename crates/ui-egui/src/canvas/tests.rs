@@ -2898,3 +2898,23 @@ fn damage_grows_by_nested_effect_reach() {
     group.visible = false;
     assert_eq!(effect_reach(&[group]), 0);
 }
+
+/// Fork: the start screen has no "Join us on Discord" button (FORK.md).
+#[test]
+fn start_screen_has_no_discord_button() {
+    use egui_kittest::kittest::Queryable;
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 760.0)).build_ui_state(
+        |ui, (app, ready): &mut (PhotocraftApp, bool)| {
+            if *ready {
+                egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| document_area(app, ui));
+            }
+        },
+        (app, false),
+    );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
+    h.state_mut().1 = true;
+    h.run_steps(3);
+    assert!(h.query_all_by_label_contains("New document").next().is_some(), "the start screen is drawn");
+    assert!(h.query_all_by_label_contains("Join us on Discord").next().is_none());
+}
