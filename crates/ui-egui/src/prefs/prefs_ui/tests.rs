@@ -2060,3 +2060,22 @@ fn reset_section_on_type_keeps_the_favourite_fonts() {
     assert_eq!(prefs.favorite_fonts, ["Bebas Neue"], "the favourites are kept");
     assert_eq!(stored(&store)["type"]["favoriteFonts"], json!(["Bebas Neue"]));
 }
+
+#[test]
+fn the_settings_scrollbar_sits_at_the_right_edge_of_the_pane() {
+    // The page's scroll area shrank to its content, so its scrollbar floated mid-window with the
+    // rest of the pane empty. It fills the pane, the scrollbar at the dialog's right edge.
+    use egui::accesskit::Role;
+    use egui_kittest::{Harness, kittest::Queryable};
+    let (mut app, _) = app_with_store();
+    app.run("prefs.set", json!({"values": {"interface.language": "en"}})).unwrap();
+    open_preferences(&mut app, "tools");
+    let mut h = Harness::builder().with_size(vec2(1280.0, 560.0)).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        app
+    });
+    h.run_steps(4);
+    let ok = h.get_by_label("OK").rect();
+    let bar_right = h.query_all_by_role(Role::ScrollBar).map(|n| n.rect().right()).fold(f32::MIN, f32::max);
+    assert!(bar_right > ok.right() - 30.0, "scrollbar right {bar_right} vs the pane's right edge {}", ok.right());
+}
