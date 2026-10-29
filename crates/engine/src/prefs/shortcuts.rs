@@ -131,6 +131,8 @@ pub const ALTERNATE_SHORTCUTS: &[(&str, &str)] = &[
     ("edit.fill", "Shift+Backspace"),
     ("select.inverse", "Shift+F7"),
     ("view.zoomIn", "Cmd++"),
+    // The command palette answers ⌘P too; Print keeps its menu item with no key.
+    ("edit.search", "Cmd+P"),
     #[cfg(not(target_os = "macos"))]
     ("file.close", "Cmd+F4"),
 ];

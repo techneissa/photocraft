@@ -59,6 +59,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         let tool_icon = icons::button(ui, icons::tool_icon(app.ui.tool), if t.pro { 26.0 } else { 28.0 }, !t.pro, tl!(app.ui.tool.label()));
                         // Photoshop: right-click the tool icon for Reset Tool / Reset All Tools (#2825).
                         let mut reset = None;
+                        let tool_command = crate::tool_shortcuts::id(app.ui.tool);
                         tool_icon.context_menu(|ui| {
                             if ui.button(tl!("Reset Tool")).clicked() {
                                 reset = Some("tool.reset");
@@ -68,6 +69,8 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                                 reset = Some("tool.resetAll");
                                 ui.close();
                             }
+                            ui.separator();
+                            crate::assign_shortcut::item(ui, &tool_command);
                         });
                         if let Some(id) = reset
                             && let Err(e) = crate::menus::invoke(app, ui.ctx(), id, json!({}))

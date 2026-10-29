@@ -197,6 +197,7 @@ pub fn button_with_icon_size_tip(ui: &mut egui::Ui, name: &str, box_size: f32, i
     let resp = IconButton::new(label, Vec2::splat(box_size), &style).selected(selected).show(ui, |ui, rect, tint| {
         paint(ui, rect, name, icon_size, tint);
     });
+    crate::assign_shortcut::attach(ui, &resp);
     if tooltip.is_empty() || !show_tip { resp } else { resp.on_hover_text(label) }
 }
 

@@ -70,7 +70,7 @@ pub static CATALOG: &[(&[&str], &str, Option<&str>, &str)] = &[
     (&["File"], "---", None, "---"),
     (&["File"], "File Info…", Some("Cmd+Alt+Shift+I"), "file.fileInfo"),
     (&["File"], "---", None, "---"),
-    (&["File"], "Print…", Some("Cmd+P"), "file.print"),
+    (&["File"], "Print…", None, "file.print"),
     (&["File"], "Print One Copy", Some("Cmd+Alt+Shift+P"), "file.printOneCopy"),
     (&["File"], "---", None, "---"),
     (&["File"], "Exit", Some("Cmd+Q"), "file.exit"),

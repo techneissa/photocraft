@@ -13,6 +13,7 @@ macro_rules! tl {
         $crate::i18n::t($s)
     };
 }
+mod assign_shortcut;
 mod blend_wheel;
 pub mod canvas;
 pub mod control;
