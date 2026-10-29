@@ -605,7 +605,7 @@ fn preferences_interface_search_hides_rows_and_skips_empty_groups() {
     }
 }
 
-fn app_with_store() -> (PhotocraftApp, Arc<Mutex<Option<String>>>) {
+pub(super) fn app_with_store() -> (PhotocraftApp, Arc<Mutex<Option<String>>>) {
     app_with_saved(None)
 }
 
