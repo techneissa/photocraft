@@ -599,7 +599,7 @@ mod page {
         }
         // the lists grow with the room the page has
         assert!(editor::list_height(700.0, 80.0) > editor::list_height(400.0, 80.0));
-        assert_eq!(editor::list_height(100.0, 80.0), 160.0, "never under the least height");
+        assert_eq!(editor::list_height(100.0, 80.0), 60.0, "never under the least height");
     }
 
     #[test]
@@ -613,5 +613,26 @@ mod page {
         let a = h.get_all_by_label("Add to the menu").next().unwrap().rect();
         let b = h.get_all_by_label("Add to the menu").nth(1).unwrap().rect();
         assert!((b.center().y - a.center().y).abs() <= 27.0 + 26.0, "rows are one line tall");
+    }
+
+    #[test]
+    fn the_page_fits_a_short_window_and_keeps_its_size() {
+        // The lists asked for more height than the page was given (the "Shown" heading and the
+        // frames' margins were left out), so the dialog grew past the window's bottom, and back
+        // after every resize.
+        for height in [740.0, 860.0] {
+            let mut h = Harness::builder().with_size(egui::vec2(1280.0, height)).build_eframe(move |cc| {
+                let mut app = app();
+                PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+                crate::prefs_ui::open_preferences(&mut app, "contextMenus");
+                app
+            });
+            h.run_steps(4);
+            let ok = h.get_by_label("OK").rect().bottom();
+            assert!(ok <= height - 20.0, "OK at {ok} sits inside a window {height} tall");
+            h.run_steps(6);
+            let later = h.get_by_label("OK").rect().bottom();
+            assert!((later - ok).abs() < 1.0, "the dialog keeps its height at {height}: OK at {later}, was {ok}");
+        }
     }
 }
