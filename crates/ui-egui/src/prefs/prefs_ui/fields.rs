@@ -253,46 +253,49 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                 super::ai_models::privacy(ui);
             }
             let privacy_height = ui.cursor().top() - privacy_top;
-            egui::ScrollArea::vertical().max_height((content_height - 30.0 - privacy_height).max(0.0)).id_salt("prefs-scroll").show(ui, |ui| {
-                #[cfg(not(target_arch = "wasm32"))]
-                if section == "aiModels" {
-                    super::ai_models::show(ui, &mut app.prefs_rt.ai_models);
-                    return;
-                }
-                let order: Vec<String> =
-                    f.get("__order").and_then(|o| o.get(&section)).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
-                if !has_visible_fields(&values, &section) {
-                    ui.add_space(4.0);
-                    ui.label(RichText::new(tl!("These settings aren't available in PhotoCraft yet.")).color(t.text_faint));
-                } else if let Some(obj) = values.get_mut(&section).and_then(Value::as_object_mut) {
-                    section_fields(ui, &section, obj, &order, lang, system, filter);
-                    if section == "fileHandling" {
-                        ui.label(
-                            RichText::new(tl!("0 turns this threshold off; SVG groups nested deeper than 100 levels are always rasterized."))
-                                .color(t.text_faint),
-                        );
+            egui::ScrollArea::vertical().max_height((content_height - 30.0 - privacy_height).max(0.0)).auto_shrink([false, true]).id_salt("prefs-scroll").show(
+                ui,
+                |ui| {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    if section == "aiModels" {
+                        super::ai_models::show(ui, &mut app.prefs_rt.ai_models);
+                        return;
                     }
-                    if section == "performance" {
-                        gpu_status_rows(ui, f.get("__gpuInfo"), f.get("__gpuAdapters"), obj);
+                    let order: Vec<String> =
+                        f.get("__order").and_then(|o| o.get(&section)).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
+                    if !has_visible_fields(&values, &section) {
+                        ui.add_space(4.0);
+                        ui.label(RichText::new(tl!("These settings aren't available in PhotoCraft yet.")).color(t.text_faint));
+                    } else if let Some(obj) = values.get_mut(&section).and_then(Value::as_object_mut) {
+                        section_fields(ui, &section, obj, &order, lang, system, filter);
+                        if section == "fileHandling" {
+                            ui.label(
+                                RichText::new(tl!("0 turns this threshold off; SVG groups nested deeper than 100 levels are always rasterized."))
+                                    .color(t.text_faint),
+                            );
+                        }
+                        if section == "performance" {
+                            gpu_status_rows(ui, f.get("__gpuInfo"), f.get("__gpuAdapters"), obj);
+                        }
+                        ui.add_space(8.0);
                     }
-                    ui.add_space(8.0);
-                }
-                if search.trim().is_empty()
-                    && has_visible_fields(&values, &section)
-                    && crate::widgets::secondary_button(ui, tl!("Reset Section"), 110.0).clicked()
-                    && let Some(mut def) = prefs::Preferences::default().get(&section)
-                {
-                    // The favourite fonts are the user's library, not a Type setting: kept, as
-                    // `prefs.reset {"path": "type"}` keeps them.
-                    if section == "type"
-                        && let Some(favorites) = values.get(&section).and_then(|v| v.get("favoriteFonts")).cloned()
-                        && let Some(def) = def.as_object_mut()
+                    if search.trim().is_empty()
+                        && has_visible_fields(&values, &section)
+                        && crate::widgets::secondary_button(ui, tl!("Reset Section"), 110.0).clicked()
+                        && let Some(mut def) = prefs::Preferences::default().get(&section)
                     {
-                        def.insert("favoriteFonts".into(), favorites);
+                        // The favourite fonts are the user's library, not a Type setting: kept, as
+                        // `prefs.reset {"path": "type"}` keeps them.
+                        if section == "type"
+                            && let Some(favorites) = values.get(&section).and_then(|v| v.get("favoriteFonts")).cloned()
+                            && let Some(def) = def.as_object_mut()
+                        {
+                            def.insert("favoriteFonts".into(), favorites);
+                        }
+                        values[&section] = def;
                     }
-                    values[&section] = def;
-                }
-            });
+                },
+            );
         });
     });
     f.insert("section".into(), json!(section));
