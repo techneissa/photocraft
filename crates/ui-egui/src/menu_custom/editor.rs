@@ -26,12 +26,14 @@ use crate::theme::Tokens;
 
 const ROW_H: f32 = 26.0;
 /// The least height of the lists; in a window with less room the page scrolls.
-const MIN_LIST_H: f32 = 160.0;
+const MIN_LIST_H: f32 = 60.0;
 /// The most: the page itself is never taller than the Preferences dialog's content.
 const MAX_LIST_H: f32 = 1400.0;
 /// What the page takes under the lists: a line of margin.
 const BELOW_LIST: f32 = 8.0;
 const GAP: f32 = 12.0;
+/// The inner margin of a list's frame.
+const FRAME_MARGIN: f32 = 4.0;
 /// The share of the width the shown list takes; the rest is the list to add from.
 const LEFT_SHARE: f32 = 0.54;
 /// The most rows of Available drawn for a search that matches many commands.
@@ -259,7 +261,10 @@ pub fn page(app: &mut PhotocraftApp, ui: &mut egui::Ui, height: f32, draft: &mut
     }
     ui.add_space(6.0);
 
-    view.list_h = list_height(height, ui.cursor().top() - origin);
+    // The "Shown" heading and the list frame's margins sit above and around the lists too: leaving
+    // them out made the page taller than it was given, so the dialog grew back after every resize.
+    let around_lists = ui.text_style_height(&egui::TextStyle::Body) + ui.spacing().item_spacing.y + 2.0 * (FRAME_MARGIN + 1.0);
+    view.list_h = list_height(height, ui.cursor().top() - origin + around_lists);
     let width = ui.available_width() - 2.0;
     let left_w = ((width - GAP) * LEFT_SHARE).floor();
     let right_w = (width - GAP - left_w).max(120.0);
@@ -355,7 +360,7 @@ fn truncated(ui: &egui::Ui, text: String, font: egui::FontId, color: Color32, ma
 }
 
 fn frame(t: &Tokens) -> egui::Frame {
-    egui::Frame::new().fill(t.field).stroke(Stroke::new(1.0, t.card_border)).corner_radius(6.0).inner_margin(4.0)
+    egui::Frame::new().fill(t.field).stroke(Stroke::new(1.0, t.card_border)).corner_radius(6.0).inner_margin(FRAME_MARGIN)
 }
 
 fn shown_list(ui: &mut egui::Ui, t: &Tokens, key: &str, menu: &mut Vec<Slot>, view: &mut View, width: f32) {
