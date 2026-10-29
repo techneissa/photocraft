@@ -145,14 +145,18 @@ fn atom(key: usize, value: Option<usize>, positive: bool) -> String {
     if positive { base.to_string() } else { format!("Not {base}") }
 }
 
-/// A context where both conditions hold (`None` = no condition = always), or `None` when they
-/// can't both hold. Only the keys the two read are enumerated, with the keys that follow from them.
-pub fn overlap(a: Option<&Expr>, b: Option<&Expr>) -> Option<Context> {
-    let mut used = Vec::new();
-    a.iter().chain(b.iter()).for_each(|e| e.keys(&mut used));
-    let used = keys::closure(&used);
+/// The most value combinations [`overlap`] tries for one search. A condition naming every key has
+/// millions; past this the answer is "they may overlap" (a conflict is shown, nothing is hidden).
+pub const MAX_ASSIGNMENTS: usize = 4096;
+
+/// How many combinations the keys' values make.
+fn combinations(used: &[usize]) -> usize {
+    used.iter().fold(1usize, |n, k| n.saturating_mul(KEYS.get(*k).map_or(1, |d| d.size())))
+}
+
+/// The first context (every combination of `used`, like an odometer) where both conditions hold.
+fn search(a: Option<&Expr>, b: Option<&Expr>, used: &[usize]) -> Option<Context> {
     let mut cx = Context::default();
-    // every combination of the used keys' values, like an odometer
     let mut counter = vec![0usize; used.len()];
     loop {
         for (k, v) in used.iter().zip(&counter) {
@@ -173,6 +177,29 @@ pub fn overlap(a: Option<&Expr>, b: Option<&Expr>) -> Option<Context> {
             i += 1;
         }
     }
+}
+
+/// A context where both conditions hold (`None` = no condition = always), or `None` when they
+/// can't both hold. Only the keys the two read are enumerated, with the keys that follow from them.
+/// A condition that can never hold on its own ends it at once (checked first, over its own keys);
+/// a search over more than [`MAX_ASSIGNMENTS`] combinations is not made: the two are taken to
+/// overlap, and the context returned is then only the default one.
+pub fn overlap(a: Option<&Expr>, b: Option<&Expr>) -> Option<Context> {
+    for side in [a, b].into_iter().flatten() {
+        let mut own = Vec::new();
+        side.keys(&mut own);
+        let own = keys::closure(&own);
+        if combinations(&own) <= MAX_ASSIGNMENTS && search(Some(side), None, &own).is_none() {
+            return None;
+        }
+    }
+    let mut used = Vec::new();
+    a.iter().chain(b.iter()).for_each(|e| e.keys(&mut used));
+    let used = keys::closure(&used);
+    if combinations(&used) > MAX_ASSIGNMENTS {
+        return Some(Context::default());
+    }
+    search(a, b, &used)
 }
 
 /// Whether the condition can ever hold.

@@ -306,3 +306,32 @@ fn the_context_checks_itself() {
     // unknown names leave it alone
     assert_eq!(Context::default().with("nope", "x"), Context::default());
 }
+
+#[test]
+fn a_condition_naming_every_key_is_not_enumerated_in_full() {
+    let everything: String = keys::KEYS
+        .iter()
+        .map(|k| if k.is_bool() { k.name.to_string() } else { format!("{} != {}", k.name, k.values()[0].name) })
+        .collect::<Vec<_>>()
+        .join(" && ");
+    let all = p(&everything);
+    let mut used = Vec::new();
+    all.keys(&mut used);
+    assert!(keys::closure(&used).len() == keys::KEYS.len());
+    let started = std::time::Instant::now();
+    // too many combinations to try: they are taken to overlap
+    assert!(expr::overlap(Some(&all), Some(&p("tool == brush"))).is_some());
+    assert!(expr::overlap(Some(&all), None).is_some());
+    assert!(started.elapsed().as_millis() < 500, "{:?}", started.elapsed());
+}
+
+#[test]
+fn a_condition_that_never_holds_ends_it_even_beside_a_huge_one() {
+    let everything: String = keys::KEYS.iter().filter(|k| k.is_bool()).map(|k| k.name).collect::<Vec<_>>().join(" && ");
+    let huge = p(&format!("{everything} && tool != brush"));
+    let never = p("textFocus && !textFocus");
+    assert!(expr::overlap(Some(&never), Some(&huge)).is_none());
+    assert!(expr::overlap(Some(&huge), Some(&never)).is_none());
+    // and a small search is still exact
+    assert!(expr::overlap(Some(&p("tool == brush")), Some(&p("tool == move"))).is_none());
+}
