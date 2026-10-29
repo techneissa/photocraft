@@ -78,7 +78,12 @@ pub(crate) fn import_bytes(app: &mut PhotocraftApp, file_name: &str, bytes: &[u8
         None => crate::prefs_ui::open_shortcuts(app, 0),
     };
     let shown = std::path::Path::new(file_name).file_name().map_or_else(|| file_name.to_string(), |s| s.to_string_lossy().to_string());
-    let result = std::str::from_utf8(bytes).map_err(|_| "This isn't a PhotoCraft shortcuts file: it isn't text".to_string()).and_then(|text| {
+    let text = if bytes.len() > shortcut_backup::MAX_BYTES {
+        Err("This file is too big to be a shortcuts file".to_string())
+    } else {
+        std::str::from_utf8(bytes).map_err(|_| "This isn't a PhotoCraft shortcuts file: it isn't text".to_string())
+    };
+    let result = text.and_then(|text| {
         let f = &app.ui.dialog_mut(id).ok_or("the Keyboard Shortcuts dialog is gone")?.fields;
         let mut p = staged(f);
         let key_ok = |k: &str| crate::shortcuts::parse(k).is_some();

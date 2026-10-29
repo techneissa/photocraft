@@ -275,6 +275,7 @@ fn a_wrong_newer_or_broken_file_is_refused_and_changes_nothing() {
         ("keys.json", br#"{"kind": "lightcraft-shortcuts", "version": 1, "shortcuts": {}}"#.to_vec(), "isn't a PhotoCraft shortcuts file"),
         ("keys.json", br#"{"kind": "photocraft-shortcuts", "version": 99, "shortcuts": {}}"#.to_vec(), "newer PhotoCraft"),
         ("keys.json", vec![0xff, 0xfe, 0x00], "isn't text"),
+        ("keys.json", vec![b' '; photocraft_engine::shortcut_backup::MAX_BYTES + 1], "too big"),
     ] {
         let e = super::shortcuts_backup::import_bytes(h.state_mut(), name, &bytes).unwrap_err();
         assert!(e.contains(why), "{e}");
