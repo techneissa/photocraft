@@ -227,7 +227,7 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                 || tl!(&title).to_lowercase().contains(&search.trim().to_lowercase());
             let filter = if show_all { "" } else { search.trim() };
             ui.add_space(6.0);
-            egui::ScrollArea::vertical().max_height(content_height - 30.0).id_salt("prefs-scroll").show(ui, |ui| {
+            egui::ScrollArea::vertical().max_height(content_height - 30.0).auto_shrink([false, true]).id_salt("prefs-scroll").show(ui, |ui| {
                 let order: Vec<String> =
                     f.get("__order").and_then(|o| o.get(&section)).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
                 if !has_visible_fields(&values, &section) {
