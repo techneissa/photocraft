@@ -50,7 +50,7 @@ pub(super) fn add_button(ui: &mut egui::Ui, f: &mut Map<String, Value>, enabled:
 /// A command's chord as a chip beside its other keys; a click on its × deletes it.
 pub(super) fn chip(ui: &mut egui::Ui, t: &Tokens, id: &str, chords: &mut BTreeMap<String, String>, selected: &mut String) {
     let Some(c) = chords.get(id) else { return };
-    let b = egui::Button::new(RichText::new(format!("{}  ×", chord::text(c))).size(11.0).color(t.accent_text)).small();
+    let b = egui::Button::new(RichText::new(format!("{}  ×", chord::text(c))).size(12.0).color(t.accent_text)).min_size(egui::vec2(64.0, 18.0));
     if ui.add(b).on_hover_text(tl!("Delete Chord")).clicked() {
         chords.remove(id);
         *selected = id.to_string();

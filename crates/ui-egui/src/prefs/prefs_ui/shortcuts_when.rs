@@ -17,7 +17,10 @@ use photocraft_engine::when::{Chip, Expr, expr, parse};
 
 use crate::theme::Tokens;
 
+/// The least width of a When cell; it takes the rest of the row when the dialog is wider.
 const CELL_W: f32 = 240.0;
+/// The width of the `+` button after it.
+const PLUS_W: f32 = 24.0;
 const MAX_ITEMS: usize = 40;
 /// Rows of the list that show before it scrolls.
 const LIST_ROWS: f32 = 10.0;
@@ -109,7 +112,8 @@ pub(super) fn cell(
     let editing = edit.as_ref().is_some_and(|e| e.id == id);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
-        let (rect, r) = ui.allocate_exact_size(vec2(CELL_W, 20.0), Sense::click());
+        let width = (ui.available_width() - PLUS_W - ui.spacing().item_spacing.x * 2.0).max(CELL_W);
+        let (rect, r) = ui.allocate_exact_size(vec2(width, 20.0), Sense::click());
         let label = crate::i18n::fmt(tl!("Condition of {command}"), &[("command", name)]);
         r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &label));
         if r.hovered() || editing {

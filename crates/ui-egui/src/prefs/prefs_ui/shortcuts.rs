@@ -397,7 +397,8 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     // lists them as rows of their own (#3665).
                     ui.horizontal(|ui| {
                         for k in &alts {
-                            let b = egui::Button::new(RichText::new(format!("{}  ×", crate::shortcuts::pretty(k))).size(11.0).color(t.text)).small();
+                            let b = egui::Button::new(RichText::new(format!("{}  ×", crate::shortcuts::pretty(k))).size(12.0).color(t.text))
+                                .min_size(vec2(64.0, 18.0));
                             if ui.add(b).on_hover_text(tl!("Delete Shortcut")).clicked() {
                                 alt_overrides.insert(id.clone(), alts.iter().filter(|x| *x != k).cloned().collect());
                                 selected = id.clone();
