@@ -814,6 +814,53 @@ fn crop_target_accepts_whole_number_floats() {
     assert_eq!(doc(&s).size, Size::new(40, 20));
 }
 
+/// #9212: a non-deleting crop keeps the pixels outside the frame, and W x H resamples them
+/// too. A 20 px frame of a 2000 px Background resampled to 2000 px scales its hidden pixels
+/// x100, to 200000 px a side (160 GB at 8 bits, past the 8 GiB budget): refused before
+/// allocating, like a target size past the budget.
+#[test]
+fn crop_target_budgets_the_hidden_pixels_it_resamples() {
+    let mut s = Session::new();
+    s.execute("file.new", json!({"width": 2000, "height": 2000})).unwrap();
+    s.execute("paint.setSymmetry", json!({"mode": "vertical", "center": [500, 700]})).unwrap();
+    let symmetry = s.active().unwrap().symmetry.clone();
+    let past = s.active().unwrap().history.past_len();
+    let mut p = json!({"x": 0, "y": 0, "width": 20, "height": 20, "deleteCroppedPixels": false, "targetWidth": 2000, "targetHeight": 2000});
+    for angle in [None, Some(90)] {
+        let mut p = p.clone();
+        if let Some(a) = angle {
+            p["angle"] = json!(a);
+        }
+        let err = s.execute("image.crop", p).unwrap_err().to_string();
+        assert!(err.contains("200000 x 200000 px is 40000 megapixels"), "{angle:?}: {err}");
+        assert_eq!(doc(&s).size, Size::new(2000, 2000), "{angle:?}: the document is unchanged");
+        assert_eq!(s.active().unwrap().history.past_len(), past, "{angle:?}: no history step");
+        // The turned crop rotates first: the painting symmetry turns back with the document.
+        assert_eq!(s.active().unwrap().symmetry, symmetry, "{angle:?}: the painting symmetry stays");
+    }
+    // Deleting the cropped pixels leaves only the frame to resample.
+    p["deleteCroppedPixels"] = json!(true);
+    s.execute("image.crop", p).unwrap();
+    assert_eq!(doc(&s).size, Size::new(2000, 2000));
+    assert_eq!(s.active().unwrap().history.past_len(), past + 1);
+}
+
+/// #9212: Image Size resamples the pixels outside the canvas as well. After a non-deleting
+/// crop to 10 px, 20000 px (400 MP, within the budget) scales the hidden 100 px Background x2000.
+#[test]
+fn image_size_budgets_the_hidden_pixels_it_resamples() {
+    let mut s = Session::new();
+    s.execute("file.new", json!({"width": 100, "height": 100})).unwrap();
+    s.execute("image.crop", json!({"x": 0, "y": 0, "width": 10, "height": 10, "deleteCroppedPixels": false})).unwrap();
+    let past = s.active().unwrap().history.past_len();
+    let err = s.execute("image.imageSize", json!({"width": 20000, "height": 20000})).unwrap_err().to_string();
+    assert!(err.contains("200000 x 200000 px is 40000 megapixels"), "{err}");
+    assert_eq!((doc(&s).size, s.active().unwrap().history.past_len()), (Size::new(10, 10), past));
+    // Without resampling only the resolution changes.
+    s.execute("image.imageSize", json!({"resolution": 300, "resample": "none"})).unwrap();
+    assert_eq!((doc(&s).size, doc(&s).resolution_dpi), (Size::new(10, 10), 300.0));
+}
+
 #[test]
 fn crop_target_rejects_bad_params_without_changing_the_document() {
     let rect = json!({"x": 0, "y": 0, "width": 10, "height": 10});
