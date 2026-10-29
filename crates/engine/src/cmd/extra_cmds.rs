@@ -1029,7 +1029,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "layer.hideLayers",
             "Hide Layers",
             &["Layer"],
-            Some("Cmd+,"),
+            None, // fork: ⌘, opens Settings, as in every Mac app (FORK.md)
             r##"{"layer":id?} (shows them instead when every targeted layer is already hidden, so ⌘, toggles)"##,
             has_layer,
             hide_or_show

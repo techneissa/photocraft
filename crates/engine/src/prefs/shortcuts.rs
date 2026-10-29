@@ -133,6 +133,8 @@ pub const ALTERNATE_SHORTCUTS: &[(&str, &str)] = &[
     ("view.zoomIn", "Cmd++"),
     // The command palette answers ⌘P too; Print keeps its menu item with no key.
     ("edit.search", "Cmd+P"),
+    // fork: ⌘, opens Settings beside ⌘K, as in every Mac app; Hide Layers has no key (FORK.md)
+    ("edit.preferences.general", "Cmd+,"),
     #[cfg(not(target_os = "macos"))]
     ("file.close", "Cmd+F4"),
 ];
