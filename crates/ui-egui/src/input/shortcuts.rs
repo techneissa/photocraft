@@ -561,6 +561,10 @@ fn handle_modal_canvas_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus:
     // focused text field keeps its keys.
     let liquify_focus = (app.distort.liquify.is_some() || app.distort.caf.is_some()) && focus != Focus::None;
     if liquify_focus || !app.ui.dialogs.is_empty() || app.discard.is_some() {
+        // ⌘, while Preferences is open closes it.
+        if app.discard.is_none() && crate::prefs_ui::close_shortcut(app, ctx) {
+            return true;
+        }
         // Shortcuts whose When condition asks for a dialog (`dialogOpen`) work in it.
         if crate::keybinds::blocked::fire(app, ctx, focus) {
             return true;

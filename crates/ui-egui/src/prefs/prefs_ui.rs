@@ -79,6 +79,7 @@ pub struct Runtime {
 pub use crate::shortcuts::{default_shortcut, effective_shortcut};
 
 mod appearance;
+mod close_keys;
 mod dialogs;
 mod fields;
 mod graphics;
@@ -94,6 +95,7 @@ mod startup;
 use appearance::{DARK_THEME_OPTIONS, LIGHT_THEME_OPTIONS, display_scale, favorite_theme_groups, selected_theme};
 pub(crate) use appearance::{appearance_context_menu, cycle_appearance, step_brightness, sync_appearance};
 pub use appearance::{canvas_style, pasteboard_color};
+pub use close_keys::{close_shortcut, esc_closes, prompting, remember_typing, request_close, show_prompt};
 pub use dialogs::{
     PREFERENCES_SIZE, apply, confirm, invoke, is_preferences, open_mismatch, open_preferences, open_shortcuts, owns, preferences_changed, width,
 };
@@ -121,6 +123,8 @@ pub(crate) use startup::{on_recovery_event, remember_rulers};
 
 // Test modules stay after the production code: the prefs_usage test reads each file up to
 // its first `#[cfg(test)] mod`.
+#[cfg(test)]
+mod close_keys_tests;
 #[cfg(test)]
 mod recovery_tests;
 
