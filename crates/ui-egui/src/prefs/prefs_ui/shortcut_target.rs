@@ -7,21 +7,23 @@ use super::shortcuts::shortcut_items;
 use super::{PhotocraftApp, Value};
 
 /// Open Keyboard Shortcuts (or reuse the open one) with `command_id` selected, scrolled into view
-/// and waiting for a key press. An id the dialog doesn't list opens it plain. Returns the dialog id.
-#[allow(dead_code)] // callers: Assign Shortcut… (right-click, palette)
-pub(crate) fn open_shortcuts_for(app: &mut PhotocraftApp, command_id: &str) -> u64 {
+/// and waiting for a key press. An id the dialog doesn't list opens it with nothing selected and
+/// no capture. Returns the dialog id.
+pub fn open_shortcuts_for(app: &mut PhotocraftApp, command_id: &str) -> u64 {
     let known = shortcut_items(app).iter().any(|i| i.0 == command_id);
     let open = app.ui.dialogs.iter().find(|d| d.fields.get("__prefsui").and_then(Value::as_str) == Some("shortcuts")).map(|d| d.id);
     let id = open.unwrap_or_else(|| super::open_shortcuts(app, 0));
-    if known && let Some(d) = app.ui.dialog_mut(id) {
+    if let Some(d) = app.ui.dialog_mut(id) {
         let f = &mut d.fields;
         f.insert("tab".into(), json!(0));
         f.insert("filter".into(), json!(""));
-        f.insert("selected".into(), json!(command_id));
-        f.insert("capture".into(), json!(true));
+        f.insert("selected".into(), json!(if known { command_id } else { "" }));
+        f.insert("capture".into(), json!(known));
         f.insert("captureAlt".into(), json!(false));
-        f.insert("reveal".into(), json!(true));
+        f.insert("captureChord".into(), json!(false));
+        f.insert("reveal".into(), json!(known));
         f.insert("conflict".into(), Value::Null);
+        f.insert("chordConflict".into(), Value::Null);
         f.insert("message".into(), json!(""));
     }
     id
@@ -52,9 +54,8 @@ mod tests {
         assert_eq!(first, again);
         assert_eq!(app.ui.dialogs.len(), 1);
         assert_eq!(field(&app, again, "selected"), json!("edit.paste"));
-        let before = field(&app, again, "selected");
         open_shortcuts_for(&mut app, "no.such.command");
-        assert_eq!(field(&app, again, "selected"), before);
-        assert_eq!(field(&app, again, "capture"), json!(true));
+        assert_eq!(field(&app, again, "selected"), json!(""), "nothing is selected for an id the dialog doesn't list");
+        assert_eq!(field(&app, again, "capture"), json!(false));
     }
 }

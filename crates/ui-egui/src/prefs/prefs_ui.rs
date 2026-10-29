@@ -91,12 +91,11 @@ use fields::{
 use graphics::{gpu_status_rows, rendering_mode_value};
 use save::SaveRetry;
 pub(crate) use save::save_preferences;
-// Called by Assign Shortcut… (right-click, palette) once that lands; unused until then.
 #[cfg(test)]
 use save::{SAVE_RETRY_MAX_S, SAVE_RETRY_S, merge_changes, persist};
 pub use save::{autosave_now, tick};
-#[allow(unused_imports)]
-pub(crate) use shortcut_target::open_shortcuts_for;
+/// The one entry point for Assign Shortcut…: the dialog on a command with capture on.
+pub use shortcut_target::open_shortcuts_for;
 #[cfg(test)]
 pub(crate) use shortcuts::capture_key_press;
 pub use shortcuts::{is_modifier_key, reserved_shortcut, shortcut_items, shortcut_text};
