@@ -334,7 +334,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     let needle = filter.to_ascii_lowercase();
     let reveal = f.remove("reveal").is_some();
     let clashes = super::shortcuts_when::clash_notes(&items, (&overrides, &alt_overrides), &chords, &whens);
-    egui::ScrollArea::vertical().max_height(420.0).id_salt("shortcuts-scroll").show(ui, |ui| {
+    egui::ScrollArea::both().max_height(420.0).auto_shrink([false, true]).id_salt("shortcuts-scroll").show(ui, |ui| {
         let mut last_top = String::new();
         egui::Grid::new("shortcut-grid").num_columns(4).spacing([12.0, 3.0]).striped(true).show(ui, |ui| {
             for (id, label, path, def) in &items {
