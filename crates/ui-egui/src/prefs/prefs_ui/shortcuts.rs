@@ -333,6 +333,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     }
     let needle = filter.to_ascii_lowercase();
     let reveal = f.remove("reveal").is_some();
+    let clashes = super::shortcuts_when::clash_notes(&items, (&overrides, &alt_overrides), &chords, &whens);
     egui::ScrollArea::vertical().max_height(420.0).id_salt("shortcuts-scroll").show(ui, |ui| {
         let mut last_top = String::new();
         egui::Grid::new("shortcut-grid").num_columns(4).spacing([12.0, 3.0]).striped(true).show(ui, |ui| {
@@ -358,7 +359,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     ui.label(RichText::new(&top).font(crate::theme::semibold(12.5)).color(t.text));
                     ui.label("");
                     ui.label("");
-                    ui.label("");
+                    super::shortcuts_when::header(ui, &t, tab);
                     ui.end_row();
                     last_top = top;
                 }
@@ -414,7 +415,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                             ui.label(RichText::new(tl!("modified")).color(t.text_faint).size(10.5));
                         }
                     });
-                    super::shortcuts_when::cell(ui, &t, id, &name, &mut whens, &mut when_edit, &mut selected);
+                    super::shortcuts_when::cell(ui, &t, (id, &name, clashes.get(id)), &mut whens, &mut when_edit, &mut selected);
                 } else {
                     // Edit › Menus, Keyboard Shortcuts, Preferences, Save and Exit always stay (#5096).
                     let hideable = photocraft_engine::prefs::MenuCustomization::hideable(id);
@@ -485,7 +486,6 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
         colors.clear();
     }
     super::shortcuts_when::strip(ui, &t, tab, &items, &mut whens, &mut when_edit);
-    (message, message_warning) = super::shortcuts_when::notes(&items, f, &whens, &overrides, &alt_overrides, (message, message_warning));
     if !message.is_empty() {
         ui.label(RichText::new(&message).color(if message_warning { t.warning } else { t.text_dim }));
     }

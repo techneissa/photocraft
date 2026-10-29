@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use serde_json::{Map, Value, json};
 
-use super::shortcuts::{capture_key_press, capture_mods_field, capture_mods_json, dialog_keys, shortcut_items, shortcut_text};
+use super::shortcuts::{capture_key_press, capture_mods_field, capture_mods_json, shortcut_items, shortcut_text};
 use super::{PhotocraftApp, RichText, Tokens, prefs};
 use crate::keybinds::chord;
 
@@ -125,13 +125,10 @@ fn finish(app: &mut PhotocraftApp, f: &mut Map<String, Value>, selected: &str, f
     let items = shortcut_items(app);
     let mut chords = load_map(f);
     let whens = super::shortcuts_when::load_map(f);
-    let overrides: BTreeMap<String, String> = f.get("overrides").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
-    let alternates: BTreeMap<String, Vec<String>> = f.get("alternates").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
     let others = |keep: &dyn Fn(&Item) -> bool| -> Vec<String> {
         items.iter().filter(|i| i.0 != selected && prefs::can_overlap(&whens, &i.0, selected) && keep(i)).map(|i| i.0.clone()).collect()
     };
     let same: Vec<String> = others(&|i| chords.get(&i.0) == Some(&chord));
-    let leads: Vec<String> = others(&|i| dialog_keys(&overrides, &alternates, &i.0, i.3.as_deref()).iter().any(|k| k == first));
     let before = chords.insert(selected.to_string(), chord.clone());
     save_map(f, &chords);
     // who loses their chord to this one when OK is clicked (the latest assignment wins)
@@ -141,7 +138,7 @@ fn finish(app: &mut PhotocraftApp, f: &mut Map<String, Value>, selected: &str, f
     f.insert("chordLosers".into(), json!(losers));
     let shown = chord::text(&chord);
     let names = |ids: &[String]| ids.iter().map(|id| name_of(&items, id)).collect::<Vec<_>>().join(", ");
-    let mut text = if same.is_empty() {
+    let text = if same.is_empty() {
         crate::i18n::fmt(tl!("{chord} assigned."), &[("chord", &shown)])
     } else {
         crate::i18n::fmt(
@@ -149,15 +146,7 @@ fn finish(app: &mut PhotocraftApp, f: &mut Map<String, Value>, selected: &str, f
             &[("chord", &shown), ("commands", &names(&same))],
         )
     };
-    if !leads.is_empty() {
-        text.push(' ');
-        text.push_str(&crate::i18n::fmt(
-            tl!("{key} is also the shortcut of {commands}: it will wait for the chord's second key."),
-            &[("key", &crate::shortcuts::pretty(first)), ("commands", &names(&leads))],
-        ));
-    }
-    let clash = !same.is_empty() || !leads.is_empty();
-    say(f, text, clash);
+    say(f, text, !same.is_empty());
     let conflict = if same.is_empty() { Value::Null } else { json!({"chord": chord, "command": selected, "holders": same, "before": before}) };
     f.insert("chordConflict".into(), conflict);
 }
@@ -213,4 +202,9 @@ pub(super) fn at_ok(f: &Map<String, Value>) -> (Value, Value) {
         }
     }
     (json!(chords), json!(super::shortcuts_when::load_map(f)))
+}
+
+/// A key or a chord as menus show it (`⌘K C`).
+pub(super) fn shown(key: &str) -> String {
+    chord::text(key)
 }

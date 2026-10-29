@@ -121,12 +121,16 @@ pub(super) fn settings_height(available: f32, item_spacing: f32, button_height: 
     (available - (item_spacing + 8.0 + button_height + 4.0)).max(160.0)
 }
 
+/// The least width Keyboard Shortcuts keeps on a small screen: the command, key, further keys and
+/// When columns still fit.
+const SHORTCUTS_MIN_WIDTH: f32 = 820.0;
+
 /// Max dialog width for our dialogs. Preferences fills the width it is given (`available`, its
 /// resizable area).
 pub fn width(fields: &Map<String, Value>, available: f32) -> Option<f32> {
     match fields.get("__prefsui").and_then(Value::as_str)? {
         "prefs" => Some(available.max(380.0)),
-        "shortcuts" => Some(1000.0),
+        "shortcuts" => Some(available.clamp(SHORTCUTS_MIN_WIDTH, 1000.0)),
         _ => Some(460.0),
     }
 }

@@ -18,9 +18,11 @@ use photocraft_engine::when::{Chip, Expr, expr, parse};
 use crate::theme::Tokens;
 
 /// The least width of a When cell; it takes the rest of the row when the dialog is wider.
-const CELL_W: f32 = 240.0;
+const CELL_W: f32 = 180.0;
 /// The width of the `+` button after it.
 const PLUS_W: f32 = 24.0;
+/// The width of the warning icon before it.
+const WARN_W: f32 = 18.0;
 const MAX_ITEMS: usize = 40;
 /// Rows of the list that show before it scrolls.
 const LIST_ROWS: f32 = 10.0;
@@ -100,8 +102,7 @@ fn draw_chips(painter: &egui::Painter, t: &Tokens, expr: &Expr, left: f32, cy: f
 pub(super) fn cell(
     ui: &mut egui::Ui,
     t: &Tokens,
-    id: &str,
-    name: &str,
+    (id, name, clash): (&str, &str, Option<&String>),
     whens: &mut BTreeMap<String, String>,
     edit: &mut Option<WhenEdit>,
     selected: &mut String,
@@ -112,7 +113,7 @@ pub(super) fn cell(
     let editing = edit.as_ref().is_some_and(|e| e.id == id);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
-        let width = (ui.available_width() - PLUS_W - ui.spacing().item_spacing.x * 2.0).max(CELL_W);
+        let width = (ui.available_width() - PLUS_W - WARN_W - ui.spacing().item_spacing.x * 3.0).max(CELL_W);
         let (rect, r) = ui.allocate_exact_size(vec2(width, 20.0), Sense::click());
         let label = crate::i18n::fmt(tl!("Condition of {command}"), &[("command", name)]);
         r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &label));
@@ -137,6 +138,12 @@ pub(super) fn cell(
         if r.on_hover_text(tip).clicked() {
             *selected = id.to_string();
             *edit = Some(WhenEdit { id: id.to_string(), text: text.clone().unwrap_or_default(), fresh: true, ..Default::default() });
+        }
+        // a clash with another command in the same context: a small warning, the sentence on hover
+        let (warn, wr) = ui.allocate_exact_size(vec2(WARN_W, 20.0), Sense::hover());
+        if let Some(sentence) = clash {
+            crate::icons::paint(ui, warn, "triangle-alert", 14.0, t.warning);
+            wr.on_hover_text(sentence);
         }
         let plus = crate::icons::button(ui, "plus", 20.0, false, tl!("Add Condition"));
         let state_id = Id::unique("pc-when-builder").with(id);
@@ -329,7 +336,7 @@ fn list(ctx: &egui::Context, t: &Tokens, edit: &WhenEdit, field_rect: Rect, sug:
                     };
                     ui.painter().text(pos2(row.left() + 8.0, row.center().y), Align2::LEFT_CENTER, &item.label, FontId::monospace(11.5), tint);
                     let detail = ui.painter().with_clip_rect(row);
-                    detail.text(pos2(row.left() + 150.0, row.center().y), Align2::LEFT_CENTER, &item.detail, crate::theme::medium(11.0), t.text_dim);
+                    detail.text(pos2(row.left() + 150.0, row.center().y), Align2::LEFT_CENTER, short(&item.detail), crate::theme::medium(11.0), t.text_dim);
                     if i == edit.selected && edit.navigated {
                         r.scroll_to_me(None);
                     }
@@ -468,35 +475,108 @@ pub(super) fn strip(ui: &mut egui::Ui, t: &Tokens, tab: u64, items: &[Item], whe
     editor(ui, t, &name, whens, slot);
 }
 
-/// After a condition changed: the commands that now share a key with it in the same context.
-/// `current` is the dialog's message and whether it is a warning; the note replaces it.
-pub(super) fn notes(
+/// The When column's header, a dim "When" with what a condition does and doesn't limit.
+pub(super) fn header(ui: &mut egui::Ui, t: &Tokens, tab: u64) {
+    if tab == 0 {
+        ui.label(RichText::new(tl!("When")).size(11.0).color(t.text_faint))
+            .on_hover_text(tl!("Limits this command's keys to a context. Menus and the palette still run it."));
+    } else {
+        ui.label("");
+    }
+}
+
+/// A key as the dialog holds it for a command: its edited main key (`""` removes it) or its
+/// default, then its further keys, all canonical.
+fn keys_of(overrides: &BTreeMap<String, String>, alternates: &BTreeMap<String, Vec<String>>, id: &str, default: Option<&str>) -> Vec<String> {
+    use photocraft_engine::prefs::{default_alternates, normalize_shortcut};
+    let main = match overrides.get(id) {
+        Some(s) if s.is_empty() => None,
+        Some(s) => normalize_shortcut(s),
+        None => default.and_then(normalize_shortcut),
+    };
+    let mut keys: Vec<String> = main.iter().cloned().collect();
+    let further: Vec<String> = match alternates.get(id) {
+        Some(list) => list.iter().filter_map(|k| normalize_shortcut(k)).collect(),
+        None => default_alternates(id).filter_map(normalize_shortcut).collect(),
+    };
+    for k in further {
+        if !keys.contains(&k) {
+            keys.push(k);
+        }
+    }
+    keys
+}
+
+/// What clashes with what, for the warning icons: command id → the sentence for its tooltip. Only
+/// clashes that involve a condition or a chord count (a default key two commands share is not
+/// this feature's business), and two commands whose conditions can't hold together never clash.
+pub(super) fn clash_notes(
     items: &[Item],
-    f: &Map<String, Value>,
+    (overrides, alternates): (&BTreeMap<String, String>, &BTreeMap<String, Vec<String>>),
+    chords: &BTreeMap<String, String>,
     whens: &BTreeMap<String, String>,
-    overrides: &BTreeMap<String, String>,
-    alternates: &BTreeMap<String, Vec<String>>,
-    current: (String, bool),
-) -> (String, bool) {
-    let before = load_map(f);
-    let changed: Vec<&String> = whens.keys().chain(before.keys()).filter(|id| before.get(*id) != whens.get(*id)).collect();
-    for id in changed {
-        let Some(me) = items.iter().find(|i| i.0 == *id) else { continue };
-        let mine = super::shortcuts::dialog_keys(overrides, alternates, id, me.3.as_deref());
-        for other in items.iter().filter(|o| o.0 != *id && prefs_overlap(whens, id, &o.0)) {
-            let theirs = super::shortcuts::dialog_keys(overrides, alternates, &other.0, other.3.as_deref());
-            if let Some(key) = mine.iter().find(|k| theirs.contains(k)) {
-                let text = crate::i18n::fmt(
-                    tl!("{key} is also used by {command} in the same context."),
-                    &[("key", &crate::shortcuts::pretty(key)), ("command", &name_of(items, &other.0))],
-                );
-                return (text, true);
+) -> BTreeMap<String, String> {
+    let mut notes: BTreeMap<String, String> = BTreeMap::new();
+    if whens.is_empty() && chords.is_empty() {
+        return notes;
+    }
+    let mut by_key: BTreeMap<String, Vec<&str>> = BTreeMap::new();
+    for (id, _, _, def) in items {
+        for k in keys_of(overrides, alternates, id, def.as_deref()) {
+            by_key.entry(k).or_default().push(id);
+        }
+    }
+    let involved = |id: &str| whens.contains_key(id) || chords.contains_key(id);
+    let is_tool = |id: &str| crate::tool_shortcuts::tool(id).is_some();
+    let mut note = |id: &str, other: &str, key: &str, leader: bool| {
+        let template = if leader {
+            tl!("{key} is also the shortcut of {command}: it waits for the chord's second key.")
+        } else {
+            tl!("{key} is also used by {command} in the same context.")
+        };
+        let text = crate::i18n::fmt(template, &[("key", &super::shortcuts_chord::shown(key)), ("command", &name_of(items, other))]);
+        notes.entry(id.to_string()).or_insert(text);
+    };
+    for (key, ids) in &by_key {
+        for (i, a) in ids.iter().enumerate() {
+            for b in ids.iter().skip(i + 1) {
+                if (involved(a) || involved(b)) && !(is_tool(a) && is_tool(b)) && prefs_overlap(whens, a, b) {
+                    note(a, b, key, false);
+                    note(b, a, key, false);
+                }
             }
         }
     }
-    current
+    let mut by_chord: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for (id, c) in chords {
+        by_chord.entry(c).or_default().push(id);
+        let Some([first, _]) = photocraft_engine::prefs::chord_steps(c) else { continue };
+        for other in by_key.get(&first).into_iter().flatten().filter(|o| **o != id && prefs_overlap(whens, id, o)) {
+            note(id, other, &first, true);
+        }
+    }
+    for (c, ids) in by_chord {
+        for (i, a) in ids.iter().enumerate() {
+            for b in ids.iter().skip(i + 1).filter(|b| prefs_overlap(whens, a, b)) {
+                note(a, b, c, false);
+                note(b, a, c, false);
+            }
+        }
+    }
+    notes
 }
 
 fn prefs_overlap(whens: &BTreeMap<String, String>, a: &str, b: &str) -> bool {
     photocraft_engine::prefs::can_overlap(whens, a, b)
+}
+
+/// A suggestion's description cut to a short hint: up to its first parenthesis, at most 36 characters.
+fn short(detail: &str) -> String {
+    let head = detail.split(" (").next().unwrap_or(detail);
+    if head.chars().count() <= 36 { head.to_string() } else { format!("{}…", head.chars().take(35).collect::<String>().trim_end()) }
+}
+
+#[cfg(test)]
+pub(super) fn short_for_test(detail: &str) -> String {
+    short(detail)
 }

@@ -311,6 +311,36 @@ fn a_dialog_made_by_an_older_build_still_works() {
     crate::dialogs::confirm(h.state_mut(), id).unwrap();
 }
 
+#[test]
+fn a_clash_gets_a_warning_note_only_when_the_conditions_can_hold_together() {
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let items = crate::prefs_ui::shortcut_items(&app);
+    let overrides: std::collections::BTreeMap<String, String> = [("edit.copy", "F9"), ("edit.cut", "F9")].map(|(a, b)| (a.to_string(), b.to_string())).into();
+    let alts = Default::default();
+    let notes = |chords: &std::collections::BTreeMap<String, String>, whens: &std::collections::BTreeMap<String, String>| {
+        super::shortcuts_when::clash_notes(&items, (&overrides, &alts), chords, whens)
+    };
+    let none = Default::default();
+    assert!(notes(&none, &none).is_empty(), "no condition or chord, no note: a shared key is not this feature's business");
+    let mut whens: std::collections::BTreeMap<String, String> = [("edit.copy", "tool == brush")].map(|(a, b)| (a.to_string(), b.to_string())).into();
+    let n = notes(&none, &whens);
+    assert!(n["edit.copy"].contains("also used by Cut") && n["edit.cut"].contains("also used by Copy"), "{n:?}");
+    whens.insert("edit.cut".into(), "tool != brush".into());
+    assert!(notes(&none, &whens).is_empty(), "they never hold together");
+    // a chord whose first key is another command's key
+    let chords: std::collections::BTreeMap<String, String> = [("edit.paste", "F9 V")].map(|(a, b)| (a.to_string(), b.to_string())).into();
+    let n = notes(&chords, &none);
+    assert!(n["edit.paste"].contains("waits for the chord's second key"), "{n:?}");
+}
+
+#[test]
+fn the_when_header_says_it_is_for_keys_only_and_suggestions_are_short() {
+    let (h, _) = dialog("edit.copy", "Copy");
+    h.get_all_by_label("When").next().expect("a When header");
+    assert_eq!(super::shortcuts_when::short_for_test("A dialog is open (shortcuts normally wait for it)"), "A dialog is open");
+    assert!(super::shortcuts_when::short_for_test(&"x".repeat(80)).chars().count() <= 36);
+}
+
 /// Opt-in pictures for review (`PHOTOCRAFT_SHORTCUT_SNAPSHOTS` names the folder): the dialog with
 /// a chord, conditions and the JSON icons; the When autocomplete open; the keycap hint of a chord
 /// waiting on its second key.
