@@ -586,17 +586,15 @@ pub(super) fn dialog_keys(overrides: &BTreeMap<String, String>, alternates: &BTr
 /// the dialog's), save the bindings as a new set or over the one in use, delete it, export it as
 /// a `.kys` file or summarize it as an HTML page. Everything but Export and Summarize waits for
 /// OK, like the rest of the dialog.
+/// The dialog's staged bindings: main keys, further keys, chords, When conditions.
+type Staged<'a> = (&'a mut BTreeMap<String, String>, &'a mut BTreeMap<String, Vec<String>>, &'a mut BTreeMap<String, String>, &'a mut BTreeMap<String, String>);
+
 #[allow(clippy::too_many_arguments)]
 fn set_row(
     app: &mut PhotocraftApp,
     ui: &mut egui::Ui,
     f: &mut Map<String, Value>,
-    (overrides, alternates, chords, whens): (
-        &mut BTreeMap<String, String>,
-        &mut BTreeMap<String, Vec<String>>,
-        &mut BTreeMap<String, String>,
-        &mut BTreeMap<String, String>,
-    ),
+    (overrides, alternates, chords, whens): Staged,
     items: &[(String, String, Vec<String>, Option<String>)],
     message: &mut String,
     warning: &mut bool,
