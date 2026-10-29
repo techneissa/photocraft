@@ -3,7 +3,9 @@
 //! reads); a set is a saved copy of them, `Preferences::shortcut_sets` keyed by name, and
 //! `Preferences::shortcut_set` names the one in use ("" for the defaults). The bindings differ
 //! from their set after an edit until it is saved ("modified", as Photoshop marks the set).
-//! A set saves to and loads from a `.kys` file (`crate::kys::write` / the import), and
+//! A set holds the chords and When conditions too (`Preferences::chords` / `shortcut_when`);
+//! switching to a set, the defaults included, replaces them. A `.kys` file (`crate::kys::write` /
+//! the import) holds keys only: Photoshop's format has neither. A set saves to and loads from it, and
 //! [`summarize`] writes the HTML table of Photoshop's Summarize button.
 //!
 //! `edit.keyboardShortcuts` takes the set parameters: `useSet` (load a set's bindings, before
@@ -32,25 +34,42 @@ pub struct ShortcutSet {
     pub shortcuts: BTreeMap<String, String>,
     /// Command id → further keys, replacing the defaults.
     pub alternate_shortcuts: BTreeMap<String, Vec<String>>,
+    /// Command id → chord (`Cmd+K C`); none by default.
+    pub chords: BTreeMap<String, String>,
+    /// Command id → When condition text; none means always.
+    pub shortcut_when: BTreeMap<String, String>,
 }
 
 impl ShortcutSet {
     /// A set of these bindings, without the actions' function keys (they belong to the
     /// actions, as in an `.atn` file, not to a set).
-    pub fn from_bindings(shortcuts: &BTreeMap<String, String>, alternates: &BTreeMap<String, Vec<String>>) -> Self {
+    pub fn from_bindings(
+        shortcuts: &BTreeMap<String, String>,
+        alternates: &BTreeMap<String, Vec<String>>,
+        chords: &BTreeMap<String, String>,
+        when: &BTreeMap<String, String>,
+    ) -> Self {
         let shortcuts = shortcuts.iter().filter(|(id, _)| !is_action_key(id)).map(|(id, k)| (id.clone(), k.clone())).collect();
         let alternate_shortcuts = alternates.iter().filter(|(id, _)| !is_action_key(id)).map(|(id, k)| (id.clone(), k.clone())).collect();
-        Self { shortcuts, alternate_shortcuts }
+        Self { shortcuts, alternate_shortcuts, chords: chords.clone(), shortcut_when: when.clone() }
     }
 
     /// The bindings `p` uses now, without the actions' function keys.
     pub fn of(p: &Preferences) -> Self {
-        Self::from_bindings(&p.shortcuts, &p.alternate_shortcuts)
+        Self::from_bindings(&p.shortcuts, &p.alternate_shortcuts, &p.chords, &p.shortcut_when)
     }
 
     /// Put this set's bindings in place of `shortcuts` / `alternates`, keeping the actions'
     /// function keys: switching sets with `useSet` and in the Keyboard Shortcuts dialog.
-    pub fn apply(&self, shortcuts: &mut BTreeMap<String, String>, alternates: &mut BTreeMap<String, Vec<String>>) {
+    pub fn apply(
+        &self,
+        shortcuts: &mut BTreeMap<String, String>,
+        alternates: &mut BTreeMap<String, Vec<String>>,
+        chords: &mut BTreeMap<String, String>,
+        when: &mut BTreeMap<String, String>,
+    ) {
+        chords.clone_from(&self.chords);
+        when.clone_from(&self.shortcut_when);
         shortcuts.retain(|id, _| is_action_key(id));
         shortcuts.extend(self.shortcuts.iter().filter(|(id, _)| !is_action_key(id)).map(|(id, k)| (id.clone(), k.clone())));
         alternates.retain(|id, _| is_action_key(id));
@@ -59,7 +78,7 @@ impl ShortcutSet {
 
     /// Use this set's bindings in `p`, keeping the actions' function keys.
     pub fn load_into(&self, p: &mut Preferences) {
-        self.apply(&mut p.shortcuts, &mut p.alternate_shortcuts);
+        self.apply(&mut p.shortcuts, &mut p.alternate_shortcuts, &mut p.chords, &mut p.shortcut_when);
     }
 
     /// Check every key (a set from a call or a hand-edited file must not hold garbage).
@@ -71,6 +90,12 @@ impl ShortcutSet {
         }
         for (id, keys) in &self.alternate_shortcuts {
             alternate_keys(&json!(keys)).map_err(|e| format!("`{id}`: {e}"))?;
+        }
+        for (id, c) in &self.chords {
+            crate::prefs::check_chord(c).map_err(|e| format!("`{id}`: {e}"))?;
+        }
+        for (id, w) in &self.shortcut_when {
+            crate::prefs::check_when(w).map_err(|e| format!("`{id}`: {e}"))?;
         }
         Ok(())
     }
@@ -107,17 +132,24 @@ fn saved(p: &Preferences) -> Option<&ShortcutSet> {
 /// Do these bindings differ from the set `active` of `sets` ("" or a missing name: the
 /// defaults)? The actions' function keys don't count, on either side (a set saved before they
 /// were left out may still hold some). The Keyboard Shortcuts dialog's "(modified)" too.
-pub fn differs(sets: &BTreeMap<String, ShortcutSet>, active: &str, shortcuts: &BTreeMap<String, String>, alternates: &BTreeMap<String, Vec<String>>) -> bool {
-    let now = ShortcutSet::from_bindings(shortcuts, alternates);
+pub fn differs(
+    sets: &BTreeMap<String, ShortcutSet>,
+    active: &str,
+    shortcuts: &BTreeMap<String, String>,
+    alternates: &BTreeMap<String, Vec<String>>,
+    chords: &BTreeMap<String, String>,
+    when: &BTreeMap<String, String>,
+) -> bool {
+    let now = ShortcutSet::from_bindings(shortcuts, alternates, chords, when);
     match sets.get(active) {
-        Some(s) => ShortcutSet::from_bindings(&s.shortcuts, &s.alternate_shortcuts) != now,
+        Some(s) => ShortcutSet::from_bindings(&s.shortcuts, &s.alternate_shortcuts, &s.chords, &s.shortcut_when) != now,
         None => now != ShortcutSet::default(),
     }
 }
 
 /// Do the bindings differ from the set in use?
 pub fn modified(p: &Preferences) -> bool {
-    differs(&p.shortcut_sets, &p.shortcut_set, &p.shortcuts, &p.alternate_shortcuts)
+    differs(&p.shortcut_sets, &p.shortcut_set, &p.shortcuts, &p.alternate_shortcuts, &p.chords, &p.shortcut_when)
 }
 
 /// Before the call's binding changes: `useSet` loads a set ("" or [`DEFAULTS_NAME`]: the
@@ -142,7 +174,7 @@ pub fn load(next: &mut Preferences, p: &Value) -> Result<bool, String> {
 pub fn store(next: &mut Preferences, p: &Value) -> Result<bool, String> {
     let mut changed = false;
     if let Some(v) = p.get("sets") {
-        let obj = v.as_object().ok_or("`sets` maps set names to {shortcuts, alternateShortcuts}")?;
+        let obj = v.as_object().ok_or("`sets` maps set names to {shortcuts, alternateShortcuts, chords, shortcutWhen}")?;
         if obj.len() > MAX_SETS {
             return Err(format!("at most {MAX_SETS} shortcut sets"));
         }
@@ -152,7 +184,7 @@ pub fn store(next: &mut Preferences, p: &Value) -> Result<bool, String> {
             let set: ShortcutSet = serde_json::from_value(s.clone()).map_err(|e| format!("set `{name}`: {e}"))?;
             set.validate().map_err(|e| format!("set `{name}`: {e}"))?;
             // Like `saveSet`, a set holds no action keys.
-            sets.insert(name, ShortcutSet::from_bindings(&set.shortcuts, &set.alternate_shortcuts));
+            sets.insert(name, ShortcutSet::from_bindings(&set.shortcuts, &set.alternate_shortcuts, &set.chords, &set.shortcut_when));
         }
         next.shortcut_sets = sets;
         changed = true;
@@ -295,6 +327,33 @@ mod tests {
 
     fn prefs() -> Preferences {
         Preferences::default()
+    }
+
+    #[test]
+    fn a_set_holds_chords_and_conditions() {
+        let mut p = prefs();
+        p.chords.insert("edit.copy".into(), "Cmd+K C".into());
+        p.shortcut_when.insert("edit.copy".into(), "!textFocus".into());
+        assert!(modified(&p), "a chord or a condition alone is a change from the defaults");
+        assert!(store(&mut p, &json!({"saveSet": "Mine"})).unwrap());
+        assert!(!modified(&p));
+        p.shortcut_when.insert("edit.copy".into(), "hasDocument".into());
+        assert!(modified(&p), "an edited condition");
+        p.shortcut_when.insert("edit.copy".into(), "!textFocus".into());
+        p.chords.clear();
+        assert!(modified(&p), "a removed chord");
+        // the defaults clear them; the saved set brings them back
+        load(&mut p, &json!({"useSet": ""})).unwrap();
+        assert!(p.chords.is_empty() && p.shortcut_when.is_empty() && !modified(&p));
+        load(&mut p, &json!({"useSet": "Mine"})).unwrap();
+        assert_eq!(p.chords["edit.copy"], "Cmd+K C");
+        assert_eq!(p.shortcut_when["edit.copy"], "!textFocus");
+        // `sets` checks them, and an old set without them loads as none
+        assert!(store(&mut p, &json!({"sets": {"Bad": {"chords": {"edit.copy": "Cmd+K"}}}})).is_err());
+        assert!(store(&mut p, &json!({"sets": {"Bad": {"shortcutWhen": {"edit.copy": "nope"}}}})).is_err());
+        assert!(store(&mut p, &json!({"sets": {"Old": {"shortcuts": {"edit.copy": "F9"}}}})).unwrap());
+        load(&mut p, &json!({"useSet": "Old"})).unwrap();
+        assert!(p.chords.is_empty() && p.shortcut_when.is_empty());
     }
 
     #[test]

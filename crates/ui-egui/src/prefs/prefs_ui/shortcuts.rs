@@ -220,7 +220,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     let items = shortcut_items(app);
     // The Set row, then the search (the Menus tab searches too).
     if tab == 0 {
-        set_row(app, ui, f, &mut overrides, &mut alt_overrides, &items, &mut message, &mut message_warning);
+        set_row(app, ui, f, (&mut overrides, &mut alt_overrides, &mut chords, &mut whens), &items, &mut message, &mut message_warning);
         ui.add_space(4.0);
     }
     let mut filter = f.get("filter").and_then(Value::as_str).unwrap_or("").to_string();
@@ -591,8 +591,12 @@ fn set_row(
     app: &mut PhotocraftApp,
     ui: &mut egui::Ui,
     f: &mut Map<String, Value>,
-    overrides: &mut BTreeMap<String, String>,
-    alternates: &mut BTreeMap<String, Vec<String>>,
+    (overrides, alternates, chords, whens): (
+        &mut BTreeMap<String, String>,
+        &mut BTreeMap<String, Vec<String>>,
+        &mut BTreeMap<String, String>,
+        &mut BTreeMap<String, String>,
+    ),
     items: &[(String, String, Vec<String>, Option<String>)],
     message: &mut String,
     warning: &mut bool,
@@ -604,8 +608,8 @@ fn set_row(
         active.clear();
     }
     // The engine decides what a set holds and when it is modified (not the actions' F-keys).
-    let now = ShortcutSet::from_bindings(overrides, alternates);
-    let modified = shortcut_sets::differs(&sets, &active, overrides, alternates);
+    let now = ShortcutSet::from_bindings(overrides, alternates, chords, whens);
+    let modified = shortcut_sets::differs(&sets, &active, overrides, alternates, chords, whens);
     let defaults = tl!("PhotoCraft Defaults").to_string();
     let shown = |name: &str| -> String {
         let base = if name.is_empty() { defaults.clone() } else { name.to_string() };
@@ -623,7 +627,7 @@ fn set_row(
         let pairs: Vec<(String, &str)> = names.iter().map(|(n, l)| (n.clone(), l.as_str())).collect();
         if crate::widgets::dropdown(ui, "shortcut-set", tl!("Set:"), &mut chosen, &pairs, 220.0) && chosen != active {
             // As `useSet`: the set's bindings, keeping the actions' F-keys.
-            sets.get(&chosen).cloned().unwrap_or_default().apply(overrides, alternates);
+            sets.get(&chosen).cloned().unwrap_or_default().apply(overrides, alternates, chords, whens);
             active = chosen;
             message.clear();
         }
