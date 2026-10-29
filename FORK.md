@@ -90,6 +90,7 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
 | Crop W×H with Delete Cropped Pixels off no longer aborts the app: upstream PR #9213 taken early (a real merge; nothing to do when upstream merges it) | upstream `pr-9213` | none | engine `cmd/image_cmds.rs`, `mode_cmds.rs`, `analysis_cmds.rs` + tests | engine `image_cmds mode_cmds` |
 | Undo/redo stress test: hundreds of random edits, undos and redos (65 commands, 8/16/32-bit RGB, Gray, CMYK) must restore exact states, never panic or hang; `-- --ignored` for the long run, `PHOTOCRAFT_UNDO_STRESS_*` env vars | `test/undo-redo-stress` | `crates/engine/tests/undo_redo_stress.rs` | none | `cargo test -p photocraft-engine --test undo_redo_stress` |
 | No "Join us on Discord" button on the start screen or in About (the Discord link in the link row stays) | `feat/hide-discord-button` | none | ui-egui `canvas/start_screen.rs`, `dialogs.rs` (2 lines removed each), `links.rs` (`#[allow(dead_code)]` on `discord_button`), `canvas/tests.rs` (1 test appended) | `start_screen` |
+| ⌘, opens Settings, as in every Mac app (⌘K still works); Hide Layers has no default key (Photoshop's ⌘,): give it one with Assign Shortcut… | `feat/settings-cmd-comma` | none | engine `cmd/extra_cmds.rs` (Hide Layers' default key → None), `prefs/shortcuts.rs` (`edit.preferences.general` alternate `Cmd+,`); ui-egui `layer_shortcut_tests.rs` (the ⌘, test now checks Settings), `menus/native_menu/tests.rs` (2 asserts) | engine `shortcuts`, ui-egui `layer_shortcut native_menu` |
 
 Every feature also has a row in `docs/parity-checklist.md` when it adds commands; clashes there are fixed by the
 update script (both sides kept).
@@ -106,7 +107,7 @@ cargo test -p photocraft-ml
 cargo test -p photocraft-text --lib -- big_collection
 cargo test -p photocraft-engine --lib -- when chords chord_cmds shortcut_backup shortcut_sets image_cmds mode_cmds
 cargo test -p photocraft-engine --test undo_redo_stress
-cargo test -p photocraft-ui-egui --lib -- start_screen title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
+cargo test -p photocraft-ui-egui --lib -- start_screen layer_shortcut native_menu title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
 cargo test -p photocraft-gpu --test it live_transform
 ```
 
