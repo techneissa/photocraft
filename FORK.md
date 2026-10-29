@@ -29,7 +29,12 @@ failure. The run pushes its merge with the secret `FORK_PUSH_TOKEN`, the fine-gr
 (Contents and Workflows: read and write): GitHub's own token may not push an official update that changes a
 workflow file. Without the secret it uses GitHub's own token.
 
-The official project's own workflows (CI, Docs, FreeBSD, Nix, Packaging lint, Perf nightly, Release, SonarCloud,
+The workflow `.github/workflows/fork-ci.yml` (Actions ▸ Fork CI) runs the official CI (`ci.yml`, `cargo xtask ci` on
+Linux) on `custom` after every push to it, the daily merge included, so the full suite runs on GitHub and not on
+this Mac (the fork is public, so GitHub's runners are free). The official `CI` workflow must stay enabled on the fork
+for it (`gh workflow enable CI -R techneissa/photocraft`).
+
+The official project's other workflows (Docs, FreeBSD, Nix, Packaging lint, Perf nightly, Release, SonarCloud,
 Windows arm64) are switched off in this fork: the official project runs them. A workflow the official project
 adds later starts switched on; switch it off in Actions unless it is wanted here.
 
@@ -53,15 +58,16 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
 2. Put the code in new files; touch existing files only with small hooks (a `mod` line, a menu entry, a match arm,
    a state field). Never reformat, rename or move official code. This is what keeps updates conflict-free.
 3. Add tests. Check in batches:
-   - after each change: only the tests of the code it touched (`cargo test -p <crate> --lib <filter>`,
-     `cargo clippy -p <crate>`);
-   - once per round of work: `cargo clippy -p <crates> --all-targets -- -D warnings`, `cargo xtask layers`,
-     `cargo xtask wasm` (when L0–L6 changed), `cargo xtask parity` (when commands were added; commit
-     `docs/parity-checklist.md`);
-   - once per merge into `custom`: the full `cargo xtask ci`.
+   - after each change, and once more at the end of the round: only the tests of the code it touched
+     (`cargo test -p <crate> --lib <filter>`), `cargo clippy -p <crate> --all-targets -- -D warnings` for the crates it
+     touched (the known official lints below excepted), and `cargo fmt --all --check`;
+   - the full suite runs on GitHub, not on this Mac: a push to `custom` starts Fork CI (`fork-ci.yml`), which runs the
+     official CI (`cargo xtask ci`) on `custom`. Check it with `gh run list -R techneissa/photocraft -w CI -b custom`
+     and fix a failure in the next round.
 
-   This fork reads `AGENTS.md`'s "before you finish a task" list as once per round, and the full gate as once
-   per merge (techneissa, 2026-10-28).
+   This fork reads `AGENTS.md`'s "before you finish a task" list as the above: no `cargo xtask ci` on this Mac
+   (techneissa, 2026-10-29: the same tests ran several times per feature and loaded the Mac). The official CI runs on
+   Linux, so macOS-only tests (`macvision`, the real-Vision tests) run only in a lane's own filtered tests.
 4. `git switch custom && git merge --no-ff feat/<name>`, then `git push mine custom feat/<name>`.
 5. Add a row to the table below, and run `update-photocraft.sh` to install it.
 

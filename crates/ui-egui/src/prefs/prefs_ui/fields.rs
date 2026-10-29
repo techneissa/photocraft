@@ -199,7 +199,8 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                 }
                 for &(id, title) in &found {
                     let sel = section == id;
-                    let empty = id != crate::menu_custom::PAGE && !super::SHELL_SECTIONS.iter().any(|(shell, _)| *shell == id) && !has_visible_fields(&values, id);
+                    let empty =
+                        id != crate::menu_custom::PAGE && !super::SHELL_SECTIONS.iter().any(|(shell, _)| *shell == id) && !has_visible_fields(&values, id);
                     let (rect, resp) = ui.allocate_exact_size(vec2(170.0, 22.0), Sense::click());
                     if sel {
                         ui.painter().rect_filled(rect, t.radius_sm, t.row_selected);
