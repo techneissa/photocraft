@@ -98,7 +98,7 @@ fn open_shortcuts_for_reuses_the_open_dialog() {
     let b = crate::prefs_ui::open_shortcuts_for(h.state_mut(), "tools.select.zoom");
     assert_eq!(a, b, "one Keyboard Shortcuts dialog");
     assert_asked_for(&h, "tools.select.zoom");
-    assert_eq!(dialog_field(h.state(), "filter"), Some(json!("Zoom Tool")), "its row is in view");
+    assert_eq!(dialog_field(h.state(), "reveal"), Some(json!(true)), "its row is scrolled into view");
 }
 
 #[test]
