@@ -3534,3 +3534,17 @@ curves	Smooth	تنعيم
 	Update and Restart	التحديث وإعادة التشغيل
 	X	X
 	Y	Y
+# Optional local AI model management (fork: PR #8231, FORK.md)
+	AI Models	نماذج الذكاء الاصطناعي
+	Models are optional and run entirely on this computer. Downloading fetches the model file from Hugging Face; no images or documents are ever uploaded. Without a model, Select Subject, Remove Background and Remove Subject use the built-in (non-AI) methods.	النماذج اختيارية وتعمل بالكامل على هذا الكمبيوتر. يجلب التنزيل ملف النموذج من Hugging Face، ولا تُرفع أي صور أو مستندات أبدًا. من دون نموذج، تستخدم أوامر تحديد الموضوع وإزالة الخلفية وإزالة الموضوع الطرق المدمجة (دون ذكاء اصطناعي).
+	Model download worker failed.	تعذّر تنزيل النموذج.
+	Select Subject, Remove Background	تحديد الموضوع، إزالة الخلفية
+	Installed	مثبّت
+	Not installed	غير مثبّت
+	{size} MB · {licence}	{size} ميغابايت · {licence}
+	Download	تنزيل
+	{done} / {total} MB ({percent}%)	{done} / {total} ميغابايت ({percent}%)
+	Cancelling…	جارٍ الإلغاء…
+	Confirm remove	تأكيد الإزالة
+	subject segmentation (BiRefNet-lite)	تجزئة الموضوع (BiRefNet-lite)
+	inpainting (LaMa)	ملء الصورة (LaMa)
