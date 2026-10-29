@@ -191,21 +191,39 @@ pub fn open_mismatch(app: &mut PhotocraftApp, message: &str, action: &str, missi
     open_kind(app, "mismatch", tl!("Embedded Profile Mismatch"), fields)
 }
 
+/// The width one tool column (checkbox, name, key) of the Toolbar tab takes.
+const TOOLBAR_COLUMN_WIDTH: f32 = 240.0;
+
+/// How many tool columns fit `width`: one to four.
+pub(super) fn toolbar_columns(width: f32) -> usize {
+    ((width / TOOLBAR_COLUMN_WIDTH) as usize).clamp(1, 4)
+}
+
 pub(super) fn toolbar_tab(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let mut hidden: Vec<String> = f.get("toolbarHidden").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
-    egui::ScrollArea::vertical().max_height(380.0).id_salt("toolbar-scroll").show(ui, |ui| {
-        egui::Grid::new("toolbar-grid").num_columns(2).spacing([16.0, 4.0]).show(ui, |ui| {
-            for tool in crate::state::Tool::ALL {
-                let name = format!("{tool:?}");
-                let mut on = !hidden.contains(&name);
-                crate::widgets::checkbox(ui, &mut on, tl!(tool.label()));
-                if on {
-                    hidden.retain(|h| *h != name);
-                } else if !hidden.contains(&name) {
-                    hidden.push(name);
+    // As many (checkbox + name, key) pairs per row as the width holds, tools running down each column.
+    let columns = toolbar_columns(ui.available_width());
+    let rows = crate::state::Tool::ALL.len().div_ceil(columns);
+    egui::ScrollArea::vertical().max_height(380.0).auto_shrink([false, true]).id_salt("toolbar-scroll").show(ui, |ui| {
+        egui::Grid::new("toolbar-grid").num_columns(columns * 2).spacing([16.0, 4.0]).show(ui, |ui| {
+            for row in 0..rows {
+                for column in 0..columns {
+                    let Some(tool) = crate::state::Tool::ALL.get(column * rows + row) else {
+                        ui.label("");
+                        ui.label("");
+                        continue;
+                    };
+                    let name = format!("{tool:?}");
+                    let mut on = !hidden.contains(&name);
+                    crate::widgets::checkbox(ui, &mut on, tl!(tool.label()));
+                    if on {
+                        hidden.retain(|h| *h != name);
+                    } else if !hidden.contains(&name) {
+                        hidden.push(name);
+                    }
+                    let k = tool.key();
+                    ui.label(if k == '\0' { String::new() } else { k.to_string() });
                 }
-                let k = tool.key();
-                ui.label(if k == '\0' { String::new() } else { k.to_string() });
                 ui.end_row();
             }
         });
