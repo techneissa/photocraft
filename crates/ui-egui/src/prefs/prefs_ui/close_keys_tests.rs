@@ -126,3 +126,21 @@ fn esc_closes_an_open_dropdown_and_not_preferences() {
     esc(&mut h);
     assert!(!open(&h), "the next one closes Preferences");
 }
+
+#[test]
+fn a_context_menus_draft_counts_as_a_change() {
+    let (mut app, _) = super::tests::app_with_store();
+    let id = open_preferences(&mut app, "general");
+    let mut draft = crate::menu_custom::Custom::from_value(&app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields[crate::menu_custom::DRAFT]);
+    draft
+        .menus
+        .insert(crate::menu_custom::menus::CANVAS_SELECTION.into(), crate::menu_custom::Arrangement { items: vec![], hidden: vec!["select.deselect".into()] });
+    app.ui.dialog_mut(id).unwrap().fields.insert(crate::menu_custom::DRAFT.into(), draft.to_value());
+    let mut h = Harness::builder().with_size(egui::vec2(1280.0, 860.0)).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        app
+    });
+    h.run_steps(4);
+    esc(&mut h);
+    assert!(open(&h) && h.query_by_label("Unsaved changes").is_some(), "the draft alone asks first");
+}
