@@ -16,6 +16,14 @@ fn app() -> PhotocraftApp {
     PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
 }
 
+/// Import `text` into the arrangement being edited, as the Import icon does with a file's text.
+fn import_text(app: &mut PhotocraftApp, text: &str) -> Result<Vec<String>, String> {
+    let mut custom = current(app);
+    let skipped = backup::import_into(&mut custom, text)?;
+    set_current(app, &custom);
+    Ok(skipped)
+}
+
 #[test]
 fn slots_save_switch_and_say_when_empty() {
     let mut c = with(LAYERS_ROW, arrangement(&["cmd:layer.delete"], &["layer.exportAs"]));
@@ -117,7 +125,7 @@ fn export_then_import_restores_the_menus_and_the_presets() {
     backup::export_to(&mut a, &path).unwrap();
     store(&mut a, &Custom::default());
     assert!(load(&a).menus.is_empty());
-    backup::import_bytes(&mut a, "Context Menus.json", std::fs::read(&path).unwrap()).unwrap();
+    backup::import_bytes(&mut a, std::fs::read(&path).unwrap()).unwrap();
     assert_eq!(load(&a).menus, c.menus);
     assert_eq!(load(&a).presets.slots, c.presets.slots);
     let _ = std::fs::remove_dir_all(dir);
@@ -130,7 +138,7 @@ fn the_default_menus_export_and_import_as_the_default() {
     assert!(parsed.menus.is_empty() && parsed.presets.is_none() && parsed.skipped.is_empty());
     let mut a = app();
     store(&mut a, &with(TAB, arrangement(&[], &["file.closeAll"])));
-    backup::import_text(&mut a, &text).unwrap();
+    import_text(&mut a, &text).unwrap();
     assert!(load(&a).menus.is_empty(), "a file without arrangements clears them");
 }
 
@@ -148,12 +156,12 @@ fn a_wrong_foreign_or_newer_file_is_refused_and_changes_nothing() {
         (r#"{"kind": "photocraft-context-menus", "menus": {}}"#, "no valid version"),
         (r#"{"kind": "photocraft-context-menus", "version": 1}"#, "no `menus`"),
     ] {
-        let e = backup::import_text(&mut a, text).unwrap_err();
+        let e = import_text(&mut a, text).unwrap_err();
         assert!(e.contains(why), "{text}: {e}");
         assert_eq!(load(&a), before, "{text}");
     }
-    assert!(backup::import_bytes(&mut a, "x.json", vec![0xff, 0xfe]).is_err());
-    assert!(backup::import_text(&mut a, &" ".repeat((1 << 20) + 1)).unwrap_err().contains("too big"));
+    assert!(backup::import_bytes(&mut a, vec![0xff, 0xfe]).is_err());
+    assert!(import_text(&mut a, &" ".repeat((1 << 20) + 1)).unwrap_err().contains("too big"));
     assert_eq!(load(&a), before);
 }
 
@@ -180,4 +188,43 @@ fn unknown_items_are_skipped_and_named() {
         assert!(skipped.contains(name), "{name} in {skipped}");
     }
     assert!(backup::skipped_note(&parsed.skipped).contains("unknown items skipped"));
+}
+
+/// An app whose open dialog answers `answers` at once.
+fn app_answering(answers: Vec<Option<crate::file_dialog::FileDialogAnswer>>) -> PhotocraftApp {
+    let (show, _) = crate::file_dialog::fake(answers);
+    PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { file_dialog: Some(show), ..Default::default() })
+}
+
+#[test]
+fn the_import_icon_refuses_a_big_file_before_reading_it_and_reads_a_small_one() {
+    use crate::file_dialog::FileDialogAnswer::Paths;
+    let dir = std::env::temp_dir().join(format!("pc-context-menus-big-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    // 2 GiB of nothing: reading it would take seconds and memory, the length alone refuses it
+    let big = dir.join("big.json");
+    std::fs::File::create(&big).unwrap().set_len(1 << 31).unwrap();
+    let small = dir.join("small.json");
+    std::fs::write(&small, backup::render(&with(TAB, arrangement(&[], &["file.closeAll"]))).unwrap()).unwrap();
+    let mut a = app_answering(vec![Some(Paths(vec![big.to_string_lossy().into_owned()])), Some(Paths(vec![small.to_string_lossy().into_owned()]))]);
+    let ctx = egui::Context::default();
+    let started = std::time::Instant::now();
+    backup::import(&mut a);
+    a.poll_file_dialog(&ctx, None);
+    assert!(a.ui.status.contains("too big") && a.ui.status_error, "{}", a.ui.status);
+    assert!(started.elapsed().as_secs() < 2);
+    assert!(load(&a).menus.is_empty());
+    backup::import(&mut a);
+    a.poll_file_dialog(&ctx, None);
+    assert!(load(&a).menus.contains_key(TAB));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn the_error_messages_are_translatable_strings() {
+    // each refusal goes through tl!: a catalogue with the string translates it
+    for text in ["not json", r#"{"kind":"x"}"#] {
+        assert!(backup::parse(text).unwrap_err().starts_with("This file is not a PhotoCraft context menu backup"));
+    }
+    assert!(Custom::default().clear(0).unwrap_err().contains("Preset 1 is already empty"));
 }

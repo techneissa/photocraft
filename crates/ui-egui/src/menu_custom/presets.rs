@@ -115,7 +115,7 @@ impl Presets {
 }
 
 fn bad_slot() -> String {
-    format!("`slot` must be a number from 1 to {COUNT}")
+    crate::i18n::fmt(tl!("`slot` must be a number from 1 to {n}"), &[("n", &COUNT.to_string())])
 }
 
 impl Custom {
@@ -149,7 +149,7 @@ impl Custom {
             return Err(bad_slot());
         }
         if self.presets.get(slot).is_none() {
-            return Err(format!("Preset {} is already empty", slot + 1));
+            return Err(crate::i18n::fmt(tl!("Preset {n} is already empty"), &[("n", &(slot + 1).to_string())]));
         }
         self.presets.put(slot, None);
         if self.presets.active == Some(slot) {
@@ -170,7 +170,7 @@ impl Custom {
             return Err(bad_slot());
         }
         let Some(set) = self.presets.get(slot).cloned() else {
-            return Err(format!("Preset {} is empty: arrange the menus, then Save to Preset {}", slot + 1, slot + 1));
+            return Err(crate::i18n::fmt(tl!("Preset {n} is empty: arrange the menus, then Save to Preset {n}"), &[("n", &(slot + 1).to_string())]));
         };
         let before = Undo { menus: self.menus.clone(), active: self.presets.active, after: set.clone() };
         let changes = before.menus != set;
@@ -186,7 +186,7 @@ impl Custom {
     /// Bring back the set the last switch replaced.
     pub fn undo(&mut self) -> Result<(), String> {
         if !self.can_undo() {
-            return Err("Nothing to undo: the menus have not been switched to a preset, or have changed since".into());
+            return Err(tl!("Nothing to undo: the menus have not been switched to a preset, or have changed since").to_string());
         }
         let Some(undo) = self.presets.undo.take() else { return Ok(()) };
         self.menus = undo.menus;

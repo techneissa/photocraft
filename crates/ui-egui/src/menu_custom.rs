@@ -93,14 +93,57 @@ pub fn store(app: &mut PhotocraftApp, custom: &Custom) {
     }
 }
 
+/// The Preferences dialog's field holding the arrangement being edited: the page works on this
+/// draft, and OK or Apply saves it ([`commit`]); Cancel drops it, so nothing reaches the
+/// preferences or the disk.
+pub const DRAFT: &str = "__contextMenus";
+
+/// The open Preferences dialog's draft, when one is open.
+fn draft_mut(app: &mut PhotocraftApp) -> Option<&mut Value> {
+    app.ui.dialogs.iter_mut().find(|d| crate::prefs_ui::is_preferences(&d.fields)).and_then(|d| d.fields.get_mut(DRAFT))
+}
+
+/// What the page shows: the open Preferences dialog's draft, else what is saved.
+pub fn current(app: &mut PhotocraftApp) -> Custom {
+    match draft_mut(app) {
+        Some(draft) => Custom::from_value(draft),
+        None => load(app),
+    }
+}
+
+/// Make `custom` the arrangement being edited (the saved one when no Preferences dialog is open).
+pub fn set_current(app: &mut PhotocraftApp, custom: &Custom) {
+    match draft_mut(app) {
+        Some(draft) => *draft = custom.to_value(),
+        None => store(app, custom),
+    }
+}
+
+/// OK or Apply on Preferences: the draft in `fields` becomes the saved arrangement.
+pub fn commit(app: &mut PhotocraftApp, fields: &serde_json::Map<String, Value>) {
+    if let Some(draft) = fields.get(DRAFT) {
+        store(app, &Custom::from_value(draft));
+    }
+}
+
+/// Does the draft in `fields` differ from what is saved?
+pub fn changed(app: &PhotocraftApp, fields: &serde_json::Map<String, Value>) -> bool {
+    fields.get(DRAFT).is_some_and(|draft| Custom::from_value(draft) != load(app))
+}
+
 /// The rows of menu `key` as arranged in `saved` (the preferences' value), over `default`, the
-/// rows the menu builds now. A menu nothing is arranged for, and an arrangement that would leave
-/// no row, give `default` back.
+/// rows the menu builds now. A menu with no arrangement gives `default` back; an arrangement that
+/// takes every row out gives no rows.
 pub fn arranged(saved: &Value, key: &str, default: Vec<Row>) -> Vec<Row> {
-    let custom = Custom::from_value(saved);
-    let Some(arrangement) = custom.menus.get(key) else { return default };
-    let rows = apply(arrangement, &default, &menus::universe(key), menus::can_add(key));
-    if rows.iter().any(Option::is_some) { rows } else { default }
+    let Some(arrangement) = arrangement_of(saved, key) else { return default };
+    apply(&arrangement, &default, &menus::universe(key), menus::can_add(key))
+}
+
+/// Menu `key`'s arrangement in `saved`, read without the rest of the value; None when it has none
+/// (nothing at all is arranged, the usual case, costs no parsing).
+fn arrangement_of(saved: &Value, key: &str) -> Option<Arrangement> {
+    let a = Arrangement::from_value(saved.get("menus")?.get(key)?);
+    (!a.items.is_empty() || !a.hidden.is_empty()).then_some(a)
 }
 
 /// The menu key of an open canvas menu: the selection tools' menus only.
@@ -125,6 +168,12 @@ pub fn canvas_rows(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Row> {
         Some(key) => arranged(&app.session.prefs().context_menus, key, built),
         None => built,
     }
+}
+
+/// Does the open canvas menu close: the tool changed, or the arrangement left it no row (such a
+/// menu does not open)?
+pub fn closed(app: &PhotocraftApp, menu: &CanvasToolMenu) -> bool {
+    app.ui.tool != menu.tool || (canvas_key(menu).is_some() && canvas_rows(app, menu).is_empty())
 }
 
 /// Is `command` a row of the open canvas menu?

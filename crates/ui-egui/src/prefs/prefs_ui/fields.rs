@@ -226,7 +226,7 @@ fn prefs_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Va
             ui.set_width((ui.available_width() - 12.0).max(340.0));
             // Context Menus is not a settings section: its page arranges the right-click menus.
             if section == crate::menu_custom::PAGE {
-                crate::menu_custom::editor::page(app, ui, content_height);
+                crate::menu_custom::editor::page(app, ui, content_height, f.entry(crate::menu_custom::DRAFT).or_insert(Value::Null));
                 return;
             }
             let title = SECTIONS.iter().find(|(id, _)| *id == section).map_or("General", |(_, t)| *t);

@@ -12,7 +12,7 @@ pub const SEPARATOR: &str = "---";
 pub const CMD: &str = "cmd:";
 
 /// One entry of an arranged menu.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Slot {
     Cmd(String),
     Separator,

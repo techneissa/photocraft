@@ -20,6 +20,7 @@ use serde_json::{Value, json};
 use super::presets::{COUNT, Presets, Set};
 use super::{Arrangement, Custom, MAX_ITEMS, Slot, catalog, menus};
 use crate::PhotocraftApp;
+use crate::file_dialog::{FileDialogAnswer, FileDialogRequest, last_used_dir};
 
 /// The file's `kind`.
 pub const KIND: &str = "photocraft-context-menus";
@@ -50,28 +51,32 @@ pub struct Parsed {
 }
 
 fn refuse(why: &str) -> String {
-    format!("This file is not a PhotoCraft context menu backup ({why}).")
+    crate::i18n::fmt(tl!("This file is not a PhotoCraft context menu backup ({why})."), &[("why", why)])
 }
 
 /// Check `text` as a backup file.
 pub fn parse(text: &str) -> Result<Parsed, String> {
-    let file: Value = serde_json::from_str(text).map_err(|_| refuse("it is not JSON"))?;
-    let Some(obj) = file.as_object() else { return Err(refuse("it is not a JSON object")) };
+    let file: Value = serde_json::from_str(text).map_err(|_| refuse(tl!("it is not JSON")))?;
+    let Some(obj) = file.as_object() else { return Err(refuse(tl!("it is not a JSON object"))) };
     match obj.get("kind").and_then(Value::as_str) {
         Some(KIND) => {}
-        Some(other) => return Err(refuse(&format!("its kind is \"{}\"", other.chars().take(40).collect::<String>()))),
-        None => return Err(refuse("it has no kind")),
+        Some(other) => {
+            let kind: String = other.chars().take(40).collect();
+            return Err(refuse(&crate::i18n::fmt(tl!("its kind is \"{kind}\""), &[("kind", &kind)])));
+        }
+        None => return Err(refuse(tl!("it has no kind"))),
     }
     match obj.get("version").and_then(Value::as_u64) {
         Some(VERSION) => {}
         Some(v) if v > VERSION => {
-            return Err(format!(
-                "This backup was made by a newer PhotoCraft (file version {v}; this one reads up to {VERSION}). Update PhotoCraft to import it."
+            return Err(crate::i18n::fmt(
+                tl!("This backup was made by a newer PhotoCraft (file version {v}; this one reads up to {max}). Update PhotoCraft to import it."),
+                &[("v", &v.to_string()), ("max", &VERSION.to_string())],
             ));
         }
-        _ => return Err("This context menu backup has no valid version.".into()),
+        _ => return Err(tl!("This context menu backup has no valid version.").to_string()),
     }
-    let Some(saved) = obj.get("menus").and_then(Value::as_object) else { return Err("This context menu backup has no `menus` object.".into()) };
+    let Some(saved) = obj.get("menus").and_then(Value::as_object) else { return Err(tl!("This context menu backup has no `menus` object.").to_string()) };
     let mut skipped = Vec::new();
     let menus = clean_set(saved, &mut skipped);
     let presets = obj.get("presets").and_then(Value::as_object).map(|saved| {
@@ -106,7 +111,7 @@ fn clean(key: &str, a: &Arrangement, skipped: &mut Vec<String>) -> Arrangement {
     let mut items = Vec::new();
     for (n, s) in a.items.iter().enumerate() {
         if n >= MAX_ITEMS {
-            skipped.push(format!("{} more", a.items.len() - MAX_ITEMS));
+            skipped.push(crate::i18n::fmt(tl!("{n} more"), &[("n", &(a.items.len() - MAX_ITEMS).to_string())]));
             break;
         }
         let known = Slot::parse(s).filter(|slot| match slot {
@@ -126,63 +131,84 @@ fn clean(key: &str, a: &Arrangement, skipped: &mut Vec<String>) -> Arrangement {
 pub fn skipped_note(skipped: &[String]) -> String {
     let shown: Vec<&str> = skipped.iter().take(4).map(String::as_str).collect();
     let more = skipped.len().saturating_sub(shown.len());
-    let tail = if more > 0 { format!(" and {more} more") } else { String::new() };
-    format!("{} unknown item{} skipped: {}{tail}", skipped.len(), if skipped.len() == 1 { "" } else { "s" }, shown.join(", "))
+    let tail = if more > 0 { crate::i18n::fmt(tl!(" and {n} more"), &[("n", &more.to_string())]) } else { String::new() };
+    let template = if skipped.len() == 1 { tl!("{n} unknown item skipped: {items}") } else { tl!("{n} unknown items skipped: {items}") };
+    crate::i18n::fmt(template, &[("n", &skipped.len().to_string()), ("items", &shown.join(", "))]) + &tail
 }
 
-/// Make `text`'s menus (and presets, when it holds them) the arrangement. The reply names what was skipped.
-pub fn import_text(app: &mut PhotocraftApp, text: &str) -> Result<Vec<String>, String> {
+/// Check `text` and make its menus (and presets, when it holds them) the arrangement `custom`
+/// holds. The reply names what was skipped. Nothing changes when the file is refused.
+pub fn import_into(custom: &mut Custom, text: &str) -> Result<Vec<String>, String> {
     if text.len() > MAX_BYTES {
-        return Err("This file is too big to be a PhotoCraft context menu backup.".into());
+        return Err(too_big());
     }
     let parsed = parse(text)?;
-    let mut custom = super::load(app);
     custom.menus = parsed.menus;
     if let Some(p) = parsed.presets {
         custom.presets = p;
     }
-    super::store(app, &custom);
     Ok(parsed.skipped)
 }
 
-fn say(app: &mut PhotocraftApp, text: String, error: bool) {
-    app.ui.status = text;
-    app.ui.status_error = error;
+fn too_big() -> String {
+    tl!("This file is too big to be a PhotoCraft context menu backup.").to_string()
 }
 
-/// Write the backup to `path`, with the app's writer.
+fn error(app: &mut PhotocraftApp, text: String) {
+    app.ui.status = text;
+    app.ui.status_error = true;
+}
+
+/// Write the backup of the arrangement being edited to `path`, with the app's writer.
 pub fn export_to(app: &mut PhotocraftApp, path: &str) -> Result<Value, String> {
-    let text = render(&super::load(app))?;
-    let write = app.services.write.as_mut().ok_or("no writer configured")?;
-    write(path, text.as_bytes()).map_err(|e| format!("Could not write {path}: {e}"))?;
-    let name = std::path::Path::new(path).file_name().map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned());
-    say(app, format!("{} {name}", tl!("Exported the context menus to")), false);
+    let text = render(&super::current(app))?;
+    let write = app.services.write.as_mut().ok_or_else(|| tl!("no writer configured").to_string())?;
+    write(path, text.as_bytes()).map_err(|e| crate::i18n::fmt(tl!("Could not write {path}: {e}"), &[("path", path), ("e", &e)]))?;
     Ok(json!({"path": path}))
 }
 
-/// Read the backup in `bytes` (the file `name`).
-pub fn import_bytes(app: &mut PhotocraftApp, name: &str, bytes: Vec<u8>) -> Result<Value, String> {
-    let text = String::from_utf8(bytes).map_err(|_| refuse("it is not text")).inspect_err(|e| say(app, e.clone(), true))?;
-    let skipped = import_text(app, &text).inspect_err(|e| say(app, e.clone(), true))?;
-    let name = std::path::Path::new(name).file_name().map_or_else(|| name.to_string(), |n| n.to_string_lossy().into_owned());
-    let mut note = format!("{} {name}", tl!("Imported the context menus from"));
+/// Read the backup in `bytes` into the arrangement being edited. A refused file changes nothing.
+pub fn import_bytes(app: &mut PhotocraftApp, bytes: Vec<u8>) -> Result<Value, String> {
+    let text = String::from_utf8(bytes).map_err(|_| refuse(tl!("it is not text"))).inspect_err(|e| error(app, e.clone()))?;
+    let mut custom = super::current(app);
+    let skipped = import_into(&mut custom, &text).inspect_err(|e| error(app, e.clone()))?;
+    super::set_current(app, &custom);
     if !skipped.is_empty() {
-        note = format!("{note}. {}", skipped_note(&skipped));
+        app.ui.status = skipped_note(&skipped);
+        app.ui.status_error = false;
     }
-    say(app, note, false);
     Ok(json!({"skipped": skipped}))
+}
+
+/// The name and bytes of the file an open dialog answered with, refusing one over [`MAX_BYTES`]
+/// before it is read.
+fn read_capped(answer: FileDialogAnswer) -> Result<Vec<u8>, String> {
+    match answer {
+        FileDialogAnswer::Paths(paths) => {
+            let path = paths.into_iter().next().ok_or_else(|| "cancelled".to_string())?;
+            let size = std::fs::metadata(&path).map_err(|e| format!("{path}: {e}"))?.len();
+            if size > MAX_BYTES as u64 {
+                return Err(too_big());
+            }
+            photocraft_format::read_file(std::path::Path::new(&path)).map_err(|e| format!("{path}: {e}"))
+        }
+        FileDialogAnswer::Contents(_, bytes) => Ok(bytes),
+        FileDialogAnswer::ContentsMany(files) => files.into_iter().next().map(|(_, bytes)| bytes).ok_or_else(|| "cancelled".to_string()),
+        _ => Err(tl!("no file was chosen").to_string()),
+    }
 }
 
 /// Export icon: ask where, then write.
 pub fn export(app: &mut PhotocraftApp) {
     if let Err(e) = app.pick_save(FILE_NAME, |app, path| export_to(app, &path)) {
-        say(app, e, true);
+        error(app, e);
     }
 }
 
 /// Import icon: ask which file, then read it.
 pub fn import(app: &mut PhotocraftApp) {
-    if let Err(e) = app.pick_file_bytes_filtered(&["json"], |app, name, bytes| import_bytes(app, &name, bytes)) {
-        say(app, e, true);
+    let request = FileDialogRequest::Open { multiple: false, initial_dir: last_used_dir(&app.ui.recent_files), extensions: Some(vec!["json".to_string()]) };
+    if let Err(e) = app.ask_file(request, |app, answer| import_bytes(app, read_capped(answer)?)) {
+        error(app, e);
     }
 }
