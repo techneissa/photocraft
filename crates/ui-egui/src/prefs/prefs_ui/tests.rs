@@ -2079,3 +2079,62 @@ fn the_settings_scrollbar_sits_at_the_right_edge_of_the_pane() {
     let bar_right = h.query_all_by_role(Role::ScrollBar).map(|n| n.rect().right()).fold(f32::MIN, f32::max);
     assert!(bar_right > ok.right() - 30.0, "scrollbar right {bar_right} vs the pane's right edge {}", ok.right());
 }
+
+/// Keyboard Shortcuts and Menus on `tab`, in a window `size` big.
+fn shortcuts_harness(tab: u64, size: egui::Vec2) -> egui_kittest::Harness<'static, PhotocraftApp> {
+    let (mut app, _) = app_with_store();
+    app.run("prefs.set", json!({"values": {"interface.language": "en"}})).unwrap();
+    open_shortcuts(&mut app, tab);
+    let mut h = egui_kittest::Harness::builder().with_size(size).with_max_steps(64).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        app
+    });
+    h.run_steps(4);
+    h
+}
+
+#[test]
+fn the_menus_and_toolbar_scrollbars_sit_at_the_right_edge_of_the_window() {
+    // The scroll area shrank to its content, so its scrollbar floated mid-window.
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::Queryable;
+    for tab in [0, 1, 2] {
+        let h = shortcuts_harness(tab, vec2(1280.0, 560.0));
+        let ok = h.get_by_label("OK").rect();
+        let bar_right = h.query_all_by_role(Role::ScrollBar).map(|n| n.rect().right()).fold(f32::MIN, f32::max);
+        assert!(bar_right > ok.right() - 30.0, "tab {tab}: scrollbar right {bar_right} vs the window's right edge {}", ok.right());
+    }
+}
+
+#[test]
+fn the_toolbar_tab_lays_the_tools_out_in_several_columns_that_follow_the_width() {
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::Queryable;
+    let h = shortcuts_harness(2, vec2(1500.0, 700.0));
+    let mut lefts: Vec<i32> = h.query_all_by_role(Role::CheckBox).map(|n| n.rect().left().round() as i32).collect();
+    lefts.sort();
+    lefts.dedup();
+    assert!(lefts.len() > 1, "several columns at the default width, got {lefts:?}");
+    let counts = [200.0, 500.0, 740.0, 1000.0].map(super::dialogs::toolbar_columns);
+    assert_eq!(counts, [1, 2, 3, 4]);
+}
+
+/// Opt-in pictures (`PHOTOCRAFT_SHORTCUT_TAB_SNAPSHOTS` names the folder): the Menus and Toolbar tabs.
+#[test]
+fn shortcuts_tabs_snapshots() {
+    let Some(directory) = std::env::var_os("PHOTOCRAFT_SHORTCUT_TAB_SNAPSHOTS") else { return };
+    let _gpu = photocraft_testkit::gpu_lock();
+    let directory = std::path::PathBuf::from(directory);
+    std::fs::create_dir_all(&directory).unwrap();
+    for (tab, name) in [(1, "menus"), (2, "toolbar")] {
+        let (mut app, _) = app_with_store();
+        open_shortcuts(&mut app, tab);
+        let mut h =
+            egui_kittest::Harness::builder().with_size(vec2(1300.0, 700.0)).with_pixels_per_point(2.0).with_max_steps(64).wgpu().build_eframe(move |cc| {
+                PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+                app
+            });
+        h.run_steps(6);
+        h.render().expect("render").save(directory.join(format!("{name}.png"))).unwrap();
+    }
+}

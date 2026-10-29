@@ -1,6 +1,9 @@
 use super::dialogs::toolbar_tab;
 use super::{BTreeMap, Map, PhotocraftApp, RichText, Tokens, Value, default_shortcut, json, prefs, vec2};
 
+/// The room the Visible checkbox and the colour dropdown of a Menus row take.
+const MENU_CONTROLS_WIDTH: f32 = 230.0;
+
 /// Every shortcut-bearing command (engine registry plus shell commands): (id, label, menu path,
 /// default shortcut), menu items first in Photoshop order.
 pub fn shortcut_items(app: &PhotocraftApp) -> Vec<(String, String, Vec<String>, Option<String>)> {
@@ -178,6 +181,8 @@ pub(crate) fn capture_key_press(capture_mods: egui::Modifiers, i: &egui::InputSt
 pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let t = Tokens::get(ui.ctx());
     let mut tab = f.get("tab").and_then(Value::as_u64).unwrap_or(0);
+    // The window takes the width the dialog allows on every tab, not the width of the rows it holds.
+    ui.set_min_width(ui.available_width());
     ui.horizontal(|ui| {
         for (i, name) in [tl!("Keyboard Shortcuts"), tl!("Menus"), tl!("Toolbar")].iter().enumerate() {
             if crate::widgets::pill_tab(ui, name, tab == i as u64).clicked() {
@@ -334,6 +339,9 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     let needle = filter.to_ascii_lowercase();
     let reveal = f.remove("reveal").is_some();
     let clashes = super::shortcuts_when::clash_notes(&items, (&overrides, &alt_overrides), &chords, &whens);
+    // Fills the dialog's width, so the scrollbar sits at its right edge; on Menus the controls
+    // sit at the right end of the name column's room.
+    let name_width = (ui.available_width() - MENU_CONTROLS_WIDTH).clamp(260.0, 640.0);
     egui::ScrollArea::both().max_height(420.0).auto_shrink([false, true]).id_salt("shortcuts-scroll").show(ui, |ui| {
         let mut last_top = String::new();
         egui::Grid::new("shortcut-grid").num_columns(4).spacing([12.0, 3.0]).striped(true).show(ui, |ui| {
@@ -368,6 +376,9 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     _ => shown_label,
                 };
                 let sel = selected == *id;
+                if tab == 1 {
+                    ui.set_min_width(name_width);
+                }
                 let name_row = ui.selectable_label(sel, RichText::new(format!("   {name}")).color(t.text_dim));
                 if name_row.clicked() {
                     selected = id.clone();
