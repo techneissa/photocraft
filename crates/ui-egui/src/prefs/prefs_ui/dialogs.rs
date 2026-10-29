@@ -91,7 +91,9 @@ pub(super) fn preference_values(p: &prefs::Preferences) -> Map<String, Value> {
 
 /// Compare the editable sections, excluding settings managed outside Preferences.
 pub fn preferences_changed(app: &PhotocraftApp, fields: &Map<String, Value>) -> bool {
-    is_preferences(fields) && fields.get("values").and_then(Value::as_object).is_some_and(|values| *values != preference_values(app.session.prefs()))
+    is_preferences(fields)
+        && (fields.get("values").and_then(Value::as_object).is_some_and(|values| *values != preference_values(app.session.prefs()))
+            || crate::menu_custom::changed(app, fields))
 }
 
 /// Commit the working copy and keep the current section open. Failure leaves the draft intact.
@@ -133,10 +135,11 @@ pub fn width(fields: &Map<String, Value>, available: f32) -> Option<f32> {
 
 /// Open Edit › Preferences on `section`.
 pub fn open_preferences(app: &mut PhotocraftApp, section: &str) -> u64 {
-    let section = if super::sections().any(|(id, _)| id == section) { section } else { "general" };
+    let section = if super::sections().any(|(id, _)| id == section) || section == crate::menu_custom::PAGE { section } else { "general" };
     let working = preference_values(app.session.prefs());
     let order = field_order(app.session.prefs(), &working);
-    open_kind(app, "prefs", "Preferences", json!({"section": section, "values": working, "__order": order}))
+    let draft = app.session.prefs().context_menus.clone();
+    open_kind(app, "prefs", "Preferences", json!({"section": section, "values": working, "__order": order, crate::menu_custom::DRAFT: draft}))
 }
 
 /// Each section's keys in declaration order (JSON objects sort their keys; the serialised text
@@ -321,7 +324,9 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
     match f.get("__prefsui").and_then(Value::as_str).unwrap_or("") {
         "prefs" => {
             let values = f.get("values").cloned().unwrap_or(Value::Null);
-            app.run("prefs.set", json!({"path": "", "value": values}))
+            let saved = app.run("prefs.set", json!({"path": "", "value": values}))?;
+            crate::menu_custom::commit(app, f);
+            Ok(saved)
         }
         "shortcuts" => {
             let overrides = f.get("overrides").cloned().unwrap_or(json!({}));

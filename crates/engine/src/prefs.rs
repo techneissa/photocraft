@@ -1187,6 +1187,11 @@ pub struct Preferences {
     pub script_events: crate::automate_cmds::ScriptEvents,
     /// Layer Mask Display Options: the layer mask rubylith's colour and opacity.
     pub layer_mask_overlay: LayerMaskOverlay,
+    /// The right-click menus the user arranged (Preferences › Context Menus): per menu, the rows
+    /// shown in order and the built-in rows taken out, plus three presets of the whole set. Null
+    /// until something is arranged, which leaves every menu as it is. JSON owned by the shell
+    /// (`ui-egui::menu_custom`), which reads it leniently.
+    pub context_menus: Value,
 }
 
 impl Preferences {

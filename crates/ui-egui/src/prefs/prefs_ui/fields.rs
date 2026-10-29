@@ -177,7 +177,11 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
     let lang = crate::i18n::Lang::from_pref(values.pointer("/interface/language").and_then(Value::as_str).unwrap_or("auto"));
     let mut search = f.get("__search").and_then(Value::as_str).unwrap_or("").to_string();
     crate::widgets::text_field(ui, ui.scope_id().with("prefs-search"), &mut search, tl!("Search settings…"), ui.available_width(), false);
-    let found = preference_sections(&values, &search);
+    let mut found = preference_sections(&values, &search);
+    let q = search.trim().to_lowercase();
+    if q.is_empty() || crate::menu_custom::PAGE_TITLE.to_lowercase().contains(&q) || tl!(crate::menu_custom::PAGE_TITLE).to_lowercase().contains(&q) {
+        found.push((crate::menu_custom::PAGE, crate::menu_custom::PAGE_TITLE));
+    }
     if !found.iter().any(|(id, _)| *id == section)
         && let Some((first, _)) = found.first()
     {
@@ -195,7 +199,7 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                 }
                 for &(id, title) in &found {
                     let sel = section == id;
-                    let empty = !super::SHELL_SECTIONS.iter().any(|(shell, _)| *shell == id) && !has_visible_fields(&values, id);
+                    let empty = id != crate::menu_custom::PAGE && !super::SHELL_SECTIONS.iter().any(|(shell, _)| *shell == id) && !has_visible_fields(&values, id);
                     let (rect, resp) = ui.allocate_exact_size(vec2(170.0, 22.0), Sense::click());
                     if sel {
                         ui.painter().rect_filled(rect, t.radius_sm, t.row_selected);
@@ -229,6 +233,11 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
         crate::widgets::vline(ui, content_height);
         ui.vertical(|ui| {
             ui.set_width((ui.available_width() - 12.0).max(340.0));
+            // Context Menus is not a settings section: its page arranges the right-click menus.
+            if section == crate::menu_custom::PAGE {
+                crate::menu_custom::editor::page(app, ui, content_height, f.entry(crate::menu_custom::DRAFT).or_insert(Value::Null));
+                return;
+            }
             let title = super::sections().find(|(id, _)| *id == section).map_or("General", |(_, t)| t);
             ui.label(RichText::new(tl!(&title)).font(crate::theme::semibold(14.0)).color(t.text));
             let show_all = search.trim().is_empty()

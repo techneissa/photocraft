@@ -148,7 +148,7 @@ pub fn show(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, on_set: bo
         ui.set_min_width(220.0);
         let mut rename = false;
         let has_selection = app.session.active().is_some_and(|s| s.doc.selection.is_some());
-        items(app, ui, l, on_set, entries(l, on_set, has_selection), actions);
+        items(app, ui, l, on_set, crate::menu_custom::layer_rows(app, entries(l, on_set, has_selection)), actions);
         ui.separator();
         if ui.button(tl!("Rename Layer…")).clicked() {
             rename = true;
@@ -222,7 +222,7 @@ fn items(app: &crate::PhotocraftApp, ui: &mut egui::Ui, l: &Layer, on_set: bool,
             }
             Some((label, id)) => {
                 // Skip commands this build doesn't have rather than showing dead items.
-                if photocraft_engine::commands::find(id).is_none() && !crate::menu_catalog::CATALOG.iter().any(|m| m.3 == id) {
+                if !crate::menus::is_live(id) && !crate::menu_catalog::CATALOG.iter().any(|m| m.3 == id) {
                     continue;
                 }
                 last_sep = false;

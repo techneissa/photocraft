@@ -507,7 +507,7 @@ pub fn rows(menu: &CanvasToolMenu) -> &'static [Row] {
 
 /// Is `command` one of the open menu's rows, and enabled?
 pub fn available(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> bool {
-    (rows(menu).iter().flatten().any(|(_, id)| *id == command) || is_spelling(menu, command) || is_crop(menu, command)) && entry_enabled(app, menu, command)
+    (crate::menu_custom::canvas_has(app, menu, command) || is_spelling(menu, command) || is_crop(menu, command)) && entry_enabled(app, menu, command)
 }
 
 /// Is `command` the transform box's current mode (checked in the transform menu)?
@@ -1110,7 +1110,7 @@ fn menu_id() -> egui::Id {
 pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
     let Some(menu) = app.ui.canvas_tool_menu.clone() else { return };
     if ctx.input(|i| i.key_pressed(egui::Key::Escape))
-        || app.ui.tool != menu.tool
+        || crate::menu_custom::closed(app, &menu)
         || (menu.transform && app.ui.transform.is_none())
         || (menu.text && app.ui.text_edit.is_none())
         || (menu.type_layer && app.ui.text_edit.is_some())
@@ -1160,8 +1160,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
                         selected = Some(command);
                     }
                 }
-                for row in rows(&menu) {
-                    let Some((label, command)) = *row else {
+                for row in crate::menu_custom::canvas_rows(app, &menu) {
+                    let Some((label, command)) = row else {
                         ui.separator();
                         continue;
                     };

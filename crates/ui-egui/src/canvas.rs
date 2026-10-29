@@ -102,6 +102,8 @@ use strokes::{HOLD_REPEAT_MS, draw_clone_preview, feed_live_stroke, pointer_butt
 pub(crate) use strokes::{SPOT_HEALING_TRAIL, live_retouch_points};
 pub(crate) use tabs::arranged_cells;
 #[cfg(test)]
+pub(crate) use tabs::tab_context_items as built_tab_items;
+#[cfg(test)]
 use tabs::{TEAR_OFF, pro_tab_title, tab_context_items, tab_drop_index, tab_move_target, tabs, torn_off};
 pub use tabs::{TabStrip, document_area, extra_windows};
 use tabs::{dots, paint_dots};
