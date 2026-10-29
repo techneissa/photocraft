@@ -91,6 +91,7 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
 | Undo/redo stress test: hundreds of random edits, undos and redos (65 commands, 8/16/32-bit RGB, Gray, CMYK) must restore exact states, never panic or hang; `-- --ignored` for the long run, `PHOTOCRAFT_UNDO_STRESS_*` env vars | `test/undo-redo-stress` | `crates/engine/tests/undo_redo_stress.rs` | none | `cargo test -p photocraft-engine --test undo_redo_stress` |
 | No "Join us on Discord" button on the start screen or in About (the Discord link in the link row stays) | `feat/hide-discord-button` | none | ui-egui `canvas/start_screen.rs`, `dialogs.rs` (2 lines removed each), `links.rs` (`#[allow(dead_code)]` on `discord_button`), `canvas/tests.rs` (1 test appended) | `start_screen` |
 | ⌘, opens Settings, as in every Mac app (⌘K still works); Hide Layers has no default key (Photoshop's ⌘,): give it one with Assign Shortcut… | `feat/settings-cmd-comma` | none | engine `cmd/extra_cmds.rs` (Hide Layers' default key → None), `prefs/shortcuts.rs` (`edit.preferences.general` alternate `Cmd+,`); ui-egui `layer_shortcut_tests.rs` (the ⌘, test now checks Settings), `menus/native_menu/tests.rs` (2 asserts) | engine `shortcuts`, ui-egui `layer_shortcut native_menu` |
+| ⌘, or Esc closes Preferences; with unsaved changes (Context Menus draft included) a small prompt asks Save / Don't Save / Cancel; Esc in a text field or open dropdown keeps its own job; the Cancel button and close box still discard | `feat/settings-close-keys` (from `feat/settings-cmd-comma`), merged via `feat/settings-close-keys-custom` | ui-egui `prefs/prefs_ui/close_keys.rs`, `close_keys_tests.rs` | ui-egui `input/shortcuts.rs` (hook), `prefs/prefs_ui.rs`, `prefs_ui/dialogs.rs` | `close_keys` |
 | Preferences pages, Keyboard Shortcuts tabs: lists fill the window with the scrollbar at the right edge; Toolbar tab in 1–4 columns by width; Keyboard Shortcuts keeps its width while searching | `fix/prefs-scroll-width`, `fix/shortcuts-tabs-layout` (from `origin/main`), `fix/shortcuts-search-width` (from `feat/shortcut-upgrade`) | none | ui-egui `prefs/prefs_ui/fields.rs` (`auto_shrink`), `prefs_ui/shortcuts.rs` (`name_width`, `toolbar_columns`, min width), `prefs_ui/tests.rs` (tests appended) | `prefs_ui` |
 | Context Menus page keeps the size the Preferences window is dragged to | `fix/context-menus-resize` (from `feat/context-menu-editor`) | in `menu_custom/editor.rs` | none | `menu_custom` |
 | Arabic text for the AI Models page (Arabic arrived upstream after PR #8231; a block at the end of `ar.tsv`, commit on custom) | custom | none | ui-egui `i18n/ar.tsv` (13 lines appended) | `ai_models` |
@@ -110,7 +111,7 @@ cargo test -p photocraft-ml
 cargo test -p photocraft-text --lib -- big_collection
 cargo test -p photocraft-engine --lib -- when chords chord_cmds shortcut_backup shortcut_sets image_cmds mode_cmds
 cargo test -p photocraft-engine --test undo_redo_stress
-cargo test -p photocraft-ui-egui --lib -- start_screen layer_shortcut native_menu title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
+cargo test -p photocraft-ui-egui --lib -- close_keys start_screen layer_shortcut native_menu title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
 cargo test -p photocraft-gpu --test it live_transform
 ```
 
@@ -150,6 +151,8 @@ the layers of one new document (double and multiple exposures). Agreed 2026-10-2
    as today.
 
 ## Known failures on this Mac (not caused by the fork)
+
+- `dialogs::palette::list::upgrade_tests::page_up_and_page_down_move_a_page_and_stop_at_the_ends` (fork) failed once in a 1000-test run on 2026-10-29 and passes alone: load-flaky.
 
 Checked 2026-10-28 on official `main` (b8c3f3aa8) as well: the same failures, none in a fork file.
 
