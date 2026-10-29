@@ -553,6 +553,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let start = pinned.or_else(|| ctx.data_mut(|m| m.get_persisted::<egui::Vec2>(place))).or_else(|| crate::blur_pins::first_place(&d.fields, ctx));
         let mut drag = egui::Vec2::ZERO;
         let mut close_clicked = false;
+        let mut esc_close = false;
         let mut sizing = false;
         let area = match start {
             Some(offset) => egui::Modal::default_area(id).anchor(egui::Align2::LEFT_TOP, offset),
@@ -583,6 +584,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             let min = resizable_min(&fields);
             (remembered.unwrap_or(size), min, resizable_max(ctx, &fields, min))
         });
+        // Read before the dialog draws: a text field or dropdown that Esc closes has let go by the
+        // time the dialog looks, and Esc must not close Preferences as well.
+        let esc_free = !crate::prefs_ui::is_preferences(&fields) || crate::prefs_ui::esc_closes(ctx, &fields);
         let mut given = None;
         let modal = show_modal(modal, ctx, id, resize, interactive, |ui| {
             sizing = ui.is_sizing_pass();
@@ -707,9 +711,14 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             && outcome.is_none()
             && (close_clicked
                 || modal.response.should_close()
-                || (modal.is_top_modal && !modal.any_popup_open && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))))
+                || (modal.is_top_modal && !modal.any_popup_open && esc_free && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))))
         {
             outcome = Some(false);
+            // Preferences with unsaved changes asks first (Esc, as ⌘,), through its own prompt.
+            if crate::prefs_ui::is_preferences(&fields) && !close_clicked {
+                outcome = None;
+                esc_close = true;
+            }
         }
         if let Some(dm) = app.ui.dialog_mut(d.id) {
             dm.fields = fields;
@@ -736,7 +745,14 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 }
             }
         }
+        if esc_close {
+            crate::prefs_ui::request_close(app, d.id);
+        }
+        if app.ui.dialogs.iter().any(|x| x.id == d.id && crate::prefs_ui::prompting(&x.fields)) {
+            crate::prefs_ui::show_prompt(app, ctx, d.id);
+        }
     }
+    crate::prefs_ui::remember_typing(ctx);
     ctx.data_mut(|m| m.insert_temp(egui::Id::unique(RECTS), shown));
 }
 

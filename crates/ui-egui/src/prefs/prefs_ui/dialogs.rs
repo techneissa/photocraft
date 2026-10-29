@@ -11,6 +11,11 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
         return None;
     }
     if let Some(section) = id.strip_prefix("edit.preferences.") {
+        // ⌘, while Preferences is open closes it.
+        if let Some(open) = super::close_keys::open_dialog(app) {
+            super::close_keys::request_close(app, open);
+            return Some(Ok(json!({"dialog": open})));
+        }
         return Some(Ok(json!({"dialog": open_preferences(app, section)})));
     }
     let dialog = |d: Option<u64>| Some(d.map(|d| json!({"dialog": d})).ok_or_else(|| "not available".to_string()));
