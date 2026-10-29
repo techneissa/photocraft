@@ -386,3 +386,24 @@ fn shortcut_upgrade_snapshots() {
     h.run_steps(4);
     h.render().expect("render the chord hint").save(directory.join("after-chord-hint.png")).unwrap();
 }
+
+/// The right edge of the dialog's button row: it follows the window's width.
+fn right_edge(h: &Harness<'_, PhotocraftApp>) -> f32 {
+    ["OK", "Cancel"].iter().map(|l| h.get_by_label(l).rect().right()).fold(f32::MIN, f32::max)
+}
+
+#[test]
+fn the_window_keeps_its_width_while_searching_and_clearing() {
+    let (mut h, id) = dialog("edit.copy", "");
+    h.run_steps(4);
+    let full = right_edge(&h);
+    for query in ["Copy", "", "zzz-no-such-command", ""] {
+        set_field(&mut h, id, "filter", json!(query));
+        // Every frame after the change, not only the settled one: the jump lasts a frame or two.
+        for _ in 0..4 {
+            h.step();
+            let now = right_edge(&h);
+            assert!((now - full).abs() < 1.0, "query {query:?}: the window's right edge is {now}, steady is {full}");
+        }
+    }
+}
