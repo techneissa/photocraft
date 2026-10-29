@@ -1472,3 +1472,26 @@ fn save_a_copy_appends_copy_unless_the_preference_says_not_to() {
         );
     }
 }
+
+#[test]
+fn a_limited_picker_refuses_a_big_file_before_reading_it() {
+    let (mut app, open, _) = app();
+    let ctx = egui::Context::default();
+    let path = std::env::temp_dir().join(format!("pc-big-{}.json", std::process::id()));
+    std::fs::write(&path, vec![b' '; 3000]).unwrap();
+    let seen = std::rc::Rc::new(std::cell::Cell::new(false));
+    let flag = seen.clone();
+    app.pick_file_bytes_limited(&["json"], 2048, move |_, _, _| {
+        flag.set(true);
+        Ok(Value::Null)
+    })
+    .unwrap();
+    app.poll_file_dialog(&ctx, None);
+    answer(&open, Some(FileDialogAnswer::Paths(vec![path.to_string_lossy().into()])));
+    app.poll_file_dialog(&ctx, None);
+    assert!(!seen.get(), "the callback never saw it");
+    assert!(read_picked(FileDialogAnswer::Paths(vec![path.to_string_lossy().into()]), 2048).unwrap_err().contains("too big"));
+    assert!(read_picked(FileDialogAnswer::Paths(vec![path.to_string_lossy().into()]), 4096).is_ok());
+    assert!(read_picked(FileDialogAnswer::Contents("k.json".into(), vec![0; 10]), 5).unwrap_err().contains("too big"));
+    std::fs::remove_file(&path).ok();
+}

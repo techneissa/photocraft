@@ -68,7 +68,7 @@ pub(super) fn export(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<
 
 /// Import…: ask for the file, then fill the dialog ([`import_bytes`]).
 pub(super) fn import_dialog(app: &mut PhotocraftApp) -> Result<Value, String> {
-    app.pick_file_bytes_filtered(&["json"], |app, name, bytes| import_bytes(app, &name, &bytes))
+    app.pick_file_bytes_limited(&["json"], shortcut_backup::MAX_BYTES, |app, name, bytes| import_bytes(app, &name, &bytes))
 }
 
 /// A shortcuts file's bytes: refused with the engine's reason, or taken into the open dialog.

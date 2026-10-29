@@ -232,10 +232,21 @@ impl PhotocraftApp {
         extensions: &[&str],
         then: impl FnOnce(&mut Self, String, Vec<u8>) -> Result<Value, String> + 'static,
     ) -> Result<Value, String> {
+        self.pick_file_bytes_limited(extensions, usize::MAX, then)
+    }
+
+    /// [`Self::pick_file_bytes_filtered`] for a file that is small by nature: one bigger than
+    /// `max` bytes fails with "<file name>: too big" before it is read.
+    pub(crate) fn pick_file_bytes_limited(
+        &mut self,
+        extensions: &[&str],
+        max: usize,
+        then: impl FnOnce(&mut Self, String, Vec<u8>) -> Result<Value, String> + 'static,
+    ) -> Result<Value, String> {
         let initial_dir = last_used_dir(&self.ui.recent_files);
         let extensions = (!extensions.is_empty()).then(|| extensions.iter().map(|s| (*s).to_string()).collect());
         self.ask_file(FileDialogRequest::Open { multiple: false, initial_dir, extensions }, move |app, answer| {
-            let (name, bytes) = read_picked(answer)?;
+            let (name, bytes) = read_picked(answer, max)?;
             then(app, name, bytes)
         })
     }
@@ -377,12 +388,18 @@ pub(crate) fn last_used_dir(recent: &[String]) -> Option<String> {
 }
 
 /// The name and bytes of the single file an open dialog answered with.
-fn read_picked(answer: FileDialogAnswer) -> Result<(String, Vec<u8>), String> {
+fn read_picked(answer: FileDialogAnswer, max: usize) -> Result<(String, Vec<u8>), String> {
+    let too_big = |name: &str| format!("{}: too big (more than {} KiB)", display_name(name), max / 1024);
     match answer {
+        FileDialogAnswer::Contents(name, bytes) if bytes.len() > max => Err(too_big(&name)),
         FileDialogAnswer::Contents(name, bytes) => Ok((name, bytes)),
-        FileDialogAnswer::ContentsMany(files) => files.into_iter().next().ok_or_else(|| CANCELLED.into()),
+        FileDialogAnswer::ContentsMany(files) => files.into_iter().next().filter(|(_, b)| b.len() <= max).ok_or_else(|| CANCELLED.into()),
         FileDialogAnswer::Paths(paths) => {
             let path = paths.into_iter().next().ok_or(CANCELLED)?;
+            // the size is asked before the bytes are read: a huge file is never loaded
+            if std::fs::metadata(&path).is_ok_and(|m| m.len() > max as u64) {
+                return Err(too_big(&path));
+            }
             let bytes = photocraft_format::read_file(std::path::Path::new(&path)).map_err(|e| format!("{}: {e}", display_name(&path)))?;
             Ok((path, bytes))
         }
