@@ -33,6 +33,7 @@ pub fn open(app: &mut PhotocraftApp, ctx: &egui::Context, url: &str) -> Value {
 }
 
 /// The prominent "Join us on Discord" button.
+#[allow(dead_code)] // fork: hidden on the start screen and in About (FORK.md)
 pub fn discord_button(app: &mut PhotocraftApp, ui: &mut egui::Ui, min_width: f32) -> egui::Response {
     let r = crate::widgets::primary_button(ui, tl!("Join us on Discord"), min_width).on_hover_text(DISCORD);
     if r.clicked() {
