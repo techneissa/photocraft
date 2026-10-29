@@ -365,6 +365,9 @@ fn interface_groups(ui: &mut egui::Ui, obj: &mut Map<String, Value>, keys: &[Str
             grid("interface-options").show(ui, |ui| field_rows(ui, "interface", obj, other, lang));
         });
     }
+    if crate::panels::title_bar_items::group_matches(query) {
+        pref_group(ui, "Top Bar", |ui| crate::panels::title_bar_items::editor(ui, obj));
+    }
 }
 
 /// Where a clicked colour swatch leaves its preference path and label for the dialog body, which

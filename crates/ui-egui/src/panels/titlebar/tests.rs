@@ -489,3 +489,53 @@ fn theme_icons_are_cached_and_fall_back() {
     out.textures_delta.clear();
     assert_eq!(calls.load(Ordering::Relaxed), 3, "each icon and size rendered once; absurd sizes never");
 }
+
+/// The top bar's items menu (`title_bar_items`): a drag that starts on the gap while it is open
+/// closes it instead of moving the window, which would leave the menu behind at the old place.
+#[test]
+fn a_drag_on_the_gap_with_the_items_menu_open_closes_it_and_does_not_move_the_window() {
+    let mut w = Win::new(1440.0);
+    w.frame(vec![]);
+    w.frame(vec![]);
+    let empty = pos2(980.0, 16.0);
+    let open = |w: &Win| egui::Popup::is_any_open(&w.ctx);
+    w.gesture_by(&[empty], false, egui::PointerButton::Secondary);
+    w.frame(vec![]);
+    assert!(open(&w), "the right-click opens the menu");
+    let path = [empty, empty + vec2(12.0, 4.0), empty + vec2(30.0, 8.0)];
+    let cmds = w.gesture(&path);
+    assert!(!cmds.iter().any(|c| matches!(c, ViewportCommand::StartDrag)), "the window stays put: {cmds:?}");
+    w.frame(vec![]);
+    assert!(!open(&w), "the drag closed the menu");
+    // With the menu gone a drag moves the window again.
+    let cmds = w.gesture(&path);
+    assert_eq!(cmds.iter().filter(|c| matches!(c, ViewportCommand::StartDrag)).count(), 1, "{cmds:?}");
+}
+
+/// Hiding every item leaves the window buttons of the custom title bar (they are not items).
+#[test]
+fn the_caption_buttons_stay_with_every_top_bar_item_hidden() {
+    for width in [760.0, 1100.0, 1440.0] {
+        let mut w = Win::new(width);
+        for id in photocraft_engine::prefs::TopBar::IDS {
+            w.app.run("prefs.set", serde_json::json!({"path": format!("interface.topBar.{id}"), "value": false})).unwrap();
+        }
+        w.frame(vec![]);
+        w.frame(vec![]);
+        let [min, max, close] = CAPTIONS.map(|c| w.caption(c));
+        assert_eq!((close.right(), close.top()), (width, 0.0), "Close sits in the window's corner at {width}");
+        assert!([min, max, close].iter().all(|r| r.width() == BUTTON_WIDTH && r.height() >= 31.0), "{width}");
+        assert_eq!((min.right(), max.right()), (max.left(), close.left()));
+        // Maximize and Close still work.
+        let cmds = w.click(max.center());
+        assert!(cmds.iter().any(|c| matches!(c, ViewportCommand::Maximized(true))), "{cmds:?}");
+        let cmds = w.click(close.center());
+        assert!(cmds.iter().any(|c| matches!(c, ViewportCommand::Close)), "{cmds:?}");
+        // The bar still has its menus and the whole gap drags the window.
+        let file = texts(&w.frame(vec![])).into_iter().any(|(t, _)| t == "File");
+        assert!(file, "the menus stay at {width}");
+        let from = pos2(min.left() - 40.0, 16.0);
+        let cmds = w.gesture(&[from, from + vec2(12.0, 4.0), from + vec2(30.0, 8.0)]);
+        assert_eq!(cmds.iter().filter(|c| matches!(c, ViewportCommand::StartDrag)).count(), 1, "{width}: {cmds:?}");
+    }
+}
