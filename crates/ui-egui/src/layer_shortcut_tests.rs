@@ -29,13 +29,13 @@ fn active(app: &PhotocraftApp) -> &photocraft_doc::Layer {
     st.doc.layer(st.active_layer.unwrap()).unwrap()
 }
 
+/// Fork: ⌘, opens Settings, as in every Mac app, and leaves the layer alone (FORK.md).
 #[test]
-fn command_comma_toggles_the_layers_visibility() {
+fn command_comma_opens_settings() {
     let mut app = app();
     press(&mut app, Key::Comma, Modifiers::COMMAND);
-    assert!(!active(&app).visible);
-    press(&mut app, Key::Comma, Modifiers::COMMAND);
     assert!(active(&app).visible);
+    assert!(app.ui.dialogs.iter().any(|d| d.fields.get("__prefsui").and_then(|v| v.as_str()) == Some("prefs")), "Settings opened");
 }
 
 #[test]

@@ -131,6 +131,8 @@ pub const ALTERNATE_SHORTCUTS: &[(&str, &str)] = &[
     ("edit.fill", "Shift+Backspace"),
     ("select.inverse", "Shift+F7"),
     ("view.zoomIn", "Cmd++"),
+    // fork: ⌘, opens Settings beside ⌘K, as in every Mac app; Hide Layers has no key (FORK.md)
+    ("edit.preferences.general", "Cmd+,"),
     #[cfg(not(target_os = "macos"))]
     ("file.close", "Cmd+F4"),
 ];
