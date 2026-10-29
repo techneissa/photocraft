@@ -1,6 +1,8 @@
+use super::chord_cmds;
+use super::chords;
 use super::cmds::bad;
 use super::files::{file_target, read_text_file, rename_path, writable, write_files_atomically};
-use super::shortcuts::{BindKind, alternate_keys, bindable, bindable_items, conflicts, default_alternates, is_tool, normalize_shortcut, reserved_shortcut};
+use super::shortcuts::{BindKind, alternate_keys, bindable, bindable_items, default_alternates, is_tool, normalize_shortcut, reserved_shortcut};
 use super::{MenuCustomization, Preferences, Result, Session, Value, json};
 
 /// Edit › Keyboard Shortcuts (engine part): list, change and reset application shortcuts.
@@ -15,12 +17,16 @@ pub(super) fn keyboard_shortcuts(s: &mut Session, p: &Value) -> Result<Value> {
             Value::Bool(true) => {
                 next.shortcuts.clear();
                 next.alternate_shortcuts.clear();
+                next.chords.clear();
+                next.shortcut_when.clear();
                 changed = true;
             }
             Value::Array(ids) => {
                 for id in ids.iter().filter_map(Value::as_str) {
                     next.shortcuts.remove(id);
                     next.alternate_shortcuts.remove(id);
+                    next.chords.remove(id);
+                    next.shortcut_when.remove(id);
                 }
                 changed = true;
             }
@@ -108,6 +114,10 @@ pub(super) fn keyboard_shortcuts(s: &mut Session, p: &Value) -> Result<Value> {
         None | Some(Value::Null) => &empty,
         Some(v) => v.as_object().ok_or_else(|| bad(cmd, "`alternates` maps command ids to lists of shortcuts"))?,
     };
+    // A backup file and the chords and conditions of the call go first: the call's own `set` and
+    // `alternates` then apply on top of the file.
+    let (chords_changed, json_import) = chord_cmds::apply(&mut next, p, cmd)?;
+    changed |= chords_changed;
     changed |= apply_shortcut_changes(&mut next, p, set, alts, cmd)?;
     // Then the sets are saved, deleted or switched, from the bindings as they now stand.
     changed |= crate::shortcut_sets::store(&mut next, p).map_err(|e| bad(cmd, e))?;
@@ -122,6 +132,7 @@ pub(super) fn keyboard_shortcuts(s: &mut Session, p: &Value) -> Result<Value> {
                 || filter.is_some()
                 || prefs.shortcuts.contains_key(c.0)
                 || prefs.alternate_shortcuts.contains_key(c.0)
+                || chord_cmds::customised(prefs, c.0)
         })
         .map(|(id, label, menu, def, kind)| {
             let main = prefs.shortcut(id, def);
@@ -130,6 +141,7 @@ pub(super) fn keyboard_shortcuts(s: &mut Session, p: &Value) -> Result<Value> {
             if !defaults.is_empty() {
                 v["defaultAlternates"] = json!(defaults);
             }
+            chord_cmds::describe(prefs, id, &mut v);
             match kind {
                 BindKind::Hold => v["hold"] = json!(true),
                 BindKind::Tool => v["tool"] = json!(true),
@@ -145,12 +157,15 @@ pub(super) fn keyboard_shortcuts(s: &mut Session, p: &Value) -> Result<Value> {
         bindings.extend(prefs.alternates(id, main).into_iter().map(|k| (id, k)));
     }
     // Tools sharing a key are a cycling group, not a conflict.
-    let conflicts: Vec<Value> = conflicts(bindings.iter().map(|(id, k)| (*id, k.as_str())))
+    let conflicts: Vec<Value> = chords::clashes(prefs, &bindings)
         .into_iter()
         .filter(|(_, ids)| !ids.iter().all(|id| is_tool(id)))
         .map(|(sc, ids)| json!({"shortcut": sc, "commands": ids}))
         .collect();
     let mut out = json!({"overrides": prefs.shortcuts, "alternateOverrides": prefs.alternate_shortcuts, "commands": list, "conflicts": conflicts});
+    out["chords"] = json!(prefs.chords);
+    out["when"] = json!(prefs.shortcut_when);
+    out["damagedWhen"] = json!(chord_cmds::damaged(prefs));
     if let (Some(o), Value::Object(sets)) = (out.as_object_mut(), crate::shortcut_sets::describe(prefs)) {
         o.extend(sets);
     }
@@ -161,6 +176,7 @@ pub(super) fn keyboard_shortcuts(s: &mut Session, p: &Value) -> Result<Value> {
     // can't be written is refused before either file is: a bad export changes nothing.
     let kys_target = file_target(cmd, p.get("exportKys"))?;
     let html_target = file_target(cmd, p.get("summarize"))?;
+    let json_target = chord_cmds::export_target(cmd, p)?;
     let mut files: Vec<(&str, String, String)> = Vec::new();
     if let Some(target) = kys_target {
         let entries: Vec<crate::kys::Entry> =
@@ -187,6 +203,13 @@ pub(super) fn keyboard_shortcuts(s: &mut Session, p: &Value) -> Result<Value> {
             None => out["html"] = json!(html),
         }
     }
+    if let Some(target) = json_target {
+        let text = chord_cmds::export_text(prefs);
+        match target {
+            Some(path) => files.push(("jsonPath", path, text)),
+            None => out["json"] = json!(text),
+        }
+    }
     for (_, path, _) in &files {
         writable(path).map_err(|e| bad(cmd, format!("{path}: {e}")))?;
     }
@@ -200,6 +223,9 @@ pub(super) fn keyboard_shortcuts(s: &mut Session, p: &Value) -> Result<Value> {
     }
     if let Some(import) = import {
         out["import"] = import;
+    }
+    if let Some(report) = json_import {
+        out["importJson"] = report;
     }
     Ok(out)
 }

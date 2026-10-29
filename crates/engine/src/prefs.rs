@@ -455,6 +455,8 @@ impl Default for Tools {
 /// since a whole-section update or a hand-edited preferences file can store anything.
 pub use photocraft_paint::ResponseCurve as PressureCurve;
 
+mod chord_cmds;
+mod chords;
 mod cmds;
 mod customize;
 mod files;
@@ -463,6 +465,7 @@ mod store;
 mod top_bar;
 mod validate;
 
+pub use chords::{can_overlap, check_chord, check_when, chord_steps, clashes, damaged as damaged_when, normalize_chord, when_of};
 pub use cmds::specs;
 #[cfg(test)]
 pub(crate) use files::write_files_atomically;
@@ -1139,6 +1142,13 @@ pub struct Preferences {
     /// ([`ALTERNATE_SHORTCUTS`]); an empty list removes them. Settings files from before this
     /// map load with nothing stored, so every command keeps its defaults.
     pub alternate_shortcuts: BTreeMap<String, Vec<String>>,
+    /// Edit › Keyboard Shortcuts: a command's chord (two steps, `Cmd+K C`), command id → chord.
+    /// Beside its main and further keys; none by default.
+    pub chords: BTreeMap<String, String>,
+    /// Edit › Keyboard Shortcuts: a command's When condition (`!dialogOpen && tool == brush`,
+    /// see [`crate::when`]), command id → condition text. Limits all of the command's keys and
+    /// its chord; none means always.
+    pub shortcut_when: BTreeMap<String, String>,
     /// Edit › Keyboard Shortcuts › Set: saved shortcut sets by name (`crate::shortcut_sets`).
     pub shortcut_sets: BTreeMap<String, crate::shortcut_sets::ShortcutSet>,
     /// The saved set in use ("" for the defaults).
@@ -1207,6 +1217,9 @@ impl Preferences {
 
     /// Set a value by dotted path, validating it. Unknown paths and wrong types are errors.
     pub fn set(&mut self, path: &str, value: Value) -> std::result::Result<(), String> {
+        if let Some(done) = chords::set(self, path, &value) {
+            return done;
+        }
         if path == "alternateShortcuts" {
             let obj = value.as_object().ok_or("`alternateShortcuts` maps command ids to lists of shortcuts")?;
             let mut map = BTreeMap::new();
@@ -1253,6 +1266,9 @@ impl Preferences {
             *self = Preferences::default();
             return Ok(());
         };
+        if chords::reset(self, path) {
+            return Ok(());
+        }
         // These maps have no stored defaults; removing an override restores the fallback.
         match keyed(path) {
             Some(("shortcuts", id)) => {

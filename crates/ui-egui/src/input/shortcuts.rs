@@ -561,6 +561,10 @@ fn handle_modal_canvas_keys(app: &mut PhotocraftApp, ctx: &egui::Context, focus:
     // focused text field keeps its keys.
     let liquify_focus = (app.distort.liquify.is_some() || app.distort.caf.is_some()) && focus != Focus::None;
     if liquify_focus || !app.ui.dialogs.is_empty() || app.discard.is_some() {
+        // Shortcuts whose When condition asks for a dialog (`dialogOpen`) work in it.
+        if crate::keybinds::blocked::fire(app, ctx, focus) {
+            return true;
+        }
         if focus != Focus::Text {
             nav_keys(app, ctx);
         }
@@ -657,6 +661,10 @@ fn handle_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
         return;
     }
     let focus = crate::shortcut_dispatch::Focus::of(ctx);
+    // A chord (⌘K then C) takes its keys before the single-key shortcuts see them.
+    if crate::keybinds::runtime::handle(app, ctx, focus) {
+        return;
+    }
     if handle_modal_canvas_keys(app, ctx, focus) || handle_pen_and_work_path_keys(app, ctx, focus) || handle_object_tool_keys(app, ctx) {
         return;
     }
@@ -875,14 +883,14 @@ fn handle_escape_and_view_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
 fn select_tool_by_key(app: &mut PhotocraftApp, ctx: &egui::Context, pressed: &impl Fn(Key) -> bool) -> bool {
     let shift_switch = app.session.prefs().tools.use_shift_key_for_tool_switch;
     for t in Tool::ALL {
-        if !crate::tool_shortcuts::uses_default(app, t) {
+        if !crate::keybinds::gate::tool_on(app, ctx, t) {
             continue;
         }
         let Some(k) = crate::spring_tools::key_of(t.key()) else { continue };
         let cycle_shift = shift_switch && ctx.input_mut(|i| i.consume_key(Modifiers::SHIFT, k));
         if cycle_shift || pressed(k) {
             let before = app.ui.tool;
-            let group: Vec<Tool> = Tool::ALL.iter().copied().filter(|x| x.key() == t.key() && crate::tool_shortcuts::uses_default(app, *x)).collect();
+            let group: Vec<Tool> = Tool::ALL.iter().copied().filter(|x| x.key() == t.key() && crate::keybinds::gate::tool_on(app, ctx, *x)).collect();
             app.ui.tool = match group.iter().position(|x| *x == app.ui.tool) {
                 Some(i) if shift_switch && !cycle_shift => group[i],
                 Some(i) => group[(i + 1) % group.len()],

@@ -28,6 +28,7 @@ pub mod i18n;
 mod icon_data;
 pub mod icons;
 pub mod jobs_ui;
+pub mod keybinds;
 pub(crate) mod last_brush;
 pub mod links;
 pub mod menu_catalog;
@@ -333,6 +334,8 @@ pub struct PhotocraftApp {
     info_samplers: Option<panels::SamplerReadouts>,
     /// Display profile readings (#569).
     monitors: monitor_status::State,
+    /// Chords waiting for their second key (`keybinds`).
+    keybinds: keybinds::State,
     checker: Option<egui::TextureHandle>,
     drag: Option<canvas::Drag>,
     /// A Move-tool press landed on a locked layer: the first pointer move shows Photoshop's

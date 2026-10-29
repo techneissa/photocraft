@@ -123,12 +123,16 @@ pub(super) fn settings_height(available: f32, item_spacing: f32, button_height: 
     (available - (item_spacing + 8.0 + button_height + 4.0)).max(160.0)
 }
 
+/// The least width Keyboard Shortcuts keeps on a small screen: the command, key, further keys and
+/// When columns still fit.
+const SHORTCUTS_MIN_WIDTH: f32 = 820.0;
+
 /// Max dialog width for our dialogs. Preferences fills the width it is given (`available`, its
 /// resizable area).
 pub fn width(fields: &Map<String, Value>, available: f32) -> Option<f32> {
     match fields.get("__prefsui").and_then(Value::as_str)? {
         "prefs" => Some(available.max(380.0)),
-        "shortcuts" => Some(720.0),
+        "shortcuts" => Some(available.clamp(SHORTCUTS_MIN_WIDTH, 1000.0)),
         _ => Some(460.0),
     }
 }
@@ -168,6 +172,8 @@ pub fn open_shortcuts(app: &mut PhotocraftApp, tab: u64) -> u64 {
         "filter": "",
         "overrides": p.shortcuts,
         "alternates": p.alternate_shortcuts,
+        "chords": p.chords,
+        "when": p.shortcut_when,
         "sets": p.shortcut_sets,
         "activeSet": p.shortcut_set,
         "hidden": p.menus.hidden,
@@ -339,6 +345,7 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
             let mut alt: BTreeMap<String, Vec<String>> =
                 serde_json::from_value(alternates).map_err(|e| format!("alternates must map command IDs to lists of shortcuts: {e}"))?;
             let items = shortcut_items(app);
+            let when_map = super::shortcuts_when::load_map(f);
             // Newly assigned shortcuts are checked first and take theirs from any holder, custom
             // overrides included; unchanged overrides only take theirs from defaults. A
             // command's further keys (#3665) take and lose keys the same way.
@@ -366,7 +373,8 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
                     continue;
                 }
                 for (other, _, _, def) in &items {
-                    if *other == id {
+                    // A command whose condition keeps it apart from this one may share the key.
+                    if *other == id || !prefs::can_overlap(&when_map, &id, other) {
                         continue;
                     }
                     let held = match ov.get(other) {
@@ -392,6 +400,7 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
                     }
                 }
             }
+            let (chords, when) = super::shortcuts_chord::at_ok(f);
             let hidden = f.get("hidden").cloned().unwrap_or(json!([]));
             let colors = f.get("colors").cloned().unwrap_or(json!({}));
             let toolbar = f.get("toolbarHidden").cloned().unwrap_or(json!([]));
@@ -399,7 +408,7 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
             let active = f.get("activeSet").cloned().unwrap_or(json!(""));
             app.run(
                 "edit.keyboardShortcuts",
-                json!({"reset": true, "set": ov, "alternates": alt, "allowUnknown": true, "removeConflicts": false, "sets": sets, "activeSet": active}),
+                json!({"reset": true, "set": ov, "alternates": alt, "chords": chords, "when": when, "allowUnknown": true, "removeConflicts": false, "sets": sets, "activeSet": active}),
             )?;
             app.run("prefs.set", json!({"values": {"menus": {"hidden": hidden, "colors": colors}, "toolbar": {"hidden": toolbar}}}))
         }

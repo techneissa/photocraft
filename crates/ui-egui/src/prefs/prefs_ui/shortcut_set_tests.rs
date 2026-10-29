@@ -178,7 +178,7 @@ fn the_set_dropdown_keeps_action_function_keys_like_use_set() {
     h.state_mut().session.edit_prefs(|p| {
         let b = photocraft_engine::shortcut_sets::ShortcutSet {
             shortcuts: [("actions.play:Sepia".to_string(), "F5".to_string()), ("layer.renameLayer".to_string(), "F2".to_string())].into(),
-            alternate_shortcuts: Default::default(),
+            ..Default::default()
         };
         p.shortcut_sets.insert("B".into(), b);
     });

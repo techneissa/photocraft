@@ -47,6 +47,12 @@ pub fn take_log(ctx: &egui::Context) -> Vec<(String, Outcome)> {
 /// (`tools.defaultColors` / `tools.swapColors`) and the fill keys are commands like any other, so
 /// their overrides apply. Held temporary tools (Space…) are not here: see [`crate::hold_keys`].
 pub fn bindings(app: &PhotocraftApp) -> Vec<(String, KeyboardShortcut)> {
+    bindings_in(app, None)
+}
+
+/// [`bindings`] for one moment: with `cx`, a command whose When condition does not hold in it has
+/// no binding (its key goes to the next command that has it, or to none).
+pub fn bindings_in(app: &PhotocraftApp, cx: Option<&crate::keybinds::when::Context>) -> Vec<(String, KeyboardShortcut)> {
     let prefs = app.session.prefs();
     let action_ids: Vec<String> = app.session.actions.list.iter().map(|a| crate::actions::shortcut_id(&a.name)).collect();
     let actions = action_ids.iter().map(|id| (id.as_str(), prefs.shortcut(id, None).map(str::to_string)));
@@ -106,6 +112,9 @@ pub fn bindings(app: &PhotocraftApp) -> Vec<(String, KeyboardShortcut)> {
     let mut all: Vec<(String, KeyboardShortcut)> = Vec::new();
     for (id, sc, _) in candidates {
         let Some(sc) = sc.as_deref().and_then(parse) else { continue };
+        if cx.is_some_and(|cx| !crate::keybinds::gate::holds(app, cx, id)) {
+            continue;
+        }
         if !all.iter().any(|(_, b)| *b == sc) {
             all.push((id.to_string(), sc));
         }
@@ -232,8 +241,11 @@ pub fn dispatch_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, focus: Foc
         return false;
     }
     const TEXT_OWNED: [&str; 6] = ["edit.copy", "edit.cut", "edit.paste", "edit.copyMerged", "select.all", "edit.pasteSpecial.pasteInPlace"];
-    let table: Vec<(String, KeyboardShortcut)> =
-        bindings(app).into_iter().filter(|(id, sc)| focus.allows(sc) && !(editing && TEXT_OWNED.contains(&id.as_str()))).collect();
+    let cx = crate::keybinds::context::read(app, focus);
+    let table: Vec<(String, KeyboardShortcut)> = bindings_in(app, Some(&cx))
+        .into_iter()
+        .filter(|(id, sc)| (focus.allows(sc) || crate::keybinds::blocked::wants(app, &cx, id)) && !(editing && TEXT_OWNED.contains(&id.as_str())))
+        .collect();
     let command = |e: &egui::Event| match e {
         egui::Event::Key { key, physical_key, pressed: true, modifiers, .. } => {
             let by_position = physical_key
@@ -344,7 +356,7 @@ pub fn disabled_reason(app: &PhotocraftApp, id: &str) -> String {
     )
 }
 
-fn label(id: &str) -> String {
+pub(crate) fn label(id: &str) -> String {
     crate::menu_catalog::CATALOG
         .iter()
         .find(|c| c.3 == id)

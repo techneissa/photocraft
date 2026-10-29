@@ -171,9 +171,9 @@ pub fn parse_hex(s: &str) -> Option<[u8; 3]> {
 // ------------------------------------------------------------------ JSON paths
 
 /// Map keys that are command ids (which contain dots): `shortcuts.<id>`,
-/// `alternateShortcuts.<id>`, `menus.colors.<id>`.
+/// `alternateShortcuts.<id>`, `chords.<id>`, `shortcutWhen.<id>`, `menus.colors.<id>`.
 pub(super) fn keyed(path: &str) -> Option<(&str, &str)> {
-    for prefix in ["shortcuts.", "alternateShortcuts.", "menus.colors."] {
+    for prefix in ["shortcuts.", "alternateShortcuts.", "chords.", "shortcutWhen.", "menus.colors."] {
         if let Some(id) = path.strip_prefix(prefix) {
             return Some((&prefix[..prefix.len() - 1], id));
         }

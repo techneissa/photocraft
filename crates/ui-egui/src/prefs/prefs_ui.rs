@@ -83,8 +83,11 @@ mod dialogs;
 mod fields;
 mod graphics;
 mod save;
+mod shortcut_target;
 mod shortcuts;
-mod shortcuts_open;
+mod shortcuts_backup;
+mod shortcuts_chord;
+mod shortcuts_when;
 mod startup;
 
 #[cfg(test)]
@@ -108,10 +111,11 @@ pub(crate) use save::save_preferences;
 #[cfg(test)]
 use save::{SAVE_RETRY_MAX_S, SAVE_RETRY_S, merge_changes, persist};
 pub use save::{autosave_now, tick};
+/// The one entry point for Assign Shortcut…: the dialog on a command with capture on.
+pub use shortcut_target::open_shortcuts_for;
 #[cfg(test)]
 pub(crate) use shortcuts::capture_key_press;
 pub use shortcuts::{is_modifier_key, reserved_shortcut, shortcut_items, shortcut_text};
-pub(crate) use shortcuts_open::open_shortcuts_for;
 pub use startup::load;
 pub(crate) use startup::{on_recovery_event, remember_rulers};
 
@@ -124,6 +128,8 @@ mod recovery_tests;
 mod shortcut_capture_tests;
 #[cfg(test)]
 mod shortcut_set_tests;
+#[cfg(test)]
+mod shortcuts_upgrade_tests;
 
 #[cfg(test)]
 mod tests;
