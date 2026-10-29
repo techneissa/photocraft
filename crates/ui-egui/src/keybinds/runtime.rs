@@ -83,13 +83,20 @@ pub fn poll(app: &mut PhotocraftApp, ctx: &egui::Context, focus: Focus) -> Poll 
     let focus = leader_focus(app, focus);
     let cx = context::read(app, focus);
     let chords = gate::chords_in(app, &cx);
-    let leader =
-        presses.iter().find_map(|(key, mods)| chords.iter().map(|(_, [first, _])| *first).find(|first| focus.allows(first) && key_matches(first, *key, *mods)));
+    let leader = presses.iter().find_map(|(key, mods)| {
+        chords.iter().find(|(id, [first, _])| arms(app, focus, id) && focus.allows(first) && key_matches(first, *key, *mods)).map(|(_, [first, _])| *first)
+    });
     let Some(first) = leader else { return Poll::Pass };
     consume_keys(ctx);
     app.keybinds.pending = Some(Pending { first, since: now });
     ctx.request_repaint_after(std::time::Duration::try_from_secs_f64(TIMEOUT + 0.05).unwrap_or_default());
     Poll::Swallow
+}
+
+/// Whether the chord of `id` may start with the keyboard where `focus` says. A text field keeps its
+/// keys (⌘K then `c` types the `c` there) unless the chord's condition asks for `textFocus`.
+fn arms(app: &PhotocraftApp, focus: Focus, id: &str) -> bool {
+    focus != Focus::Text || photocraft_engine::prefs::when_of(&app.session.prefs().shortcut_when, id).is_some_and(|e| e.mentions(super::when::keys::TEXT_FOCUS))
 }
 
 /// A chord may wait while nothing modal owns the keyboard: no dialog, prompt or warp.

@@ -254,3 +254,45 @@ fn every_tool_has_a_value_in_the_tool_key() {
         assert_eq!(format!("tools.select.{}", cx.value_name(super::when::keys::TOOL)), name, "{t:?}");
     }
 }
+
+/// One frame with a text box drawn (and focused from the first), then the keys through the key pass.
+fn typing_frame(app: &mut PhotocraftApp, ctx: &egui::Context, time: f64, events: Vec<Event>, text: &mut String) {
+    ctx.begin_pass(egui::RawInput { events, time: Some(time), ..Default::default() });
+    let id = egui::Id::unique("pc-test-text");
+    egui::Area::new(egui::Id::unique("pc-test-area")).show(ctx, |ui| {
+        let r = ui.add(egui::TextEdit::singleline(text).id(id));
+        r.request_focus();
+    });
+    crate::shortcuts::handle(app, ctx);
+    ctx.end_pass().textures_delta.clear();
+}
+
+#[test]
+fn a_leader_does_not_eat_typing_in_a_text_box() {
+    let ctx = egui::Context::default();
+    let mut app = with_chords(&[("tools.select.brush", "Cmd+K C")]);
+    let mut text = String::new();
+    typing_frame(&mut app, &ctx, 1.0, vec![], &mut text);
+    typing_frame(&mut app, &ctx, 1.1, vec![], &mut text);
+    assert!(ctx.text_edit_focused(), "the box has the keyboard");
+    typing_frame(&mut app, &ctx, 1.2, vec![press(Key::K, Modifiers::COMMAND)], &mut text);
+    assert!(app.keybinds.pending.is_none(), "⌘K did not arm the chord inside a text box");
+    // the letter after it still reaches the box: the key pass leaves it in the frame's events
+    ctx.begin_pass(egui::RawInput { events: vec![press(Key::C, Modifiers::NONE), Event::Text("c".into())], time: Some(1.3), ..Default::default() });
+    egui::Area::new(egui::Id::unique("pc-test-area")).show(&ctx, |ui| _ = ui.add(egui::TextEdit::singleline(&mut text).id(egui::Id::unique("pc-test-text"))));
+    crate::shortcuts::handle(&mut app, &ctx);
+    assert!(ctx.input(|i| i.events.iter().any(|e| matches!(e, Event::Text(t) if t == "c"))), "the c is left for the field");
+    ctx.end_pass().textures_delta.clear();
+}
+
+#[test]
+fn a_chord_that_asks_for_text_focus_may_start_in_a_text_box() {
+    let ctx = egui::Context::default();
+    let mut app = with_chords(&[("tools.select.brush", "Cmd+K C")]);
+    set_when(&mut app, "tools.select.brush", "textFocus");
+    let mut text = String::new();
+    typing_frame(&mut app, &ctx, 1.0, vec![], &mut text);
+    typing_frame(&mut app, &ctx, 1.1, vec![], &mut text);
+    typing_frame(&mut app, &ctx, 1.2, vec![press(Key::K, Modifiers::COMMAND)], &mut text);
+    assert!(app.keybinds.pending.is_some());
+}
