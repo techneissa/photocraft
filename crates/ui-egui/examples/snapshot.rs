@@ -22,6 +22,8 @@
 //! `--right-click-at X,Y` opens a screen-space context menu after the script, including panel
 //! and document-tab menus that are outside the document-coordinate control pointer.
 //! `--click-at X,Y` opens a screen-space menu (for example the top Select menu) after the script.
+//! `--hover-at X,Y` leaves the pointer there without a click, for what a tool shows under it (the
+//! brush outline, the Clone Source overlay).
 //! `--type TEXT` then types TEXT (into an open dropdown list, to see its search).
 
 use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
@@ -169,6 +171,10 @@ fn main() {
         harness.event(egui::Event::PointerButton { pos, button, pressed: true, modifiers: egui::Modifiers::NONE });
         harness.step();
         harness.event(egui::Event::PointerButton { pos, button, pressed: false, modifiers: egui::Modifiers::NONE });
+        harness.run_steps(4);
+    }
+    if let Some((x, y)) = arg(&args, "--hover-at").and_then(|s| s.split_once(',').and_then(|(x, y)| Some((x.parse::<f32>().ok()?, y.parse::<f32>().ok()?)))) {
+        harness.event(egui::Event::PointerMoved(egui::pos2(x, y)));
         harness.run_steps(4);
     }
     if let Some(text) = arg(&args, "--type") {

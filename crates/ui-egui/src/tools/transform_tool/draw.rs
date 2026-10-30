@@ -102,7 +102,7 @@ pub fn draw_content(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
     if pv.live.is_some() && pv.content_aware.is_none() {
         // The canvas composites the moving layer itself, in its place in the stack with its
         // blend mode and style (transform_live.rs): only the box is drawn here.
-    } else if let Some(h) = Homography::rect_to_quad([0.0, 0.0, 1.0, 1.0], t.quad) {
+    } else if let Some(h) = Homography::rect_to_quad([0.0, 0.0, 1.0, 1.0], texture_quad(t, pv)) {
         // A 24×24 grid keeps perspective previews straight.
         let n = 24;
         let zoom = xf.zoom * painter.ctx().pixels_per_point();
@@ -137,6 +137,18 @@ pub fn draw_content(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
     if let Some(a) = pv.above.as_ref().filter(|_| pv.live.is_none()) {
         a.draw(painter, xf, display);
     }
+}
+
+/// Where the box puts the moving texture's corners: the box's own, or, when the texture covers
+/// more than the frame (the styles of a box over several layers reach past it, [`Several`]),
+/// where the frame's transform takes the texture's rect.
+pub(super) fn texture_quad(t: &TransformSession, pv: &TransformPreview) -> [[f64; 2]; 4] {
+    let Some(sv) = pv.several.as_ref().filter(|sv| sv.rect != sv.frame) else { return t.quad };
+    let Some(h) = Homography::rect_to_quad(t.rect, t.quad) else { return t.quad };
+    corners([sv.rect.x0, sv.rect.y0, sv.rect.x1, sv.rect.y1].map(f64::from)).map(|[x, y]| {
+        let (a, b) = h.apply(x, y);
+        [a, b]
+    })
 }
 
 /// The box, handles, reference point and path outline over the preview that [`draw_content`]
