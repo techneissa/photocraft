@@ -450,6 +450,7 @@ pub(crate) fn find_subject_region(
 }
 
 fn select_subject(s: &mut Session, p: &Value) -> Result<Value> {
+    // The selected layer's pixels; the composite only when no pixel layer is selected.
     let all_layers = b(p, "sampleAllLayers", false);
     let m = mode(p, "replace");
     let engine = engine_param(s, p)?;

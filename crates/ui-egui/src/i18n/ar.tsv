@@ -3564,3 +3564,9 @@ curves	Smooth	تنعيم
 	Confirm remove	تأكيد الإزالة
 	subject segmentation (BiRefNet-lite)	تجزئة الموضوع (BiRefNet-lite)
 	inpainting (LaMa)	ملء الصورة (LaMa)
+
+# Select and Mask target ownership diagnostics (#8896 integration)
+
+	The path was kept as the Work Path	تم الاحتفاظ بالمسار كمسار عمل
+	The path was discarded	تم تجاهل المسار
+	Edit Brush…	تحرير الفرشاة…
