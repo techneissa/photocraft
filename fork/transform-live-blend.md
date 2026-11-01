@@ -29,4 +29,4 @@ cargo test -p photocraft-ui-egui --lib -- liquify_ui rasterize_prompt distort_ui
 
 ## When upstream merges
 
-**When upstream merges #8216:** if by merge commit, git sees it as already merged; if squashed, the merge conflicts in the files below: keep upstream's version where it matches and do not cherry-pick #8216 again.
+**When upstream merges #8216:** if by merge commit, git sees it as already merged; if squashed, the merge conflicts in the files under Own files and Hooks: keep upstream's version where it matches and do not cherry-pick #8216 again.

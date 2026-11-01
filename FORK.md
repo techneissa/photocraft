@@ -23,25 +23,7 @@ Fork CI (Linux) keeps checking the official changes.
 The script is `update-craft.sh` in the same folder, shared by every ArtCraft app; it keeps your edits in any
 app whose repo has a `custom` branch.
 
-## GitHub builds the app
-
-The workflow `.github/workflows/fork-build.yml` (Actions ▸ Fork build) runs daily, on every push to `custom`, and
-by hand. It merges the official update into `custom` the same way the script does, builds the Mac app with the
-fonts of the official release (craft-fonts at `release.yml`'s `craft-fonts-ref`), and publishes it as the release
-[`custom-build`](https://github.com/techneissa/photocraft/releases/tag/custom-build) (its notes name the commit).
-The update script downloads it (above). A run that hits a merge clash fails and changes nothing; GitHub emails the
-failure. The run pushes its merge with the secret `FORK_PUSH_TOKEN`, the fine-grained token "BuildCraft forks"
-(Contents and Workflows: read and write): GitHub's own token may not push an official update that changes a
-workflow file. Without the secret it uses GitHub's own token.
-
-The workflow `.github/workflows/fork-ci.yml` (Actions ▸ Fork CI) runs the official CI (`ci.yml`, `cargo xtask ci` on
-Linux) on `custom` after every push to it, the daily merge included, so the full suite runs on GitHub and not on
-this Mac (the fork is public, so GitHub's runners are free). The official `CI` workflow must stay enabled on the fork
-for it (`gh workflow enable CI -R techneissa/photocraft`).
-
-The official project's other workflows (Docs, FreeBSD, Nix, Packaging lint, Perf nightly, Release, SonarCloud,
-Windows arm64) are switched off in this fork: the official project runs them. A workflow the official project
-adds later starts switched on; switch it off in Actions unless it is wanted here.
+GitHub builds the app from `custom` (Fork build) and runs the official CI on it (Fork CI): [fork/github-builds.md](fork/github-builds.md).
 
 ## Where things are
 
@@ -74,10 +56,7 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
    (techneissa, 2026-10-29: the same tests ran several times per feature and loaded the Mac). The official CI runs on
    Linux, so macOS-only tests (`macvision`, the real-Vision tests) run only in a lane's own filtered tests.
 4. `git switch custom && git merge --no-ff feat/<name>`, then `git push mine custom feat/<name>`.
-5. Write `fork/<slug>.md` with the headings What it does / Branch / Own files / Hooks in official files / Tests /
-   When upstream merges (only for a feature that took an upstream PR early), add its line to "The features" below and
-   its test commands to `fork/tests.sh`, then run `update-photocraft.sh` to install it. FORK.md itself never holds a
-   feature's details.
+5. Write `fork/<slug>.md` (headings as in the other files), add its line below and its tests to `fork/tests.sh`; then run `update-photocraft.sh`. FORK.md never holds a feature's details.
 
 ## The features
 
@@ -104,15 +83,13 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
 - [Preferences scroll width](fork/prefs-scroll-width.md): Preferences lists fill the window, the Toolbar tab fits 1–4 columns, Keyboard Shortcuts keeps its width while searching. Branch `fix/prefs-scroll-width`, `fix/shortcuts-tabs-layout`, `fix/shortcuts-search-width`.
 - [Context menus page size](fork/context-menus-resize.md): the Context Menus page keeps the size the Preferences window is dragged to. Branch `fix/context-menus-resize`.
 - [Arabic AI Models text](fork/arabic-ai-models.md): Arabic text for the AI Models page. Branch `custom`.
+- [Place Photos](fork/place-photos.md): Place Embedded on ⇧⌘P, several photos at once, a Place Photo button in the Layers panel. Branch `feat/place-photos`.
 
 To find which feature owns an official file: `grep -l '<path>' fork/*.md`.
 
 Every feature also has a row in `docs/parity-checklist.md` when it adds commands; clashes there are fixed by the
 update script (both sides kept).
 
-The tests of every feature, after a merge:
+The tests of every feature, after a merge: run `fork/tests.sh`.
 
-Run `fork/tests.sh` (every feature's tests).
-
-- [Open as Layers interface (for LightCraft)](fork/open-as-layers-interface.md)
-- [Known failures on this Mac (not caused by the fork)](fork/known-failures.md)
+More: [GitHub builds](fork/github-builds.md), [Open as Layers interface (for LightCraft)](fork/open-as-layers-interface.md), [Known failures on this Mac](fork/known-failures.md).

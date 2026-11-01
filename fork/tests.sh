@@ -20,3 +20,4 @@ cargo test -p photocraft-ui-egui --lib -- liquify_ui rasterize_prompt distort_ui
 cargo test -p photocraft-engine --lib -- layer_copy_cmds
 cargo test -p photocraft-engine --test it -- smart_clipboard_sources
 cargo test -p photocraft-ui-egui --lib -- duplicate_layer_ui
+cargo test -p photocraft-ui-egui --lib -- place_photos file_dialog

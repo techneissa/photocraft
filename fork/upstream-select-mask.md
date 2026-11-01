@@ -27,4 +27,4 @@ cargo test -p photocraft-ui-egui --lib -- liquify_ui rasterize_prompt distort_ui
 
 ## When upstream merges
 
-**When upstream merges #10469, #10375, #6734 or #9304:** by merge commit git sees it as merged; if squashed, the merge conflicts in the files below: keep upstream's version and do not cherry-pick again. #10375 conflicted once with main (`edit_cmds.rs`: `Clip.components: None` added to its masked-layer arm and its `copy(s, false, false)` signature)
+**When upstream merges #10469, #10375, #6734 or #9304:** by merge commit git sees it as merged; if squashed, the merge conflicts in the files under Own files and Hooks: keep upstream's version and do not cherry-pick again. #10375 conflicted once with main (`edit_cmds.rs`: `Clip.components: None` added to its masked-layer arm and its `copy(s, false, false)` signature)
