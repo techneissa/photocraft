@@ -5852,7 +5852,7 @@ version = "0.19.0"
 
 [[package]]
 name = "photocraft-macvision"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "image",
  "objc2 0.6.5",
@@ -5866,7 +5866,7 @@ dependencies = [
 
 [[package]]
 name = "photocraft-ml"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "image",
  "reqwest",
@@ -5951,7 +5951,7 @@ dependencies = [
 
 [[package]]
 name = "photocraft-sam3"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "candle-core",
  "candle-nn",

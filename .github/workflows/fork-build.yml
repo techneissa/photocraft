@@ -83,6 +83,25 @@ jobs:
               git add -A docs
               git commit --no-edit
             fi
+            # The fork's own crates (version.workspace) keep the old version in Cargo.lock after an
+            # official release bumps it, and the --locked build then stops: refresh their lines.
+            python3 - <<'PY'
+          import re
+          ver = re.search(r'\[workspace\.package\][^\[]*?\nversion = "([^"]+)"', open('Cargo.toml').read()).group(1)
+          lock = open('Cargo.lock').read()
+          def fix(m):
+              block = m.group(0)
+              if 'source = ' in block or not m.group(1).startswith('photocraft'):
+                  return block
+              return re.sub(r'^version = "[^"]+"', f'version = "{ver}"', block, count=1, flags=re.M)
+          new = re.sub(r'\[\[package\]\]\nname = "([^"]+)"\n.*?(?=\n\[\[package\]\]|\Z)', fix, lock, flags=re.S)
+          if new != lock:
+              open('Cargo.lock', 'w').write(new)
+          PY
+            if ! git diff --quiet Cargo.lock; then
+              git add Cargo.lock
+              git commit -m "Cargo.lock: the fork's crates follow the workspace version"
+            fi
             git push origin HEAD:custom
           fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
