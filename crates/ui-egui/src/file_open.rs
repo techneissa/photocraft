@@ -40,6 +40,8 @@ pub(crate) enum DropPlace {
     /// Read by the shell itself (the browser reads dropped files asynchronously): its name and
     /// contents, delivered through [`Services::place_inbox`](crate::Services::place_inbox).
     Bytes(String, Vec<u8>),
+    /// Chosen in File › Place Embedded's picker (desktop): an absolute path, read when its turn comes.
+    Path(String),
 }
 
 /// `warnings` from an import, plus one for each font family the active document's type uses that
@@ -322,6 +324,7 @@ impl PhotocraftApp {
                     let placed = crate::read_dropped(&*f).and_then(|bytes| self.place_bytes(&name, bytes, None));
                     (name, placed)
                 }
+                DropPlace::Path(path) => (display_name(&path), self.run("file.placeEmbedded", serde_json::json!({"path": path}))),
                 DropPlace::Bytes(name, bytes) => {
                     let placed = self.place_bytes(&name, bytes, None);
                     (name, placed)

@@ -388,7 +388,7 @@ pub(crate) fn last_used_dir(recent: &[String]) -> Option<String> {
 }
 
 /// The name and bytes of the single file an open dialog answered with.
-fn read_picked(answer: FileDialogAnswer, max: usize) -> Result<(String, Vec<u8>), String> {
+pub(crate) fn read_picked(answer: FileDialogAnswer, max: usize) -> Result<(String, Vec<u8>), String> {
     let too_big = |name: &str| format!("{}: too big (more than {} KiB)", display_name(name), max / 1024);
     match answer {
         FileDialogAnswer::Contents(name, bytes) if bytes.len() > max => Err(too_big(&name)),

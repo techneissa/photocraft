@@ -125,6 +125,8 @@ pub static ICONS: &[(&str, &[u8])] = &[
     ("pipette", include_bytes!("../../../assets/icons/pipette.svg")),
     ("play", include_bytes!("../../../assets/icons/play.svg")),
     ("pause", include_bytes!("../../../assets/icons/pause.svg")),
+    // PhotoCraft original: the Layers panel's Place Photo button (a picture frame with a plus).
+    ("place-photo", include_bytes!("../../../assets/icons/place-photo.svg")),
     ("plus", include_bytes!("../../../assets/icons/plus.svg")),
     ("pointer", include_bytes!("../../../assets/icons/pointer.svg")),
     ("quick-selection", include_bytes!("../../../assets/icons/quick-selection.svg")),
