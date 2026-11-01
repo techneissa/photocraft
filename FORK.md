@@ -119,6 +119,8 @@ cargo test -p photocraft-engine --lib -- when chords chord_cmds shortcut_backup 
 cargo test -p photocraft-engine --test undo_redo_stress
 cargo test -p photocraft-ui-egui --lib -- close_keys start_screen layer_shortcut native_menu title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
 cargo test -p photocraft-gpu --test it live_transform
+cargo test -p photocraft-ui-egui --lib -- ai_models
+cargo test -p photocraft-cli -- models
 ```
 
 ## Open as Layers interface (for LightCraft)
