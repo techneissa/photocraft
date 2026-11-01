@@ -3,6 +3,11 @@
 The branch **`custom`** is the official PhotoCraft ([storytold/photocraft](https://github.com/storytold/photocraft))
 plus the features listed below. The installed app is built from `custom`.
 
+**Mac only.** techneissa uses this fork on macOS only. A feature or fix here must work on the Mac; Linux,
+Windows and the web build need not work (this relaxes `AGENTS.md`'s "Never break wasm" for fork code). Fork code
+that cannot build elsewhere goes behind `cfg(target_os = "macos")`, so the official code still builds there and
+Fork CI (Linux) keeps checking the official changes.
+
 ## Update the app
 
 1. In Terminal: `~/Documents/workspace/gitClones/update-photocraft.sh` (`update-craft-apps.sh` updates every
