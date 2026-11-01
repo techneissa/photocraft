@@ -26,6 +26,8 @@ mod inpaint;
 mod inpaint_detail;
 #[cfg(not(target_arch = "wasm32"))]
 mod install;
+#[cfg(not(target_arch = "wasm32"))]
+mod marker;
 mod ram;
 mod resize;
 mod segment;
@@ -37,7 +39,9 @@ pub use inpaint::{INPAINT_SIZE, inpaint, inpaint_with};
 pub use install::{download, remove};
 pub use ram::{check_memory, min_total_memory, physical_memory};
 pub use segment::{SEGMENT_SIZE, segment_subject, segment_subject_with};
-pub use store::{Located, MODELS_DIR_VAR, Model, ModelFile, Source, disable_models, install_dir, model_location, model_path, models_dir, models_disabled};
+pub use store::{
+    Located, MODELS_DIR_VAR, Model, ModelFile, Source, disable_models, install_dir, model_location, model_path, model_present, models_dir, models_disabled,
+};
 
 use std::fmt;
 

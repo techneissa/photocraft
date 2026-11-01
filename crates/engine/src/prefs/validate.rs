@@ -90,6 +90,7 @@ pub fn choices(path: &str) -> Option<&'static [&'static str]> {
         "cursors.other" => OtherCursor::NAMES,
         "tools.rightClickWithPaintingTools" => RightClickPaint::NAMES,
         "tools.selectSubjectEngine" => super::SubjectEngine::NAMES,
+        "tools.objectSelectionEngine" => super::ObjectEngine::NAMES,
         "transparencyAndGamut.gridSize" => CheckerSize::NAMES,
         "transparencyAndGamut.gridColors" => CheckerColors::NAMES,
         "unitsAndRulers.rulers" | "guidesGridAndSlices.gridUnit" => Unit::NAMES,

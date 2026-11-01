@@ -5737,6 +5737,7 @@ dependencies = [
  "photocraft-psd",
  "photocraft-raster",
  "photocraft-raw",
+ "photocraft-sam3",
  "photocraft-testkit",
  "photocraft-text",
  "photocraft-vector",
@@ -5950,7 +5951,7 @@ dependencies = [
 
 [[package]]
 name = "photocraft-sam3"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "candle-core",
  "candle-nn",

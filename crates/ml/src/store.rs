@@ -208,6 +208,11 @@ fn user_models_dir(app: &str) -> Option<PathBuf> {
     }
 }
 
+/// `<app data folder>/<app>`: the folder above [`user_models_dir`]'s.
+pub(crate) fn app_data_dir(app: &str) -> Option<PathBuf> {
+    user_models_dir(app)?.parent().map(Path::to_path_buf)
+}
+
 /// The models folder new downloads go into: `PHOTOCRAFT_MODELS_DIR`, else the shared folder
 /// (`~/Library/Application Support/ArtCraft/models`). Models are in its `<model-id>/` folders.
 /// `None` when no home folder is known (or in the browser).
@@ -241,6 +246,22 @@ pub fn model_location(model: Model) -> Option<Located> {
         return None;
     }
     Roots::current().locate(model.id(), model.files())
+}
+
+/// Whether `model` seems to be installed: every file of it is in a models folder at the published
+/// size. Looks at sizes only, so it answers at once even for SAM 3's 3.4 GB (the SHA-256 check of
+/// [`model_location`] takes seconds the first time); the model's loader still goes through
+/// [`model_location`]. `false` while [`models_disabled`].
+pub fn model_present(model: Model) -> bool {
+    if models_disabled() {
+        return false;
+    }
+    let files = model.files();
+    !files.is_empty()
+        && Roots::current()
+            .candidates(model.id())
+            .into_iter()
+            .any(|(dir, _)| files.iter().all(|f| std::fs::metadata(dir.join(f.name)).is_ok_and(|m| m.len() == f.size)))
 }
 
 /// The first file of the installed `model`, if it is installed (see [`model_location`]).
@@ -289,7 +310,19 @@ fn hash_ok(p: &Path, file: &ModelFile, meta: &std::fs::Metadata) -> bool {
     {
         return ok;
     }
-    let ok = std::fs::File::open(p).is_ok_and(|mut f| crate::install::verify(&mut f, file.size, file.sha256).is_ok());
+    // A big file that passed the check in an earlier process is not hashed again while nothing
+    // about it has changed (`marker.rs`).
+    let big = meta.len() >= crate::marker::MIN_SIZE;
+    let marker = big.then(crate::marker::marker_path).flatten();
+    let stamp = marker.is_some().then(|| crate::marker::Stamp::of(p, meta, file.sha256)).flatten();
+    let remembered = matches!((&marker, &stamp), (Some(m), Some(s)) if crate::marker::recorded(m, s));
+    let ok = remembered || std::fs::File::open(p).is_ok_and(|mut f| crate::install::verify(&mut f, file.size, file.sha256).is_ok());
+    if ok
+        && !remembered
+        && let (Some(m), Some(s)) = (&marker, stamp)
+    {
+        crate::marker::record(m, s);
+    }
     if let Ok(mut map) = seen.lock() {
         map.insert(p.to_path_buf(), (version, ok));
     }

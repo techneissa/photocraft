@@ -158,6 +158,7 @@ impl Session {
             self.cancel_jobs_on(id);
             self.subject_cache.forget_doc(id);
             self.object_finder.forget_doc(id);
+            self.sam3_forget_doc(id);
         }
         let d = self.docs.remove(index);
         self.open_document_order.retain(|&id| id != d.doc.id);
