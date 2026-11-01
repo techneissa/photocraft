@@ -104,7 +104,13 @@ fn click_and_text_masks_from_the_real_model() {
         let t = Instant::now();
         let boxed = service.boxed(handle, around, &[]).expect("box");
         let (covered, precision) = overlap(&boxed);
-        eprintln!("box (run {run}): {:?}, score {:.2}, covers {:.0}% of the disc, {:.0}% of the mask is the disc", t.elapsed(), boxed.score, covered * 100.0, precision * 100.0);
+        eprintln!(
+            "box (run {run}): {:?}, score {:.2}, covers {:.0}% of the disc, {:.0}% of the mask is the disc",
+            t.elapsed(),
+            boxed.score,
+            covered * 100.0,
+            precision * 100.0
+        );
         assert!(covered > 0.8 && precision > 0.8, "the box mask is the disc: {covered} / {precision}");
     }
 

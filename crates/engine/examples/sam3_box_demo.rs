@@ -47,7 +47,7 @@ fn main() -> Result<(), String> {
         return Err(format!("SAM 3 is not ready: {status:?}"));
     }
     for run in 0..2 {
-        s.execute("select.deselect", json!({})).map_err(|e| e.to_string())?;
+        let _ = s.execute("select.deselect", json!({}));
         let t = Instant::now();
         let r = s.execute("select.object", json!({"rect": rect})).map_err(|e| e.to_string())?;
         println!("SAM 3 rectangle (run {run}): {} ({r})", ms(t.elapsed()));
@@ -55,7 +55,7 @@ fn main() -> Result<(), String> {
     write_picture(&s, &format!("{prefix}-sam3.ppm"))?;
 
     // Select Subject with SAM 3 on the shared encoding, then in a fresh session (it encodes itself).
-    s.execute("select.deselect", json!({})).map_err(|e| e.to_string())?;
+    let _ = s.execute("select.deselect", json!({}));
     let t = Instant::now();
     let r = s.execute("select.subject", json!({"engine": "sam3"})).map_err(|e| e.to_string())?;
     println!("Select Subject with SAM 3, encoding ready: {} ({r})", ms(t.elapsed()));
@@ -65,7 +65,7 @@ fn main() -> Result<(), String> {
     let r = fresh.execute("select.subject", json!({"engine": "sam3"})).map_err(|e| e.to_string())?;
     println!("Select Subject with SAM 3, from nothing (load, encode, text): {} ({r})", ms(t.elapsed()));
     write_picture(&fresh, &format!("{prefix}-subject.ppm"))?;
-    fresh.execute("select.deselect", json!({})).map_err(|e| e.to_string())?;
+    let _ = fresh.execute("select.deselect", json!({}));
     let t = Instant::now();
     fresh.execute("select.subject", json!({"engine": "sam3"})).map_err(|e| e.to_string())?;
     println!("Select Subject with SAM 3, second time (model loaded, picture encoded again): {}", ms(t.elapsed()));

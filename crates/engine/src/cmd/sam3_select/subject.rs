@@ -34,12 +34,6 @@ pub(crate) struct SubjectSam3 {
 }
 
 impl SubjectSam3 {
-    /// A backend that cannot run, with `note` (tests).
-    #[cfg(test)]
-    pub(crate) fn refused(backend: Arc<dyn Sam3Backend>, note: &'static str) -> Self {
-        Self { backend, refusal: Some(note), ready: None }
-    }
-
     /// Why SAM 3 cannot run, if it cannot.
     pub(crate) fn refusal(&self) -> Option<&'static str> {
         self.refusal

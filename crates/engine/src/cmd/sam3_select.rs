@@ -42,9 +42,9 @@ mod boxed;
 mod mask;
 mod subject;
 
+pub use backend::{EncodedImage, Mask, PointBox, PointClick, Sam3Backend};
 pub(crate) use boxed::{BoxRequest, select_box};
 pub(crate) use subject::{SubjectSam3, failure_note};
-pub use backend::{EncodedImage, Mask, PointBox, PointClick, Sam3Backend};
 
 /// The note for an explicit `sam3` choice with no model installed.
 pub const NOT_INSTALLED: &str = "SAM 3 not installed, used Classic (Preferences › AI Models)";

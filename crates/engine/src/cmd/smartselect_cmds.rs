@@ -454,7 +454,8 @@ pub(crate) struct Subject {
 pub(crate) fn engine_param(s: &Session, p: &Value) -> Result<SubjectEngine> {
     let Some(name) = p.get("engine") else { return Ok(s.prefs().tools.select_subject_engine) };
     let name = name.as_str().ok_or_else(|| bad("select.subject", "\"engine\" is a string"))?;
-    SubjectEngine::parse(if name == "classical" { "classic" } else { name }).ok_or_else(|| bad("select.subject", "\"engine\" is auto, macos, model, sam3 or classic"))
+    SubjectEngine::parse(if name == "classical" { "classic" } else { name })
+        .ok_or_else(|| bad("select.subject", "\"engine\" is auto, macos, model, sam3 or classic"))
 }
 
 /// Finds the subject in `area` of `doc` with the engine chosen. `auto` tries the Mac's cutout, then

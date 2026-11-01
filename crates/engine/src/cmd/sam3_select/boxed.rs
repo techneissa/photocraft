@@ -30,14 +30,15 @@ pub(crate) fn select_box(s: &mut Session, req: &BoxRequest) -> Result<Attempt> {
     };
     let Some(rect) = super::mask::normalise_box(canvas, step, (image.w, image.h), req.rect) else { return Ok(Attempt::Classic(None)) };
     let backend = s.sam3.backend();
-    let region = match backend.boxed(image, rect, &[]).map_err(|e| e.to_string()).and_then(|m| super::mask::to_region(&m, canvas, step).map_err(|e| e.to_string())) {
-        Ok(region) => region,
-        Err(_) => {
-            // The image was freed, the model failed or has no box prompt: Classic answers.
-            s.sam3.clear();
-            return Ok(Attempt::Classic(Some(FAILED)));
-        }
-    };
+    let region =
+        match backend.boxed(image, rect, &[]).map_err(|e| e.to_string()).and_then(|m| super::mask::to_region(&m, canvas, step).map_err(|e| e.to_string())) {
+            Ok(region) => region,
+            Err(_) => {
+                // The image was freed, the model failed or has no box prompt: Classic answers.
+                s.sam3.clear();
+                return Ok(Attempt::Classic(Some(FAILED)));
+            }
+        };
     let Some(region) = region else {
         // Nothing found in the rectangle: the selection (and History) stay as they are.
         let selected = s.active().ok_or(EngineError::NoDocument)?.doc.selection.is_some();
