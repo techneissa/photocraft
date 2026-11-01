@@ -87,6 +87,7 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
 - [SAM 3](fork/sam3.md): LightCraft's SAM 3 model code, click and text masks, no UI yet. Branch `feat/sam3`.
 - [Refine Hair](fork/refine-hair.md): Select and Mask's Refine Hair button, closed-form matting in the edge band. Branch `feat/refine-hair`.
 - [SAM 3 click select](fork/sam3-click-select.md): Object Selection and Quick Selection select with SAM 3 (click, ⇧/⌥ refine, hover), with a Classic fallback and an engine preference. Branch `feat/sam3-click-select`.
+- [Settings sync](fork/settings-sync.md): Export Settings… / Import Settings… move every setting to another Mac in one `.pcsettings` file; the brush size in the options bar is never cut. Branch `feat/settings-sync`.
 
 To find which feature owns an official file: `grep -l '<path>' fork/*.md`.
 

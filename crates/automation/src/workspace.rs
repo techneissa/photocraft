@@ -477,6 +477,8 @@ fn command_uses_ambient_path(id: &str, params: &Value) -> bool {
         }
         // With a `path` the file is written there; without one the bytes come back as `data`.
         "actions.save" | "swatches.export" | "style.presets.exportAsl" | "layer.layerStyle.contours.save" => params.get("path").is_some(),
+        // Settings file (fork/settings-sync.md): read or written by path. Its `text` can't name a path of the computer.
+        "edit.preferences.exportSettings" | "edit.preferences.importSettings" => params.get("path").is_some(),
         // Shortcut sets: a .kys read or written by path, or a Summarize page written by path.
         "edit.keyboardShortcuts" => {
             params.get("path").is_some() || ["importKys", "exportKys", "summarize"].iter().any(|k| params.get(*k).and_then(|v| v.get("path")).is_some())

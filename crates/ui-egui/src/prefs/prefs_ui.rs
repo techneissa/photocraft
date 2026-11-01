@@ -84,6 +84,7 @@ mod dialogs;
 mod fields;
 mod graphics;
 mod save;
+mod settings_sync;
 mod shortcut_target;
 mod shortcuts;
 mod shortcuts_backup;
@@ -128,6 +129,8 @@ mod close_keys_tests;
 #[cfg(test)]
 mod recovery_tests;
 
+#[cfg(test)]
+mod settings_sync_tests;
 #[cfg(test)]
 mod shortcut_capture_tests;
 #[cfg(test)]

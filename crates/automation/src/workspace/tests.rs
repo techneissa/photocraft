@@ -454,6 +454,8 @@ fn automation_rejects_ambient_path_commands_and_preferences() {
         ("style.presets.exportAsl", serde_json::json!({"path": 5})),
         ("layer.layerStyle.contours.load", serde_json::json!({"path": "/outside/set.shc"})),
         ("layer.layerStyle.contours.save", serde_json::json!({"path": "/outside/set.shc"})),
+        ("edit.preferences.exportSettings", serde_json::json!({"path": "/outside/Mine.pcsettings"})),
+        ("edit.preferences.importSettings", serde_json::json!({"path": "/outside/Mine.pcsettings"})),
     ] {
         assert!(authorize_engine_command(id, &params).is_err(), "{id}: {params}");
     }
@@ -470,6 +472,8 @@ fn automation_rejects_ambient_path_commands_and_preferences() {
         ("style.presets.exportAsl", serde_json::json!({"group": "Basics"})),
         ("layer.layerStyle.contours.load", serde_json::json!({"data": "QUJD"})),
         ("layer.layerStyle.contours.save", serde_json::json!({"names": ["a"]})),
+        ("edit.preferences.exportSettings", serde_json::json!({})),
+        ("edit.preferences.importSettings", serde_json::json!({"text": "{}", "dryRun": true})),
     ] {
         assert!(authorize_engine_command(id, &params).is_ok(), "{id}: {params}");
     }

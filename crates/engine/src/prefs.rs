@@ -469,6 +469,7 @@ mod chords;
 mod cmds;
 mod customize;
 mod files;
+pub mod settings_sync;
 mod shortcuts;
 mod store;
 mod top_bar;

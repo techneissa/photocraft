@@ -135,7 +135,7 @@ fn section_of(id: &str) -> &str {
 
 /// Preference command specs.
 pub fn specs() -> Vec<CommandSpec> {
-    vec![
+    let mut v = vec![
         spec!(
             "prefs.get",
             "Get Preferences",
@@ -193,5 +193,7 @@ pub fn specs() -> Vec<CommandSpec> {
             true
         ),
         spec!("edit.toolbar", "Toolbar…", ["Edit"], None, r##"{"hidden":["<tool>",…]?,"order":["<tool>",…]?,"reset":bool=false}"##, toolbar, true),
-    ]
+    ];
+    v.extend(super::settings_sync::specs());
+    v
 }

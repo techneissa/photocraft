@@ -26,3 +26,6 @@ cargo test -p photocraft-algo --lib hair::
 cargo test -p photocraft-engine --lib -- hair_cmds select_mask_edits
 cargo test -p photocraft-engine --lib -- sam3_select smartselect
 cargo test -p photocraft-ui-egui --lib -- sam3_ui object_finder retouch_ui
+cargo test -p photocraft-engine --lib -- settings_sync
+cargo test -p photocraft-ui-egui --lib -- settings_sync brush_size_label
+cargo test -p photocraft-automation --lib -- automation_rejects_ambient_path

@@ -44,6 +44,8 @@ const PLACE_AFTER: &[(&str, &str)] = &[
     ("view.resetView", "view.flipHorizontal"),
     ("filter.other.colorToAlpha", "filter.other.offset"),
     ("layer.doubleExposure", "layer.maskAllObjects"),
+    ("edit.preferences.exportSettings", "edit.preferences.rawDefaults"),
+    ("edit.preferences.importSettings", "edit.preferences.exportSettings"),
 ];
 
 pub fn menu_items(app: &PhotocraftApp) -> Vec<MenuItem> {

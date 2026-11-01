@@ -6,6 +6,10 @@ use super::{BTreeMap, DialogKind, Map, PhotocraftApp, RichText, SECTIONS, Tokens
 /// Shell front ends for Edit-menu commands invoked without parameters (dialogs, pickers).
 /// `None` when `id` isn't handled here.
 pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &Value) -> Option<Result<Value, String>> {
+    // Export Settings… / Import Settings… share the `edit.preferences.` prefix but open no section.
+    if let Some(r) = super::settings_sync::invoke(app, id, params) {
+        return Some(r);
+    }
     let empty = params.as_object().is_none_or(|o| o.is_empty());
     if !empty {
         return None;
@@ -436,6 +440,7 @@ pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value,
             app.run("prefs.set", json!({"values": {"menus": {"hidden": hidden, "colors": colors}, "toolbar": {"hidden": toolbar}}}))
         }
         "presets" => Ok(Value::Null),
+        "settingsImport" => super::settings_sync::confirm(app, f),
         "presetsIO" => {
             let kinds: Vec<&str> = ["brushes", "customShapes", "tools"].into_iter().filter(|k| f.get(*k).and_then(Value::as_bool).unwrap_or(true)).collect();
             if f.get("action").and_then(Value::as_str) == Some("import") {
