@@ -2,7 +2,7 @@
 //! happens only when a user asks for a download (Settings › AI Models, `photocraft-cli models
 //! fetch`); inference never touches the network.
 //!
-//! Bytes stream into a `.part` file beside the model and are checked against the published size
+//! Bytes stream into a `.part` file beside each model file and are checked against the published size
 //! and SHA-256 before an atomic rename, so the loader never sees a partial or corrupt file.
 
 use std::fs::{File, OpenOptions};
@@ -11,68 +11,111 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
-use crate::store::{Model, models_dir};
-use crate::{Cancel, MlError};
+use crate::store::{Model, ModelFile, install_dir, model_location};
+use crate::{Cancel, MlError, Source};
 
-/// Download `model` into [`models_dir`], reporting `progress(done, total)` bytes and stopping with
-/// [`MlError::Cancelled`] once `cancel` says so. An installed, verified copy is kept as it is.
-/// Blocking: call it from a worker thread.
+/// Gives the bytes of one model file.
+type Fetch<'a> = &'a dyn Fn(&ModelFile) -> Result<Box<dyn Read>, MlError>;
+
+/// Download every file of `model` into [`install_dir`] (the shared folder, else
+/// `PHOTOCRAFT_MODELS_DIR`), reporting `progress(done, total)` bytes over all the files and
+/// stopping with [`MlError::Cancelled`] once `cancel` says so. A file already there and verified
+/// is kept as it is, so a download that stopped half way continues with the files it lacks.
+/// Returns the path of the model's first file. Blocking: call it from a worker thread.
 pub fn download(model: Model, progress: &dyn Fn(u64, u64), cancel: Cancel<'_>) -> Result<PathBuf, MlError> {
-    let dir = models_dir().ok_or_else(|| MlError::Download("cannot locate the models folder; set PHOTOCRAFT_MODELS_DIR".into()))?;
-    std::fs::create_dir_all(&dir).map_err(|e| MlError::Download(format!("create {}: {e}", dir.display())))?;
-    let _lock = lock_model(&dir, model)?;
-    let path = dir.join(model.file_name());
-    if let Ok(mut file) = File::open(&path)
-        && verify(&mut file, model.size_bytes(), model.sha256()).is_ok()
-    {
-        progress(model.size_bytes(), model.size_bytes());
-        return Ok(path);
+    let dir = install_dir(model).ok_or_else(|| MlError::Download("cannot locate the models folder; set PHOTOCRAFT_MODELS_DIR".into()))?;
+    let client = std::cell::OnceCell::new();
+    let fetch = |file: &ModelFile| -> Result<Box<dyn Read>, MlError> {
+        if client.get().is_none() {
+            let built = reqwest::blocking::Client::builder()
+                .https_only(true)
+                .user_agent(concat!("photocraft/", env!("CARGO_PKG_VERSION")))
+                .connect_timeout(std::time::Duration::from_secs(30))
+                // Per connect/read/write, so a stalled server fails (and Cancel is seen) within this.
+                .timeout(std::time::Duration::from_secs(30))
+                .build()
+                .map_err(|e| MlError::Download(format!("create download client: {e}")))?;
+            let _ = client.set(built);
+        }
+        let client = client.get().ok_or_else(|| MlError::Download("create download client".into()))?;
+        let response = client.get(file.url).send().and_then(reqwest::blocking::Response::error_for_status).map_err(|e| MlError::Download(e.to_string()))?;
+        Ok(Box::new(response))
+    };
+    download_files(&dir, model, &fetch, progress, cancel)
+}
+
+/// [`download`] with the bytes of each file from `fetch`.
+fn download_files(dir: &Path, model: Model, fetch: Fetch<'_>, progress: &dyn Fn(u64, u64), cancel: Cancel<'_>) -> Result<PathBuf, MlError> {
+    install_all(dir, model.files(), fetch, progress, cancel)?;
+    Ok(dir.join(model.file_name()))
+}
+
+/// Put every file of `files` into `dir`, fetching only those without a verified copy.
+fn install_all(dir: &Path, files: &[ModelFile], fetch: Fetch<'_>, progress: &dyn Fn(u64, u64), cancel: Cancel<'_>) -> Result<(), MlError> {
+    std::fs::create_dir_all(dir).map_err(|e| MlError::Download(format!("create {}: {e}", dir.display())))?;
+    let _lock = lock_model(dir)?;
+    let total: u64 = files.iter().map(|f| f.size).sum();
+    let mut before = 0u64;
+    for file in files {
+        let path = dir.join(file.name);
+        let shifted = |done: u64, _: u64| progress(before.saturating_add(done), total);
+        if let Ok(mut f) = File::open(&path)
+            && verify(&mut f, file.size, file.sha256).is_ok()
+        {
+            shifted(file.size, file.size);
+        } else {
+            // The lock is held, so any `.part` file is left over from a download that died.
+            clear_stale_part(&path)?;
+            install_from(fetch(file)?, &path, file.size, file.sha256, &shifted, cancel)?;
+        }
+        before = before.saturating_add(file.size);
     }
-    // The lock is held, so any `.part` file is left over from a download that died.
-    clear_stale_part(&path)?;
-    let client = reqwest::blocking::Client::builder()
-        .https_only(true)
-        .user_agent(concat!("photocraft/", env!("CARGO_PKG_VERSION")))
-        .connect_timeout(std::time::Duration::from_secs(30))
-        // Per connect/read/write, so a stalled server fails (and Cancel is seen) within this.
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| MlError::Download(format!("create download client: {e}")))?;
-    let response = client.get(model.url()).send().and_then(reqwest::blocking::Response::error_for_status).map_err(|e| MlError::Download(e.to_string()))?;
-    install_from(response, &path, model.size_bytes(), model.sha256(), progress, cancel)?;
-    Ok(path)
+    Ok(())
 }
 
-/// Delete the installed file of `model` (and any leftover partial download). Removing a model
-/// that is not installed is not an error.
+/// Delete the installed files of `model` (and any leftover partial download) from the folder
+/// downloads go into and from the shared or custom folder it was found in. The old `PhotoCraft`
+/// folder is read only and never touched. Removing a model that is not installed is not an error.
 pub fn remove(model: Model) -> Result<(), MlError> {
-    let dir = models_dir().ok_or_else(|| MlError::Download("cannot locate the models folder".into()))?;
-    remove_in(&dir, model)
+    let target = install_dir(model).ok_or_else(|| MlError::Download("cannot locate the models folder".into()))?;
+    let mut dirs = vec![target];
+    if let Some(found) = model_location(model).filter(|l| l.source != Source::Old)
+        && !dirs.contains(&found.dir)
+    {
+        dirs.push(found.dir);
+    }
+    for dir in dirs.iter().filter(|d| d.is_dir()) {
+        remove_in(dir, model.files())?;
+    }
+    Ok(())
 }
 
-fn remove_in(dir: &Path, model: Model) -> Result<(), MlError> {
-    let _lock = lock_model(dir, model)?;
-    for path in [dir.join(model.file_name()), part_path(&dir.join(model.file_name()))] {
-        match std::fs::remove_file(&path) {
-            Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(MlError::Download(format!("remove {}: {e}", path.display()))),
+fn remove_in(dir: &Path, files: &[ModelFile]) -> Result<(), MlError> {
+    let _lock = lock_model(dir)?;
+    for file in files {
+        let path = dir.join(file.name);
+        for path in [part_path(&path), path] {
+            match std::fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(MlError::Download(format!("remove {}: {e}", path.display()))),
+            }
         }
     }
     Ok(())
 }
 
-/// Exclusive, cross-process hold on one model's files for a download or removal, so a removal
+/// Exclusive, cross-process hold on one model folder for a download or removal, so a removal
 /// can't unlink another worker's partial file and two fetches can't publish each other's bytes.
 /// Released when the returned file is dropped (or the process exits).
-fn lock_model(dir: &Path, model: Model) -> Result<File, MlError> {
-    let path = dir.join(format!("{}.lock", model.file_name()));
+fn lock_model(dir: &Path) -> Result<File, MlError> {
+    let path = dir.join(".install.lock");
     let file =
         OpenOptions::new().create(true).truncate(false).write(true).open(&path).map_err(|e| MlError::Download(format!("open {}: {e}", path.display())))?;
     match file.try_lock() {
         Ok(()) => Ok(file),
         Err(std::fs::TryLockError::WouldBlock) => {
-            Err(MlError::Download(format!("the {} model is being downloaded or removed elsewhere; try again when that finishes", model.label())))
+            Err(MlError::Download("the model is being downloaded or removed elsewhere; try again when that finishes".into()))
         }
         Err(std::fs::TryLockError::Error(e)) => Err(MlError::Download(format!("lock {}: {e}", path.display()))),
     }
@@ -89,7 +132,9 @@ fn clear_stale_part(path: &Path) -> Result<(), MlError> {
 }
 
 fn part_path(path: &Path) -> PathBuf {
-    path.with_extension("onnx.part")
+    let mut part = path.as_os_str().to_owned();
+    part.push(".part");
+    PathBuf::from(part)
 }
 
 /// Check the bytes on disk, including same-size corruption.
@@ -235,34 +280,75 @@ mod tests {
         Ok(())
     }
 
+    /// A lock held on a folder blocks a removal and a second holder; other folders are independent.
     #[test]
     fn a_held_model_lock_blocks_removal_and_a_second_holder() -> Result<(), Box<dyn std::error::Error>> {
         let t = Temp::new()?;
         let model = Model::Lama;
-        std::fs::write(t.0.join(model.file_name()), b"x")?;
-        let held = lock_model(&t.0, model)?;
-        assert!(lock_model(&t.0, model).is_err());
-        assert!(remove_in(&t.0, model).is_err());
-        assert!(t.0.join(model.file_name()).exists(), "removal must wait for the download");
-        // Another model is independent.
-        drop(lock_model(&t.0, Model::BirefnetLite)?);
+        let files = model.files();
+        let path = t.0.join(model.file_name());
+        std::fs::write(&path, b"x")?;
+        let held = lock_model(&t.0)?;
+        assert!(lock_model(&t.0).is_err());
+        assert!(remove_in(&t.0, files).is_err());
+        assert!(path.exists(), "removal must wait for the download");
+        let other = Temp::new()?;
+        drop(lock_model(&other.0)?);
         drop(held);
-        remove_in(&t.0, model)?;
-        assert!(!t.0.join(model.file_name()).exists());
+        remove_in(&t.0, files)?;
+        assert!(!path.exists());
         Ok(())
     }
 
     #[test]
-    fn remove_deletes_the_model_and_a_partial_download() -> Result<(), Box<dyn std::error::Error>> {
+    fn remove_deletes_every_file_and_a_partial_download() -> Result<(), Box<dyn std::error::Error>> {
         let t = Temp::new()?;
-        let model = Model::Lama;
-        let path = t.0.join(model.file_name());
-        std::fs::write(&path, b"x")?;
-        std::fs::write(part_path(&path), b"y")?;
-        remove_in(&t.0, model)?;
-        assert!(!path.exists() && !part_path(&path).exists());
+        let files = [ModelFile { name: "a.bin", url: "", sha256: ABC_SHA256, size: 3 }, ModelFile { name: "b.json", url: "", sha256: ABC_SHA256, size: 3 }];
+        let (a, b) = (t.0.join("a.bin"), t.0.join("b.json"));
+        std::fs::write(&a, b"x")?;
+        std::fs::write(&b, b"x")?;
+        std::fs::write(part_path(&b), b"y")?;
+        let keep = t.0.join("other.txt");
+        std::fs::write(&keep, b"z")?;
+        remove_in(&t.0, &files)?;
+        assert!(!a.exists() && !b.exists() && !part_path(&b).exists());
+        assert!(keep.exists(), "only the model's own files go");
         // Not installed: still fine.
-        remove_in(&t.0, model)?;
+        remove_in(&t.0, &files)?;
+        Ok(())
+    }
+
+    #[test]
+    fn a_model_with_several_files_installs_each_file_and_continues_after_a_stop() -> Result<(), Box<dyn std::error::Error>> {
+        let t = Temp::new()?;
+        let files = [
+            ModelFile { name: "one.bin", url: "", sha256: ABC_SHA256, size: 3 },
+            ModelFile { name: "two.bin", url: "", sha256: ABC_SHA256, size: 3 },
+            ModelFile { name: "three.bin", url: "", sha256: ABC_SHA256, size: 3 },
+        ];
+        let fetched = std::cell::RefCell::new(Vec::new());
+        let last = Cell::new((0, 0));
+        let fetch = |f: &ModelFile| -> Result<Box<dyn Read>, MlError> {
+            fetched.borrow_mut().push(f.name);
+            // The second file comes back corrupt on the first attempt.
+            let bytes: &'static [u8] = if f.name == "two.bin" && fetched.borrow().len() == 2 { b"bad" } else { b"abc" };
+            Ok(Box::new(bytes))
+        };
+        let first = install_all(&t.0, &files, &fetch, &|d, tot| last.set((d, tot)), &never);
+        assert!(first.is_err(), "the corrupt second file stops the install");
+        assert!(t.0.join("one.bin").exists() && !t.0.join("two.bin").exists() && !t.0.join("three.bin").exists());
+        assert_eq!(*fetched.borrow(), ["one.bin", "two.bin"]);
+        // Retry: the verified first file is kept, only the missing two are fetched.
+        fetched.borrow_mut().clear();
+        install_all(&t.0, &files, &fetch, &|d, tot| last.set((d, tot)), &never)?;
+        assert_eq!(*fetched.borrow(), ["two.bin", "three.bin"]);
+        assert_eq!(last.get(), (9, 9), "progress counts all the files together");
+        assert!(files.iter().all(|f| t.0.join(f.name).exists()));
+        assert!(crate::store::installed_in(&t.0, &files));
+        // Everything is there: nothing is fetched.
+        fetched.borrow_mut().clear();
+        install_all(&t.0, &files, &fetch, &|_, _| {}, &never)?;
+        assert!(fetched.borrow().is_empty());
         Ok(())
     }
 

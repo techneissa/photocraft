@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use egui::RichText;
-use photocraft_ml::{MlError, Model};
+use photocraft_ml::{MlError, Model, Source};
 
 use crate::{theme::Tokens, widgets};
 
@@ -28,11 +28,19 @@ struct ModelJob {
     state: Arc<Mutex<State>>,
     cancel: Arc<AtomicBool>,
     confirm_remove: bool,
+    /// Which models folder holds the installed model.
+    source: Option<Source>,
 }
 
 impl ModelJob {
     fn new(model: Model) -> Self {
-        Self { model, state: Arc::new(Mutex::new(State { phase: Phase::Idle, error: None })), cancel: Arc::new(AtomicBool::new(false)), confirm_remove: false }
+        Self {
+            model,
+            state: Arc::new(Mutex::new(State { phase: Phase::Idle, error: None })),
+            cancel: Arc::new(AtomicBool::new(false)),
+            confirm_remove: false,
+            source: None,
+        }
     }
 
     fn lock(&self) -> MutexGuard<'_, State> {
@@ -160,6 +168,15 @@ fn powers(model: Model) -> &'static str {
     }
 }
 
+/// Where an installed model was found, as the row shows it.
+fn place(source: Source) -> &'static str {
+    match source {
+        Source::Shared => tl!("Shared Folder"),
+        Source::Custom => tl!("Custom Folder"),
+        Source::Old => tl!("Old PhotoCraft Folder (read only)"),
+    }
+}
+
 /// Megabytes with one decimal, as the size column shows them.
 fn mb(bytes: u64) -> String {
     format!("{:.1}", bytes as f64 / 1_000_000.0)
@@ -170,13 +187,14 @@ fn progress_fraction(done: u64, total: u64) -> f32 {
 }
 
 pub(super) fn show(ui: &mut egui::Ui, runtime: &mut Runtime) {
-    show_with(ui, runtime, |model| photocraft_ml::model_path(model).is_some());
+    show_with(ui, runtime, |model| photocraft_ml::model_location(model).map(|l| l.source));
 }
 
-fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, installed: impl Fn(Model) -> bool) {
+fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, found: impl Fn(Model) -> Option<Source>) {
     let t = Tokens::get(ui.ctx());
     for row in &mut runtime.rows {
-        row.refresh(installed(row.model));
+        row.source = found(row.model);
+        row.refresh(row.source.is_some());
         let state = row.lock().clone();
         ui.push_id(row.model, |ui| {
             ui.separator();
@@ -189,6 +207,9 @@ fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, installed: impl Fn(Model)
             ui.label(powers(row.model));
             let size = mb(row.model.size_bytes());
             ui.label(RichText::new(crate::i18n::fmt(tl!("{size} MB · {licence}"), &[("size", &size), ("licence", row.model.licence())])).color(t.text_dim));
+            if let (Phase::Installed, Some(source)) = (&state.phase, row.source) {
+                ui.label(RichText::new(crate::i18n::fmt(tl!("Found in: {place}"), &[("place", place(source))])).color(t.text_dim));
+            }
             match state.phase {
                 Phase::Idle => {
                     if widgets::secondary_button(ui, tl!("Download"), 0.0).clicked() {
@@ -211,6 +232,8 @@ fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, installed: impl Fn(Model)
                         row.cancel();
                     }
                 }
+                // The old folder is read only: nothing there can be removed from this page.
+                Phase::Installed if row.source == Some(Source::Old) => {}
                 Phase::Installed => {
                     ui.horizontal(|ui| {
                         if widgets::secondary_button(ui, if row.confirm_remove { tl!("Confirm remove") } else { tl!("Remove") }, 0.0).clicked() {
@@ -364,7 +387,7 @@ mod tests {
                 return;
             }
             privacy(ui);
-            show_with(ui, &mut runtime, |_| false);
+            show_with(ui, &mut runtime, |_| None);
         });
         harness.run_steps(2);
         use egui_kittest::kittest::Queryable;
@@ -396,12 +419,44 @@ mod tests {
                 crate::PhotocraftApp::setup_context(ui.ctx(), Default::default());
                 return;
             }
-            show_with(ui, &mut runtime, |_| false);
+            show_with(ui, &mut runtime, |_| None);
         });
         harness.run_steps(2);
         use egui_kittest::kittest::Queryable;
         harness.get_by_label("52.0 / 208.0 MB (25%)");
         harness.get_by_label("Cancel");
         harness.get_by_label("checksum mismatch");
+    }
+
+    /// Renders every row as installed in the folder `found` names; returns the harness.
+    fn installed_page(found: impl Fn(Model) -> Option<Source> + 'static) -> egui_kittest::Harness<'static> {
+        let mut runtime = Runtime::default();
+        let mut harness = egui_kittest::Harness::new_ui(move |ui| {
+            if ui.ctx().cumulative_pass_nr() == 0 {
+                crate::PhotocraftApp::setup_context(ui.ctx(), Default::default());
+                return;
+            }
+            show_with(ui, &mut runtime, &found);
+        });
+        harness.run_steps(2);
+        harness
+    }
+
+    #[test]
+    fn an_installed_model_says_which_folder_it_was_found_in() {
+        use egui_kittest::kittest::Queryable;
+        let harness = installed_page(|model| Some(if model == Model::Lama { Source::Shared } else { Source::Custom }));
+        harness.get_by_label("Found in: Shared Folder");
+        harness.get_by_label("Found in: Custom Folder");
+        assert_eq!(harness.get_all_by_label("Remove").count(), Model::ALL.len());
+        assert_eq!(harness.query_all_by_label("Download").count(), 0);
+    }
+
+    #[test]
+    fn a_model_in_the_old_folder_is_shown_read_only_without_remove() {
+        use egui_kittest::kittest::Queryable;
+        let harness = installed_page(|_| Some(Source::Old));
+        assert_eq!(harness.get_all_by_label("Found in: Old PhotoCraft Folder (read only)").count(), Model::ALL.len());
+        assert_eq!(harness.query_all_by_label("Remove").count(), 0);
     }
 }

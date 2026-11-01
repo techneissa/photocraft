@@ -1,7 +1,49 @@
 //! Where the model files live. They are never committed or embedded: a build or a user puts them in
-//! [`models_dir`] (see `docs/ml.md`).
+//! a models folder (see `docs/ml.md`).
+//!
+//! A model is a folder of one or more files, each with its own pinned size and SHA-256. It is
+//! looked for, in this order:
+//!
+//! 1. `$PHOTOCRAFT_MODELS_DIR`, when set (and then nowhere else): `<dir>/<model-id>/`, else the
+//!    files directly in `<dir>` (the layout before the shared folder).
+//! 2. The folder shared by the Craft apps, so a model is never downloaded twice:
+//!    `~/Library/Application Support/ArtCraft/models/<model-id>/`.
+//! 3. The old `PhotoCraft/models/` folder, with the files directly in it. Read only: nothing is
+//!    ever written or deleted there.
+//!
+//! New downloads go into step 1's folder when set, else step 2's.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+/// The environment variable that replaces every other models folder.
+pub const MODELS_DIR_VAR: &str = "PHOTOCRAFT_MODELS_DIR";
+
+/// One file of a model, pinned by size and SHA-256.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ModelFile {
+    /// File name inside the model's folder.
+    pub name: &'static str,
+    /// Published download.
+    pub url: &'static str,
+    /// SHA-256 of the published file, measured from the installed copy with `shasum -a 256`.
+    pub sha256: &'static str,
+    /// Size of the published file, to catch a truncated download.
+    pub size: u64,
+}
+
+const BIREFNET_FILES: [ModelFile; 1] = [ModelFile {
+    name: "birefnet_lite.onnx",
+    url: "https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx",
+    sha256: "5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333",
+    size: 224_005_088,
+}];
+
+const LAMA_FILES: [ModelFile; 1] = [ModelFile {
+    name: "lama_fp32.onnx",
+    url: "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx",
+    sha256: "1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6",
+    size: 208_044_816,
+}];
 
 /// A model the editor can run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -16,19 +58,19 @@ impl Model {
     /// All supported models, in display/download order.
     pub const ALL: [Self; 2] = [Self::BirefnetLite, Self::Lama];
 
-    /// Published ONNX download.
-    pub fn url(self) -> &'static str {
+    /// Folder name inside a models folder, shared by every Craft app.
+    pub fn id(self) -> &'static str {
         match self {
-            Self::BirefnetLite => "https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx",
-            Self::Lama => "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx",
+            Self::BirefnetLite => "birefnet-lite",
+            Self::Lama => "lama",
         }
     }
 
-    /// SHA-256 of the published file, measured from the installed copies with `shasum -a 256`.
-    pub fn sha256(self) -> &'static str {
+    /// Every file of the model, the one the loader reads first.
+    pub fn files(self) -> &'static [ModelFile] {
         match self {
-            Self::BirefnetLite => "5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333",
-            Self::Lama => "1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6",
+            Self::BirefnetLite => &BIREFNET_FILES,
+            Self::Lama => &LAMA_FILES,
         }
     }
 
@@ -40,12 +82,9 @@ impl Model {
         }
     }
 
-    /// File name inside the models folder.
+    /// Name of the first (main) file.
     pub fn file_name(self) -> &'static str {
-        match self {
-            Self::BirefnetLite => "birefnet_lite.onnx",
-            Self::Lama => "lama_fp32.onnx",
-        }
+        self.files().first().map_or("", |f| f.name)
     }
 
     /// Human name for messages.
@@ -56,33 +95,107 @@ impl Model {
         }
     }
 
-    /// Size of the published file, to catch a truncated download.
+    /// Size of all the published files together.
     pub fn size_bytes(self) -> u64 {
+        self.files().iter().map(|f| f.size).sum()
+    }
+}
+
+/// Which models folder a model was found in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Source {
+    /// The folder `PHOTOCRAFT_MODELS_DIR` names.
+    Custom,
+    /// The folder shared by the Craft apps (`ArtCraft/models`).
+    Shared,
+    /// The old `PhotoCraft/models` folder (read only).
+    Old,
+}
+
+impl Source {
+    /// Short English name, for messages and the CLI.
+    pub fn label(self) -> &'static str {
         match self {
-            Self::BirefnetLite => 224_005_088,
-            Self::Lama => 208_044_816,
+            Self::Custom => "custom folder",
+            Self::Shared => "shared folder",
+            Self::Old => "old PhotoCraft folder",
         }
     }
 }
 
-/// The folder models are read from: `PHOTOCRAFT_MODELS_DIR`, else the per-user data folder
-/// (`~/Library/Application Support/PhotoCraft/models`, `$XDG_DATA_HOME/photocraft/models`,
-/// `%APPDATA%\PhotoCraft\models`). `None` when no home folder is known (or in the browser).
-pub fn models_dir() -> Option<PathBuf> {
-    if cfg!(target_arch = "wasm32") {
-        return None;
+/// An installed model: the folder holding all its files, and which models folder that is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Located {
+    pub dir: PathBuf,
+    pub source: Source,
+}
+
+/// The models folders of this computer, kept apart from the environment so tests can build them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Roots {
+    custom: Option<PathBuf>,
+    shared: Option<PathBuf>,
+    old: Option<PathBuf>,
+}
+
+impl Roots {
+    /// `PHOTOCRAFT_MODELS_DIR`, the shared `ArtCraft/models` and the old `PhotoCraft/models` of
+    /// this user. Empty in the browser.
+    fn current() -> Self {
+        if cfg!(target_arch = "wasm32") {
+            return Self::default();
+        }
+        let custom = std::env::var_os(MODELS_DIR_VAR).filter(|d| !d.is_empty()).map(PathBuf::from);
+        Self { custom, shared: user_models_dir("ArtCraft"), old: user_models_dir("PhotoCraft") }
     }
-    if let Some(d) = std::env::var_os("PHOTOCRAFT_MODELS_DIR").filter(|d| !d.is_empty()) {
-        return Some(PathBuf::from(d));
+
+    /// The folder new downloads go into.
+    fn install_root(&self) -> Option<&Path> {
+        self.custom.as_deref().or(self.shared.as_deref())
     }
+
+    /// Where to look, first match wins: (model folder, which folder it is in).
+    fn candidates(&self, id: &str) -> Vec<(PathBuf, Source)> {
+        if let Some(custom) = &self.custom {
+            return vec![(custom.join(id), Source::Custom), (custom.clone(), Source::Custom)];
+        }
+        let shared = self.shared.iter().map(|d| (d.join(id), Source::Shared));
+        let old = self.old.iter().map(|d| (d.clone(), Source::Old));
+        shared.chain(old).collect()
+    }
+
+    pub(crate) fn locate(&self, id: &str, files: &[ModelFile]) -> Option<Located> {
+        self.candidates(id).into_iter().find(|(dir, _)| installed_in(dir, files)).map(|(dir, source)| Located { dir, source })
+    }
+
+    pub(crate) fn install_dir(&self, id: &str) -> Option<PathBuf> {
+        self.install_root().map(|d| d.join(id))
+    }
+}
+
+/// `<app data folder>/<app>/models`: `~/Library/Application Support` on macOS, `$XDG_DATA_HOME`
+/// (else `~/.local/share`) on Linux with the app name in lower case, `%APPDATA%` on Windows.
+fn user_models_dir(app: &str) -> Option<PathBuf> {
     let var = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
     if cfg!(target_os = "macos") {
-        var("HOME").map(|h| h.join("Library").join("Application Support").join("PhotoCraft").join("models"))
+        var("HOME").map(|h| h.join("Library").join("Application Support").join(app).join("models"))
     } else if cfg!(windows) {
-        var("APPDATA").map(|a| a.join("PhotoCraft").join("models"))
+        var("APPDATA").map(|a| a.join(app).join("models"))
     } else {
-        var("XDG_DATA_HOME").or_else(|| var("HOME").map(|h| h.join(".local").join("share"))).map(|d| d.join("photocraft").join("models"))
+        var("XDG_DATA_HOME").or_else(|| var("HOME").map(|h| h.join(".local").join("share"))).map(|d| d.join(app.to_lowercase()).join("models"))
     }
+}
+
+/// The models folder new downloads go into: `PHOTOCRAFT_MODELS_DIR`, else the shared folder
+/// (`~/Library/Application Support/ArtCraft/models`). Models are in its `<model-id>/` folders.
+/// `None` when no home folder is known (or in the browser).
+pub fn models_dir() -> Option<PathBuf> {
+    Roots::current().install_root().map(Path::to_path_buf)
+}
+
+/// The folder a download of `model` goes into (it may not exist yet).
+pub fn install_dir(model: Model) -> Option<PathBuf> {
+    Roots::current().install_dir(model.id())
 }
 
 static MODELS_DISABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -98,28 +211,36 @@ pub fn models_disabled() -> bool {
     MODELS_DISABLED.load(std::sync::atomic::Ordering::Relaxed) || std::env::var_os("PHOTOCRAFT_NO_MODELS").is_some_and(|v| !v.is_empty() && v != "0")
 }
 
-/// The installed file of `model`, if it is there with the published size and SHA-256. A partial
-/// or corrupt file is treated as missing rather than handed to the loader. `None` while
-/// [`models_disabled`].
-pub fn model_path(model: Model) -> Option<PathBuf> {
+/// Where `model` is installed, with every file of it there at the published size and SHA-256. A
+/// partial or corrupt file counts as missing rather than being handed to the loader. `None`
+/// while [`models_disabled`].
+pub fn model_location(model: Model) -> Option<Located> {
     if models_disabled() {
         return None;
     }
-    installed_in(&models_dir()?, model)
+    Roots::current().locate(model.id(), model.files())
 }
 
-fn installed_in(dir: &std::path::Path, model: Model) -> Option<PathBuf> {
-    let p = dir.join(model.file_name());
-    let meta = std::fs::metadata(&p).ok()?;
-    (meta.len() == model.size_bytes() && hash_ok(&p, model, &meta)).then_some(p)
+/// The first file of the installed `model`, if it is installed (see [`model_location`]).
+pub fn model_path(model: Model) -> Option<PathBuf> {
+    model_location(model).map(|l| l.dir.join(model.file_name()))
 }
 
-/// Whether the file at `p` has `model`'s SHA-256. The hash of a ~200 MB file is computed once
+/// Whether every file of `files` is in `dir` with its published size and SHA-256.
+pub(crate) fn installed_in(dir: &Path, files: &[ModelFile]) -> bool {
+    !files.is_empty()
+        && files.iter().all(|f| {
+            let p = dir.join(f.name);
+            std::fs::metadata(&p).is_ok_and(|meta| meta.len() == f.size && hash_ok(&p, f, &meta))
+        })
+}
+
+/// Whether the file at `p` has `file`'s SHA-256. The hash of a ~200 MB file is computed once
 /// per file version, not on every lookup. The version includes the inode and the change time
 /// on Unix, which every write, copy-over or rename moves and which a user can't set back, so a
 /// replaced file is always hashed again even when its size and modification time match.
 #[cfg(not(target_arch = "wasm32"))]
-fn hash_ok(p: &std::path::Path, model: Model, meta: &std::fs::Metadata) -> bool {
+fn hash_ok(p: &Path, file: &ModelFile, meta: &std::fs::Metadata) -> bool {
     use std::collections::HashMap;
     use std::sync::{Mutex, OnceLock};
     type Version = (u64, Option<std::time::SystemTime>, u64, i64, i64);
@@ -146,7 +267,7 @@ fn hash_ok(p: &std::path::Path, model: Model, meta: &std::fs::Metadata) -> bool 
     {
         return ok;
     }
-    let ok = std::fs::File::open(p).is_ok_and(|mut f| crate::install::verify(&mut f, model.size_bytes(), model.sha256()).is_ok());
+    let ok = std::fs::File::open(p).is_ok_and(|mut f| crate::install::verify(&mut f, file.size, file.sha256).is_ok());
     if let Ok(mut map) = seen.lock() {
         map.insert(p.to_path_buf(), (version, ok));
     }
@@ -154,19 +275,53 @@ fn hash_ok(p: &std::path::Path, model: Model, meta: &std::fs::Metadata) -> bool 
 }
 
 #[cfg(target_arch = "wasm32")]
-fn hash_ok(_: &std::path::Path, _: Model, _: &std::fs::Metadata) -> bool {
+fn hash_ok(_: &Path, _: &ModelFile, _: &std::fs::Metadata) -> bool {
     false
 }
 
 /// Where `model` is expected, installed or not (for messages).
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn expected_path(model: Model) -> String {
-    models_dir().map_or_else(|| model.file_name().to_string(), |d| d.join(model.file_name()).display().to_string())
+    install_dir(model).map_or_else(|| model.file_name().to_string(), |d| d.join(model.file_name()).display().to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    const ABC_SHA256: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+    const EMPTY_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+    /// Two small files, as a model with several files (like SAM3) would be pinned.
+    const TWO: [ModelFile; 2] =
+        [ModelFile { name: "a.bin", url: "", sha256: ABC_SHA256, size: 3 }, ModelFile { name: "b.json", url: "", sha256: EMPTY_SHA256, size: 0 }];
+
+    struct Temp(PathBuf);
+    impl Temp {
+        fn new() -> std::io::Result<Self> {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let path = std::env::temp_dir().join(format!("photocraft-ml-store-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
+            // Created exclusively, so a pre-placed directory or symlink can't be reused.
+            std::fs::create_dir(&path)?;
+            Ok(Self(path))
+        }
+        fn dir(&self, name: &str) -> PathBuf {
+            self.0.join(name)
+        }
+    }
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// Put `TWO` into `dir` (created if needed).
+    fn put_two(dir: &Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(dir)?;
+        std::fs::write(dir.join("a.bin"), b"abc")?;
+        std::fs::write(dir.join("b.json"), b"")
+    }
 
     #[test]
     fn disabled_models_are_missing() {
@@ -174,27 +329,101 @@ mod tests {
         assert!(models_disabled());
         for model in Model::ALL {
             assert_eq!(model_path(model), None);
+            assert_eq!(model_location(model), None);
         }
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn model_ids_are_the_shared_folder_names() {
+        assert_eq!(Model::BirefnetLite.id(), "birefnet-lite");
+        assert_eq!(Model::Lama.id(), "lama");
+        for model in Model::ALL {
+            assert!(!model.files().is_empty());
+            assert_eq!(model.size_bytes(), model.files().iter().map(|f| f.size).sum::<u64>());
+            assert_eq!(model.file_name(), model.files().first().map(|f| f.name).unwrap_or_default());
+        }
+    }
+
     #[test]
     fn a_same_size_corrupt_file_is_not_installed() -> Result<(), Box<dyn std::error::Error>> {
-        struct Temp(PathBuf);
-        impl Drop for Temp {
-            fn drop(&mut self) {
-                let _ = std::fs::remove_dir_all(&self.0);
-            }
-        }
-        // Created exclusively, so a pre-placed directory or symlink can't be reused.
-        let path = std::env::temp_dir().join(format!("photocraft-ml-store-{}-{:?}", std::process::id(), std::thread::current().id()));
-        std::fs::create_dir(&path)?;
-        // Guard only what this test created.
-        let dir = Temp(path);
+        let dir = Temp::new()?;
         let model = Model::Lama;
+        let file = model.files().first().ok_or("no file")?;
         // Right size, wrong bytes (sparse zeros).
-        std::fs::File::create_new(dir.0.join(model.file_name()))?.set_len(model.size_bytes())?;
-        assert_eq!(installed_in(&dir.0, model), None);
+        std::fs::File::create_new(dir.0.join(file.name))?.set_len(file.size)?;
+        assert!(!installed_in(&dir.0, model.files()));
+        Ok(())
+    }
+
+    #[test]
+    fn every_file_must_be_there_and_right() -> Result<(), Box<dyn std::error::Error>> {
+        let t = Temp::new()?;
+        let dir = t.dir("m");
+        assert!(!installed_in(&dir, &TWO), "no folder");
+        put_two(&dir)?;
+        assert!(installed_in(&dir, &TWO));
+        // One file missing.
+        std::fs::remove_file(dir.join("b.json"))?;
+        assert!(!installed_in(&dir, &TWO));
+        // One file the right size with the wrong bytes.
+        put_two(&dir)?;
+        std::fs::write(dir.join("a.bin"), b"abd")?;
+        assert!(!installed_in(&dir, &TWO));
+        // One file of the wrong size.
+        put_two(&dir)?;
+        std::fs::write(dir.join("b.json"), b"{}")?;
+        assert!(!installed_in(&dir, &TWO));
+        assert!(!installed_in(&dir, &[]), "a model without files is never installed");
+        Ok(())
+    }
+
+    fn roots(t: &Temp, custom: bool) -> Roots {
+        Roots { custom: custom.then(|| t.dir("custom")), shared: Some(t.dir("shared")), old: Some(t.dir("old")) }
+    }
+
+    #[test]
+    fn lookup_goes_shared_then_old_and_reports_where() -> Result<(), Box<dyn std::error::Error>> {
+        let t = Temp::new()?;
+        let r = roots(&t, false);
+        assert_eq!(r.locate("m", &TWO), None);
+        // Only the old folder (files directly in it): found there.
+        put_two(&t.dir("old"))?;
+        assert_eq!(r.locate("m", &TWO), Some(Located { dir: t.dir("old"), source: Source::Old }));
+        // The shared folder wins once the model is in it.
+        put_two(&t.dir("shared").join("m"))?;
+        assert_eq!(r.locate("m", &TWO), Some(Located { dir: t.dir("shared").join("m"), source: Source::Shared }));
+        // A broken shared copy does not hide the good old one.
+        std::fs::write(t.dir("shared").join("m").join("a.bin"), b"bad")?;
+        assert_eq!(r.locate("m", &TWO).map(|l| l.source), Some(Source::Old));
+        // The shared folder is looked up per model id.
+        assert_eq!(r.locate("other", &TWO).map(|l| l.source), Some(Source::Old));
+        Ok(())
+    }
+
+    #[test]
+    fn the_environment_folder_replaces_the_others() -> Result<(), Box<dyn std::error::Error>> {
+        let t = Temp::new()?;
+        let r = roots(&t, true);
+        put_two(&t.dir("shared").join("m"))?;
+        put_two(&t.dir("old"))?;
+        // Set but empty: the shared and old copies are not used.
+        assert_eq!(r.locate("m", &TWO), None);
+        // Flat files in it (the layout before the shared folder) are found...
+        put_two(&t.dir("custom"))?;
+        assert_eq!(r.locate("m", &TWO), Some(Located { dir: t.dir("custom"), source: Source::Custom }));
+        // ... and the per-model folder wins over them.
+        put_two(&t.dir("custom").join("m"))?;
+        assert_eq!(r.locate("m", &TWO), Some(Located { dir: t.dir("custom").join("m"), source: Source::Custom }));
+        Ok(())
+    }
+
+    #[test]
+    fn downloads_go_to_the_environment_folder_else_the_shared_one() -> Result<(), Box<dyn std::error::Error>> {
+        let t = Temp::new()?;
+        assert_eq!(roots(&t, false).install_dir("m"), Some(t.dir("shared").join("m")));
+        assert_eq!(roots(&t, true).install_dir("m"), Some(t.dir("custom").join("m")));
+        let none = Roots { custom: None, shared: None, old: Some(t.dir("old")) };
+        assert_eq!(none.install_dir("m"), None, "the old folder is never written to");
         Ok(())
     }
 }

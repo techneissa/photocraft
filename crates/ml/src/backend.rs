@@ -38,7 +38,8 @@ fn load(model: Model) -> Result<Plan, MlError> {
         return Err(MlError::ModelMissing { model, path: expected_path(model) });
     };
     // Load from the bytes whose hash was just checked, so what runs is what was verified.
-    let bytes = verified_bytes(&path, model.size_bytes(), model.sha256())?;
+    let file = model.files().first().ok_or_else(|| backend("model without files"))?;
+    let bytes = verified_bytes(&path, file.size, file.sha256)?;
     tract_onnx::onnx().model_for_read(&mut bytes.as_slice()).and_then(|m| m.into_optimized()).and_then(|m| m.into_runnable()).map_err(backend)
 }
 
