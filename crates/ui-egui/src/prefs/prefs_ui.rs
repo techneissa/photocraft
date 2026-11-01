@@ -88,7 +88,12 @@ mod shortcut_target;
 mod shortcuts;
 mod shortcuts_backup;
 mod shortcuts_chord;
+mod shortcuts_menus;
+mod shortcuts_record;
+mod shortcuts_rows;
+mod shortcuts_search;
 mod shortcuts_when;
+mod shortcuts_window;
 mod startup;
 
 #[cfg(test)]
@@ -118,6 +123,7 @@ pub use shortcut_target::open_shortcuts_for;
 #[cfg(test)]
 pub(crate) use shortcuts::capture_key_press;
 pub use shortcuts::{is_modifier_key, reserved_shortcut, shortcut_items, shortcut_text};
+pub use shortcuts_window::{MIN as SHORTCUTS_MIN, SIZE as SHORTCUTS_SIZE, is_window as is_shortcuts, size_id as shortcuts_size_id};
 pub use startup::load;
 pub(crate) use startup::{on_recovery_event, remember_rulers};
 
@@ -134,6 +140,10 @@ mod shortcut_capture_tests;
 mod shortcut_set_tests;
 #[cfg(test)]
 mod shortcuts_upgrade_tests;
+#[cfg(test)]
+mod shortcuts_window_snapshots;
+#[cfg(test)]
+mod shortcuts_window_tests;
 
 #[cfg(test)]
 mod tests;

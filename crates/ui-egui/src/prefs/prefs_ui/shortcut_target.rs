@@ -20,7 +20,7 @@ pub fn open_shortcuts_for(app: &mut PhotocraftApp, command_id: &str) -> u64 {
         f.insert("selected".into(), json!(if known { command_id } else { "" }));
         f.insert("capture".into(), json!(known));
         f.insert("captureAlt".into(), json!(false));
-        f.insert("captureChord".into(), json!(false));
+        f.insert("__recSteps".into(), json!([]));
         f.insert("reveal".into(), json!(known));
         f.insert("conflict".into(), Value::Null);
         f.insert("chordConflict".into(), Value::Null);

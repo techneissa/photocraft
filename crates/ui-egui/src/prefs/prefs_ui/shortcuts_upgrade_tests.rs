@@ -34,6 +34,15 @@ fn set_field(h: &mut Harness<'_, PhotocraftApp>, id: u64, name: &str, v: Value) 
     h.state_mut().ui.dialog_mut(id).unwrap().fields.insert(name.into(), v);
 }
 
+/// Record `first` then `second` for the selected command and accept with Enter, like a keyboard.
+fn record_chord(h: &mut Harness<'_, PhotocraftApp>, id: u64, first: (Key, Modifiers), second: Key) {
+    set_field(h, id, "capture", json!(true));
+    h.run_steps(2);
+    chord(h, first, second);
+    h.key_press(Key::Enter);
+    h.run_steps(2);
+}
+
 /// Press `first` then `second` (with `held` down for the first), one frame apart, like a keyboard.
 fn chord(h: &mut Harness<'_, PhotocraftApp>, first: (Key, Modifiers), second: Key) {
     key(h, first.0, true, first.1);
@@ -52,7 +61,7 @@ fn the_dialog_opens_with_a_when_column_and_no_chords() {
     assert_eq!(field(&h, id, "chords"), json!({}));
     assert_eq!(field(&h, id, "when"), json!({}));
     h.get_by_label("Condition of Copy");
-    h.get_by_label("Add Chord");
+    h.get_by_label("Add Shortcut");
     assert!(h.get_all_by_label("Add Condition").count() > 1, "one + in every row");
     h.get_by_label("Export Shortcuts as JSON…");
     h.get_by_label("Import Shortcuts from JSON…");
@@ -72,16 +81,19 @@ fn the_dialog_shows_saved_chords_and_conditions() {
 }
 
 #[test]
-fn a_chord_is_captured_from_two_key_presses_and_saved_with_ok() {
+fn a_chord_is_recorded_from_two_key_presses_and_saved_with_ok() {
     let (mut h, id) = dialog("edit.copy", "Copy");
-    h.get_by_label("Add Chord").click();
+    set_field(&mut h, id, "capture", json!(true));
     h.run_steps(2);
-    assert_eq!(field(&h, id, "captureChord"), json!(true));
     chord(&mut h, (Key::K, Modifiers::COMMAND), Key::J);
+    assert_eq!(field(&h, id, "__recSteps"), json!(["Cmd+K", "J"]));
+    assert_eq!(field(&h, id, "chords"), json!({}), "nothing is kept before Enter");
+    h.key_press(Key::Enter);
+    h.run_steps(2);
     assert_eq!(field(&h, id, "chords")["edit.copy"], json!("Cmd+K J"));
-    assert_eq!(field(&h, id, "captureChord"), json!(false));
+    assert_eq!(field(&h, id, "capture"), json!(false));
     assert_eq!(field(&h, id, "overrides"), json!({}), "the chord is not the command's main key");
-    assert!(h.get_all_by_label_contains(&crate::keybinds::chord::text("Cmd+K J")).count() >= 1, "the chord shows as a chip and in the message");
+    assert!(h.get_all_by_label_contains(&crate::keybinds::chord::text("Cmd+K J")).count() >= 1, "the chip shows the chord");
     crate::dialogs::confirm(h.state_mut(), id).unwrap();
     assert_eq!(h.state().session.prefs().chords["edit.copy"], "Cmd+K J");
 }
@@ -89,34 +101,38 @@ fn a_chord_is_captured_from_two_key_presses_and_saved_with_ok() {
 #[test]
 fn escape_cancels_a_chord_and_a_reserved_key_is_refused() {
     let (mut h, id) = dialog("edit.copy", "Copy");
-    h.get_by_label("Add Chord").click();
+    set_field(&mut h, id, "capture", json!(true));
     h.run_steps(2);
     key(&mut h, Key::K, true, Modifiers::COMMAND);
     h.run_steps(2);
-    assert_eq!(field(&h, id, "chordFirst"), json!("Cmd+K"));
+    assert_eq!(field(&h, id, "__recSteps"), json!(["Cmd+K"]));
     key(&mut h, Key::Escape, true, Modifiers::NONE);
     h.run_steps(2);
-    assert_eq!(field(&h, id, "captureChord"), json!(false));
+    assert_eq!(field(&h, id, "capture"), json!(false));
     assert_eq!(field(&h, id, "chords"), json!({}));
     // a step the system takes
-    h.get_by_label("Add Chord").click();
+    set_field(&mut h, id, "capture", json!(true));
     h.run_steps(2);
     let reserved = if cfg!(target_os = "macos") { (Key::Tab, Modifiers::COMMAND) } else { (Key::Tab, Modifiers::ALT) };
     chord(&mut h, reserved, Key::J);
+    assert_eq!(field(&h, id, "capture"), json!(false), "the system's key ends the recording");
     assert_eq!(field(&h, id, "chords"), json!({}));
     assert_eq!(field(&h, id, "messageWarning"), json!(true));
 }
 
 #[test]
-fn a_chord_already_in_use_is_taken_when_ok_is_clicked() {
+fn a_chord_already_in_use_warns_when_recorded_and_is_taken_when_ok_is_clicked() {
     let (mut h, id) = dialog("edit.cut", "Cut");
     set_field(&mut h, id, "chords", json!({"edit.copy": "Cmd+K J"}));
     h.run_steps(2);
-    h.get_by_label("Add Chord").click();
+    set_field(&mut h, id, "capture", json!(true));
     h.run_steps(2);
     chord(&mut h, (Key::K, Modifiers::COMMAND), Key::J);
+    assert!(field(&h, id, "message").as_str().unwrap().contains("already in use"), "the warning shows before Enter: {}", field(&h, id, "message"));
+    assert_eq!(field(&h, id, "chords").get("edit.cut"), None);
+    h.key_press(Key::Enter);
+    h.run_steps(2);
     assert_eq!(field(&h, id, "chords")["edit.cut"], json!("Cmd+K J"));
-    assert!(field(&h, id, "message").as_str().unwrap().contains("already in use"), "{}", field(&h, id, "message"));
     assert_eq!(field(&h, id, "chordConflict")["holders"], json!(["edit.copy"]));
     h.get_by_label("Accept and Go to Conflict");
     h.get_by_label("Undo Changes");
@@ -131,9 +147,7 @@ fn undo_puts_the_commands_old_chord_back() {
     let (mut h, id) = dialog("edit.cut", "Cut");
     set_field(&mut h, id, "chords", json!({"edit.copy": "Cmd+K J", "edit.cut": "Cmd+K X"}));
     h.run_steps(2);
-    h.get_by_label("Add Chord").click();
-    h.run_steps(2);
-    chord(&mut h, (Key::K, Modifiers::COMMAND), Key::J);
+    record_chord(&mut h, id, (Key::K, Modifiers::COMMAND), Key::J);
     h.get_by_label("Undo Changes").click();
     h.run_steps(2);
     assert_eq!(field(&h, id, "chords"), json!({"edit.copy": "Cmd+K J", "edit.cut": "Cmd+K X"}));
@@ -141,15 +155,20 @@ fn undo_puts_the_commands_old_chord_back() {
 }
 
 #[test]
-fn a_chord_is_deleted_with_its_cross_and_use_default() {
+fn a_chord_is_deleted_with_its_cross_and_the_reset_icon() {
     let (mut h, id) = dialog("edit.copy", "Copy");
-    set_field(&mut h, id, "chords", json!({"edit.copy": "Cmd+K J"}));
+    set_field(&mut h, id, "chords", json!({"edit.copy": "Cmd+K J", "edit.cut": "Cmd+K X"}));
     set_field(&mut h, id, "when", json!({"edit.copy": "hasDocument"}));
     h.run_steps(2);
-    h.get_by_label("Use Default").click();
+    h.get_by_label(&format!("Reset to {}", crate::shortcuts::pretty("Cmd+C"))).click();
+    h.run_steps(2);
+    assert_eq!(field(&h, id, "chords"), json!({"edit.cut": "Cmd+K X"}));
+    assert_eq!(field(&h, id, "when"), json!({}));
+    set_field(&mut h, id, "chords", json!({"edit.copy": "Cmd+K J"}));
+    h.run_steps(2);
+    h.get_by_label(&format!("{}  ×", crate::keybinds::chord::text("Cmd+K J"))).click();
     h.run_steps(2);
     assert_eq!(field(&h, id, "chords"), json!({}));
-    assert_eq!(field(&h, id, "when"), json!({}));
 }
 
 #[test]
@@ -224,6 +243,8 @@ fn a_key_may_be_shared_when_the_conditions_exclude_each_other() {
     h.run_steps(2);
     key(&mut h, Key::F9, true, Modifiers::NONE);
     h.run_steps(2);
+    h.key_press(Key::Enter);
+    h.run_steps(2);
     assert_eq!(field(&h, id, "overrides")["edit.cut"], json!("F9"));
     assert_eq!(field(&h, id, "conflict"), Value::Null, "no clash: they never hold together");
     crate::dialogs::confirm(h.state_mut(), id).unwrap();
@@ -241,6 +262,8 @@ fn the_same_key_clashes_when_the_conditions_overlap() {
     h.get_by_label(&crate::shortcuts::pretty("Cmd+X")).click();
     h.run_steps(2);
     key(&mut h, Key::F9, true, Modifiers::NONE);
+    h.run_steps(2);
+    h.key_press(Key::Enter);
     h.run_steps(2);
     assert_eq!(field(&h, id, "conflict")["with"], json!("edit.copy"));
 }
@@ -303,7 +326,7 @@ fn unknown_ids_in_a_backup_are_skipped_with_a_note() {
 #[test]
 fn a_dialog_made_by_an_older_build_still_works() {
     let (mut h, id) = dialog("edit.copy", "Copy");
-    for name in ["chords", "when", "whenEdit", "captureChord", "chordFirst", "chordConflict"] {
+    for name in ["chords", "when", "whenEdit", "__recSteps", "chordConflict"] {
         h.state_mut().ui.dialog_mut(id).unwrap().fields.remove(name);
     }
     h.run_steps(3);

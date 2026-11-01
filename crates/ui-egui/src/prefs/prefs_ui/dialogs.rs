@@ -128,16 +128,12 @@ pub(super) fn settings_height(available: f32, item_spacing: f32, button_height: 
     (available - (item_spacing + 8.0 + button_height + 4.0)).max(160.0)
 }
 
-/// The least width Keyboard Shortcuts keeps on a small screen: the command, key, further keys and
-/// When columns still fit.
-const SHORTCUTS_MIN_WIDTH: f32 = 820.0;
-
 /// Max dialog width for our dialogs. Preferences fills the width it is given (`available`, its
 /// resizable area).
 pub fn width(fields: &Map<String, Value>, available: f32) -> Option<f32> {
     match fields.get("__prefsui").and_then(Value::as_str)? {
         "prefs" => Some(available.max(380.0)),
-        "shortcuts" => Some(available.clamp(SHORTCUTS_MIN_WIDTH, 1000.0)),
+        "shortcuts" => Some(available.max(super::shortcuts_window::MIN.x)),
         _ => Some(460.0),
     }
 }
@@ -218,7 +214,8 @@ pub(super) fn toolbar_tab(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     // As many (checkbox + name, key) pairs per row as the width holds, tools running down each column.
     let columns = toolbar_columns(ui.available_width());
     let rows = crate::state::Tool::ALL.len().div_ceil(columns);
-    egui::ScrollArea::vertical().max_height(380.0).auto_shrink([false, true]).id_salt("toolbar-scroll").show(ui, |ui| {
+    let height = super::shortcuts_window::list_height(ui, "toolbar", true);
+    egui::ScrollArea::vertical().max_height(height).min_scrolled_height(height).auto_shrink([false, false]).id_salt("toolbar-scroll").show(ui, |ui| {
         egui::Grid::new("toolbar-grid").num_columns(columns * 2).spacing([16.0, 4.0]).show(ui, |ui| {
             for row in 0..rows {
                 for column in 0..columns {
@@ -242,9 +239,11 @@ pub(super) fn toolbar_tab(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
             }
         });
     });
-    if ui.button(tl!("Restore Defaults")).clicked() {
-        hidden.clear();
-    }
+    super::shortcuts_window::footer(ui, "toolbar", |ui| {
+        if ui.button(tl!("Restore Defaults")).clicked() {
+            hidden.clear();
+        }
+    });
     f.insert("toolbarHidden".into(), json!(hidden));
 }
 

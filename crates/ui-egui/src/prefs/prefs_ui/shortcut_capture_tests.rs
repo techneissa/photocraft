@@ -55,6 +55,8 @@ fn toolbar_shortcut_can_be_captured_and_restored_on_restart() {
     h.run_steps(2);
     h.key_press(Key::F6);
     h.run_steps(2);
+    h.key_press(Key::Enter);
+    h.run_steps(2);
     assert_eq!(field(&h, id, "overrides")["tools.select.pencil"], json!("F6"));
     crate::dialogs::confirm(h.state_mut(), id).unwrap();
     h.run_steps(2);
@@ -148,6 +150,9 @@ fn capture(h: &mut Harness<'_, PhotocraftApp>, button: &str, modifier: Key, held
     key(h, k, false, held);
     key(h, modifier, false, Modifiers::NONE);
     h.run_steps(2);
+    // Enter accepts the recording.
+    h.key_press(Key::Enter);
+    h.run_steps(2);
 }
 
 fn captured_ctrl_k(ppp: f32, gpu: bool) -> Harness<'static, PhotocraftApp> {
@@ -195,6 +200,8 @@ fn shift_is_recorded_when_modifier_key_events_carry_no_bits() {
     key(&mut h, Key::ShiftLeft, true, Modifiers::NONE);
     h.run_steps(1);
     key(&mut h, Key::F6, true, Modifiers::NONE);
+    h.run_steps(2);
+    h.key_press(Key::Enter);
     h.run_steps(2);
     assert_eq!(field(&h, id, "overrides")["edit.search"], json!("Shift+F6"));
     assert_eq!(field(&h, id, "capture"), json!(false));
@@ -264,6 +271,8 @@ fn every_modifier_key_waits_for_the_real_key() {
         assert!(field(&h, id, "overrides").get("edit.search").is_none(), "{modifier:?} alone assigns nothing");
         key(&mut h, Key::J, true, held);
         h.run_steps(2);
+        h.key_press(Key::Enter);
+        h.run_steps(2);
         let want = crate::prefs_ui::shortcut_text(Key::J, held).unwrap();
         assert_eq!(field(&h, id, "overrides")["edit.search"], json!(want), "{modifier:?}");
     }
@@ -300,6 +309,8 @@ fn a_function_key_moved_off_a_panel_toggle_runs_its_new_command() {
     key(&mut h, Key::F5, true, Modifiers::NONE);
     h.run_steps(1);
     key(&mut h, Key::F5, false, Modifiers::NONE);
+    h.run_steps(2);
+    h.key_press(Key::Enter);
     h.run_steps(2);
     let message = field(&h, id, "message");
     assert!(message.as_str().unwrap().contains("already in use"), "{message}");
@@ -339,6 +350,11 @@ fn capture_key(h: &mut Harness<'_, PhotocraftApp>, id: u64, k: Key, m: Modifiers
     h.run_steps(2);
     key(h, k, false, m);
     h.run_steps(2);
+    // Enter accepts the recording (a refused key has already ended it).
+    if h.state().ui.dialogs.iter().any(|d| d.id == id && d.fields.get("capture") == Some(&json!(true))) {
+        h.key_press(Key::Enter);
+        h.run_steps(2);
+    }
 }
 
 fn click(h: &mut Harness<'_, PhotocraftApp>, label: &str) {
@@ -392,12 +408,13 @@ fn a_system_key_is_refused() {
     assert!(!crate::prefs_ui::reserved_shortcut("garbage+"));
 }
 
-/// The conflict describes the bindings as the capture left them: Reset All, Use Default or
+/// The conflict describes the bindings as the capture left them: Reset All, the reset icon or
 /// Escape after it makes it stale, so Accept can't take a key nothing holds any more.
 #[test]
 fn a_conflict_goes_stale_when_the_bindings_change() {
-    for undo in ["Reset All to Defaults", "Use Default", "escape"] {
-        let (mut h, id) = dialog(1.0, "edit.cut", "");
+    let reset_icon = format!("Reset to {}", crate::shortcuts::pretty("Cmd+X"));
+    for undo in ["Reset All to Defaults", reset_icon.as_str(), "escape"] {
+        let (mut h, id) = dialog(1.0, "edit.cut", "Cut");
         capture_key(&mut h, id, Key::C, Modifiers::COMMAND);
         assert!(field(&h, id, "conflict").is_object(), "{undo}");
         if undo == "escape" {

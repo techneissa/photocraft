@@ -2,7 +2,7 @@ use super::dialogs::toolbar_tab;
 use super::{BTreeMap, Map, PhotocraftApp, RichText, Tokens, Value, default_shortcut, json, prefs, vec2};
 
 /// The room the Visible checkbox and the colour dropdown of a Menus row take.
-const MENU_CONTROLS_WIDTH: f32 = 230.0;
+const MENU_CONTROLS_WIDTH: f32 = super::shortcuts_menus::CONTROLS_WIDTH;
 
 /// Every shortcut-bearing command (engine registry plus shell commands): (id, label, menu path,
 /// default shortcut), menu items first in Photoshop order.
@@ -10,7 +10,7 @@ pub fn shortcut_items(app: &PhotocraftApp) -> Vec<(String, String, Vec<String>, 
     let mut out: Vec<(String, String, Vec<String>, Option<String>)> = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for it in crate::menus::menu_items(app) {
-        if it.label == "---" || !seen.insert(it.id.clone()) {
+        if it.label == "---" || super::shortcuts_window::is_dynamic_item(&it.id) || !seen.insert(it.id.clone()) {
             continue;
         }
         let default = default_shortcut(&it.id).or(it.shortcut.clone().filter(|_| !app.session.prefs().shortcuts.contains_key(&it.id)));
@@ -159,7 +159,7 @@ pub(crate) fn capture_key_press(capture_mods: egui::Modifiers, i: &egui::InputSt
         if let egui::Event::ModifiersChanged(m) = e {
             mods = *m;
         }
-        if let egui::Event::Key { key, pressed: true, modifiers, .. } = e {
+        if let egui::Event::Key { key, pressed: true, repeat: false, modifiers, .. } = e {
             if is_modifier_key(*key) {
                 mods = *modifiers | modifier_key_modifiers(*key);
                 continue;
@@ -177,7 +177,8 @@ pub(crate) fn capture_key_press(capture_mods: egui::Modifiers, i: &egui::InputSt
 }
 
 /// Keyboard Shortcuts and Menus: a searchable list of commands by menu with editable shortcuts
-/// (click a shortcut, press keys; ⌫ removes it), menu visibility and colours, toolbar tools.
+/// (click a shortcut and press keys, Enter accepts; right-click or ⌫ removes it), menu visibility
+/// and colours, toolbar tools.
 pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
     let t = Tokens::get(ui.ctx());
     let mut tab = f.get("tab").and_then(Value::as_u64).unwrap_or(0);
@@ -188,12 +189,10 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
             if crate::widgets::pill_tab(ui, name, tab == i as u64).clicked() {
                 tab = i as u64;
                 f.insert("capture".into(), json!(false));
-                f.insert("captureChord".into(), json!(false));
             }
         }
     });
     f.insert("tab".into(), json!(tab));
-    super::shortcuts_chord::capture(app, ui, f);
     ui.add_space(6.0);
     if tab == 2 {
         toolbar_tab(ui, f);
@@ -220,6 +219,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     let mut colors: BTreeMap<String, String> = f.get("colors").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
     let mut selected = f.get("selected").and_then(Value::as_str).unwrap_or("").to_string();
     let mut capture = f.get("capture").and_then(Value::as_bool).unwrap_or(false);
+    let mut rec_steps = super::shortcuts_record::load_steps(f);
     let mut message = f.get("message").and_then(Value::as_str).unwrap_or("").to_string();
     let mut message_warning = f.get("messageWarning").and_then(Value::as_bool).unwrap_or(false);
     let items = shortcut_items(app);
@@ -229,122 +229,73 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
         ui.add_space(4.0);
     }
     let mut filter = f.get("filter").and_then(Value::as_str).unwrap_or("").to_string();
+    // The search fills the row; Add Shortcut sits at its right end.
+    let mut add_clicked = false;
     ui.horizontal(|ui| {
-        ui.label(RichText::new(tl!("Search")).color(t.text_dim));
-        ui.add(egui::TextEdit::singleline(&mut filter).desired_width(260.0).hint_text(tl!("command or shortcut")));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if tab == 0 {
+                add_clicked = ui
+                    .add_enabled(!selected.is_empty(), egui::Button::new(tl!("Add Shortcut")))
+                    .on_hover_text(tl!("Record one more shortcut: a key, or two keys in a row for a chord"))
+                    .clicked();
+            }
+            let width = ui.available_width();
+            ui.add(egui::TextEdit::singleline(&mut filter).desired_width(width).hint_text(tl!("Search commands, shortcuts, ⌘ ⇧ ⌃ ⌥")))
+                .accessible_name(tl!("Search"));
+        });
     });
     f.insert("filter".into(), json!(filter));
+    if add_clicked {
+        capture = true;
+        capture_alt = true;
+        rec_steps.clear();
+        message.clear();
+        message_warning = false;
+    }
     // Menu path and command label as shown in the menus, in the UI language.
     let shown = |id: &str, label: &str, path: &[String]| -> (Vec<String>, String) {
         let lang = crate::i18n::current();
         (path.iter().map(|p| crate::i18n::tr(lang, p).to_string()).collect(), crate::i18n::tr_id(lang, id, label).to_string())
     };
-    let eff = |overrides: &BTreeMap<String, String>, id: &str, def: &Option<String>| -> Option<String> {
-        match overrides.get(id) {
-            Some(s) if s.is_empty() => None,
-            Some(s) => Some(s.clone()),
-            None => def.clone(),
-        }
-    };
-    // A command's further keys as the dialog stands: its edited list, else its defaults.
-    let eff_alts = |alts: &BTreeMap<String, Vec<String>>, id: &str, main: Option<&str>| -> Vec<String> {
-        let mut p = prefs::Preferences::default();
-        if let Some(list) = alts.get(id) {
-            p.alternate_shortcuts.insert(id.to_string(), list.clone());
-        }
-        p.alternates(id, main)
-    };
+    let eff = super::shortcuts_record::effective;
+    let eff_alts = super::shortcuts_record::effective_alts;
     let mut capture_mods = capture_mods_field(f.get("captureMods"));
-    // Key capture for the selected command: its main key, or (Add Shortcut) one more key.
+    // Recording for the selected command: its main key, or (Add Shortcut) one more key.
+    // A click into the search box (or the condition box) ends the recording: typing is typing.
+    if capture && ui.ctx().egui_wants_keyboard_input() && ui.input(|i| i.pointer.any_pressed()) {
+        capture = false;
+        rec_steps.clear();
+    }
     if capture && tab == 0 && !selected.is_empty() {
-        let (next_mods, pressed) = ui.input(|i| capture_key_press(capture_mods, i));
-        capture_mods = next_mods;
-        if let Some((key, m)) = pressed {
-            ui.input_mut(|i| {
-                i.consume_key(m, key);
-            });
-            if key == egui::Key::Escape {
-                capture = false;
-                conflict = None;
-            } else if matches!(key, egui::Key::Backspace | egui::Key::Delete) && m.is_none() {
-                if capture_alt {
-                    alt_overrides.insert(selected.clone(), Vec::new());
-                } else {
-                    overrides.insert(selected.clone(), String::new());
-                }
-                capture = false;
-                message = tl!("Shortcut removed.").into();
-                message_warning = false;
-            } else if let Some(sc) = shortcut_text(key, m).filter(|sc| reserved_shortcut(sc)) {
-                message = crate::i18n::fmt(tl!("{shortcut} is reserved by the system and can't be assigned."), &[("shortcut", &crate::shortcuts::pretty(&sc))]);
-                message_warning = true;
-                capture = false;
-            } else if let Some(sc) = shortcut_text(key, m) {
-                let clash_ids: Vec<&str> = items
-                    .iter()
-                    .filter(|(id, _, _, def)| {
-                        let cur = eff(&overrides, id, def);
-                        *id != selected
-                            && prefs::can_overlap(&whens, id, &selected)
-                            && (cur.as_deref().and_then(prefs::normalize_shortcut) == Some(sc.clone())
-                                || eff_alts(&alt_overrides, id, cur.as_deref()).contains(&sc))
-                    })
-                    .map(|(id, ..)| id.as_str())
-                    .collect();
-                let clash: Vec<String> = items
-                    .iter()
-                    .filter(|(id, ..)| clash_ids.contains(&id.as_str()))
-                    .map(|(id, label, path, _)| {
-                        let (path, label) = shown(id, label, path);
-                        format!("{} › {}", path.join(" › "), label.trim_end_matches('…'))
-                    })
-                    .collect();
-                // What Undo Changes puts back: the command's main key and further keys as they were.
-                if let Some(first) = clash_ids.first() {
-                    conflict = Some(json!({
-                        "shortcut": sc,
-                        "with": first,
-                        // Every command holding the key: Accept takes it from all of them.
-                        "holders": clash_ids,
-                        "command": selected,
-                        "main": overrides.get(&selected),
-                        "alternates": alt_overrides.get(&selected),
-                    }));
-                } else {
-                    conflict = None;
-                }
-                if capture_alt {
-                    let def = items.iter().find(|i| i.0 == selected).and_then(|i| i.3.clone());
-                    let cur = eff(&overrides, &selected, &def);
-                    let mut keys = eff_alts(&alt_overrides, &selected, cur.as_deref());
-                    if cur.as_deref().and_then(prefs::normalize_shortcut) != Some(sc.clone()) && !keys.contains(&sc) && keys.len() < prefs::MAX_ALTERNATES {
-                        keys.push(sc.clone());
-                    }
-                    alt_overrides.insert(selected.clone(), keys);
-                } else {
-                    overrides.insert(selected.clone(), sc.clone());
-                }
-                message_warning = !clash.is_empty();
-                message = if clash.is_empty() {
-                    let template = "{shortcut} assigned.";
-                    crate::i18n::fmt(tl!(template), &[("shortcut", &crate::shortcuts::pretty(&sc))])
-                } else {
-                    let template = "{shortcut} is already in use by {commands} and will be removed from it when you click OK.";
-                    crate::i18n::fmt(tl!(template), &[("shortcut", &crate::shortcuts::pretty(&sc)), ("commands", &clash.join(", "))])
-                };
-                capture = false;
-            }
+        if ui.is_enabled() {
+            let mut staged = super::shortcuts_record::Staged { overrides: &mut overrides, alternates: &mut alt_overrides, chords: &mut chords, whens: &whens };
+            let mut rec = super::shortcuts_record::Recording {
+                add: capture_alt,
+                selected: &selected,
+                mods: &mut capture_mods,
+                steps: &mut rec_steps,
+                conflict: &mut conflict,
+                message: &mut message,
+                warning: &mut message_warning,
+            };
+            capture = super::shortcuts_record::run(ui, f, &items, &mut staged, &mut rec);
         }
+    } else {
+        rec_steps.clear();
     }
     let needle = filter.to_ascii_lowercase();
+    let query = super::shortcuts_search::parse(&needle);
     let reveal = f.remove("reveal").is_some();
     let clashes = super::shortcuts_when::clash_notes(&items, (&overrides, &alt_overrides), &chords, &whens);
-    // Fills the dialog's width, so the scrollbar sits at its right edge; on Menus the controls
-    // sit at the right end of the name column's room.
-    let name_width = (ui.available_width() - MENU_CONTROLS_WIDTH).clamp(260.0, 640.0);
-    egui::ScrollArea::both().max_height(420.0).auto_shrink([false, true]).id_salt("shortcuts-scroll").show(ui, |ui| {
+    // On Menus the name takes the row's width and the two controls sit in columns at its right end
+    // (less the scroll bar).
+    let name_width = (ui.available_width() - MENU_CONTROLS_WIDTH - ui.spacing().scroll.allocated_width() - 4.0).max(200.0);
+    let list_height = super::shortcuts_window::list_height(ui, "shortcuts", true);
+    let mut click_target: Option<String> = None;
+    egui::ScrollArea::both().max_height(list_height).min_scrolled_height(list_height).auto_shrink([false, false]).id_salt("shortcuts-scroll").show(ui, |ui| {
         let mut last_top = String::new();
-        egui::Grid::new("shortcut-grid").num_columns(4).spacing([12.0, 3.0]).striped(true).show(ui, |ui| {
+        let (grid_id, columns) = if tab == 0 { ("shortcut-grid", 4) } else { ("menu-grid", 3) };
+        egui::Grid::new(grid_id).num_columns(columns).spacing([12.0, 3.0]).striped(true).show(ui, |ui| {
             for (id, label, path, def) in &items {
                 if tab == 1 && crate::tool_shortcuts::tool(id).is_some() {
                     continue;
@@ -356,7 +307,9 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                 let hay =
                     format!("{} {} {} {} {} {}", shown_path.join(" "), shown_label, path.join(" "), label, cur.clone().unwrap_or_default(), alts.join(" "))
                         .to_lowercase();
-                if !needle.is_empty() && !hay.contains(&needle) && !id.to_ascii_lowercase().contains(&needle) {
+                let keys: Vec<String> =
+                    cur.iter().chain(&alts).cloned().chain(chords.get(id).iter().flat_map(|c| c.split_whitespace().map(str::to_string))).collect();
+                if !query.matches(&keys, &|text| hay.contains(text) || id.to_ascii_lowercase().contains(text)) {
                     continue;
                 }
                 if tab == 0 && path.is_empty() && def.is_none() && cur.is_none() && alts.is_empty() {
@@ -365,9 +318,14 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                 let top = shown_path.first().cloned().unwrap_or_else(|| tl!("Other").into());
                 if top != last_top {
                     ui.label(RichText::new(&top).font(crate::theme::semibold(12.5)).color(t.text));
-                    ui.label("");
-                    ui.label("");
-                    super::shortcuts_when::header(ui, &t, tab);
+                    if tab == 1 {
+                        super::shortcuts_menus::header(ui, &t, tl!("Visible"), super::shortcuts_menus::VISIBLE_WIDTH);
+                        super::shortcuts_menus::header(ui, &t, tl!("Color"), super::shortcuts_menus::COLOR_WIDTH);
+                    } else {
+                        ui.label("");
+                        ui.label("");
+                        super::shortcuts_when::header(ui, &t, tab);
+                    }
                     ui.end_row();
                     last_top = top;
                 }
@@ -376,54 +334,86 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     _ => shown_label,
                 };
                 let sel = selected == *id;
-                if tab == 1 {
-                    ui.set_min_width(name_width);
-                }
-                let name_row = ui.selectable_label(sel, RichText::new(format!("   {name}")).color(t.text_dim));
-                if name_row.clicked() {
+                let slot = super::shortcuts_rows::selection_slot(ui);
+                let name_label = egui::Label::new(RichText::new(format!("   {name}")).color(if sel { t.text } else { t.text_dim }))
+                    .sense(egui::Sense::click())
+                    .selectable(false);
+                let name_row = if tab == 1 {
+                    // The name's column takes the row's width; the controls follow at its right end.
+                    ui.allocate_ui_with_layout(vec2(name_width, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        ui.set_min_width(name_width);
+                        ui.add(name_label)
+                    })
+                    .inner
+                } else {
+                    ui.add(name_label)
+                };
+                if name_row.clicked() || name_row.secondary_clicked() {
                     selected = id.clone();
                 }
                 if sel && reveal {
                     name_row.scroll_to_me(Some(egui::Align::Center));
                 }
+                let mut remove_row = false;
+                let mut reset_row = false;
                 if tab == 0 {
-                    let text = if sel && capture && !capture_alt {
-                        tl!("Press keys…").to_string()
+                    name_row.context_menu(|ui| {
+                        if ui.button(tl!("Remove Shortcut")).clicked() {
+                            remove_row = true;
+                            ui.close();
+                        }
+                    });
+                    let recording = sel && capture;
+                    let text = if recording && !capture_alt {
+                        if rec_steps.is_empty() { tl!("Press keys…").to_string() } else { super::shortcuts_record::shown(&rec_steps) }
                     } else {
                         cur.as_deref().map(crate::shortcuts::pretty).unwrap_or_default()
                     };
-                    let changed = overrides.contains_key(id) || alt_overrides.contains_key(id);
-                    let r = ui.add(
-                        egui::Button::new(RichText::new(tl!(&text)).size(12.0).color(if changed { t.accent_text } else { t.text })).min_size(vec2(120.0, 18.0)),
-                    );
-                    // An unassigned shortcut shows no text: name it by the command it binds.
-                    let r = if text.is_empty() { r.labelled_by(name_row.id) } else { r };
-                    if r.clicked() {
-                        selected = id.clone();
-                        capture = true;
-                        capture_alt = false;
-                        message.clear();
-                        message_warning = false;
-                    }
+                    let changed = super::shortcuts_rows::changed((&overrides, &alt_overrides, &chords, &whens), id, def.as_deref());
+                    ui.horizontal(|ui| {
+                        let r = ui.add(
+                            egui::Button::new(RichText::new(tl!(&text)).size(12.0).color(if changed { t.accent_text } else { t.text }))
+                                .min_size(vec2(120.0, 18.0)),
+                        );
+                        // An unassigned shortcut shows no text: name it by the command it binds.
+                        let r = if text.is_empty() { r.labelled_by(name_row.id) } else { r };
+                        if r.clicked() {
+                            click_target = Some(id.clone());
+                        }
+                        if r.secondary_clicked() {
+                            selected = id.clone();
+                        }
+                        r.context_menu(|ui| {
+                            if ui.button(tl!("Remove Shortcut")).clicked() {
+                                remove_row = true;
+                                ui.close();
+                            }
+                        });
+                        if recording && !capture_alt && message_warning {
+                            super::shortcuts_rows::warning_icon(ui, &t, &message);
+                        }
+                        if changed && super::shortcuts_rows::reset_button(ui, def.as_deref()) {
+                            reset_row = true;
+                        }
+                    });
                     // The further keys (F3 beside ⌘C), each removable on its own, as Photoshop
                     // lists them as rows of their own (#3665).
                     ui.horizontal(|ui| {
                         for k in &alts {
                             let b = egui::Button::new(RichText::new(format!("{}  ×", crate::shortcuts::pretty(k))).size(12.0).color(t.text))
                                 .min_size(vec2(64.0, 18.0));
-                            if ui.add(b).on_hover_text(tl!("Delete Shortcut")).clicked() {
+                            if ui.add(b).on_hover_text(tl!("Remove Shortcut")).clicked() {
                                 alt_overrides.insert(id.clone(), alts.iter().filter(|x| *x != k).cloned().collect());
                                 selected = id.clone();
-                                message = tl!("Shortcut removed.").into();
-                                message_warning = false;
                             }
                         }
                         super::shortcuts_chord::chip(ui, &t, id, &mut chords, &mut selected);
-                        if sel && capture && capture_alt {
-                            ui.label(RichText::new(tl!("Press keys…")).size(11.0).color(t.accent_text));
-                        }
-                        if changed {
-                            ui.label(RichText::new(tl!("modified")).color(t.text_faint).size(10.5));
+                        if recording && capture_alt {
+                            let live = if rec_steps.is_empty() { tl!("Press keys…").to_string() } else { super::shortcuts_record::shown(&rec_steps) };
+                            ui.label(RichText::new(live).size(12.0).color(t.accent_text));
+                            if message_warning {
+                                super::shortcuts_rows::warning_icon(ui, &t, &message);
+                            }
                         }
                     });
                     super::shortcuts_when::cell(ui, &t, (id, &name, clashes.get(id)), &mut whens, &mut when_edit, &mut selected);
@@ -431,123 +421,124 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                     // Edit › Menus, Keyboard Shortcuts, Preferences, Save and Exit always stay (#5096).
                     let hideable = photocraft_engine::prefs::MenuCustomization::hideable(id);
                     let mut visible = !hideable || !hidden.contains(id);
-                    ui.add_enabled_ui(hideable, |ui| crate::widgets::checkbox(ui, &mut visible, tl!("Visible")));
+                    super::shortcuts_menus::visible_box(ui, &t, &mut visible, hideable);
                     if visible {
                         hidden.retain(|h| h != id);
                     } else if !hidden.contains(id) {
                         hidden.push(id.clone());
                     }
                     let mut col = colors.get(id).cloned().unwrap_or_else(|| "none".into());
-                    let opts: Vec<(String, &str)> =
-                        ["none", "red", "orange", "yellow", "green", "blue", "violet", "gray"].iter().map(|c| (c.to_string(), *c)).collect();
-                    crate::widgets::dropdown(ui, &format!("menu-color-{id}"), tl!("Color"), &mut col, &opts, 90.0);
+                    super::shortcuts_menus::color_dot(ui, &t, &mut col);
                     if col == "none" {
                         colors.remove(id);
                     } else {
                         colors.insert(id.clone(), col);
                     }
                 }
+                super::shortcuts_rows::paint_selection(ui, &t, slot, name_row.rect, sel);
+                if remove_row || reset_row {
+                    let mut b =
+                        super::shortcuts_rows::Bindings { overrides: &mut overrides, alternates: &mut alt_overrides, chords: &mut chords, whens: &mut whens };
+                    if reset_row {
+                        super::shortcuts_rows::reset(&mut b, id);
+                    } else {
+                        super::shortcuts_rows::remove(&mut b, id, def.as_deref());
+                    }
+                    selected = id.clone();
+                }
                 ui.end_row();
             }
         });
     });
-    ui.add_space(6.0);
-    if tab == 0 {
-        ui.horizontal(|ui| {
-            let has_sel = !selected.is_empty();
-            if ui.add_enabled(has_sel, egui::Button::new(tl!("Add Shortcut"))).clicked() {
-                capture = true;
-                capture_alt = true;
-                message.clear();
-                message_warning = false;
-            }
-            capture &= !super::shortcuts_chord::add_button(ui, f, has_sel);
-            if ui.add_enabled(has_sel, egui::Button::new(tl!("Use Default"))).clicked() {
-                overrides.remove(&selected);
-                alt_overrides.remove(&selected);
-                chords.remove(&selected);
-                whens.remove(&selected);
-                message = tl!("Default restored.").into();
-                message_warning = false;
-            }
-            if ui.add_enabled(has_sel, egui::Button::new(tl!("Delete Shortcut"))).clicked() {
-                overrides.insert(selected.clone(), String::new());
-                message = tl!("Shortcut removed.").into();
-                message_warning = false;
-            }
+    // A click on a shortcut starts recording it.
+    if let Some(id) = click_target {
+        selected = id;
+        capture = true;
+        capture_alt = false;
+        rec_steps.clear();
+        message.clear();
+        message_warning = false;
+    }
+    // ⌫ or Delete on the selected row removes its shortcuts (not while typing or recording).
+    if tab == 0
+        && !capture
+        && ui.is_enabled()
+        && when_edit.is_none()
+        && !ui.ctx().egui_wants_keyboard_input()
+        && !selected.is_empty()
+        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Backspace) || i.consume_key(egui::Modifiers::NONE, egui::Key::Delete))
+    {
+        let default = items.iter().find(|i| i.0 == selected).and_then(|i| i.3.clone());
+        let mut b = super::shortcuts_rows::Bindings { overrides: &mut overrides, alternates: &mut alt_overrides, chords: &mut chords, whens: &mut whens };
+        super::shortcuts_rows::remove(&mut b, &selected, default.as_deref());
+    }
+    // Under the list, in a space of its own (see `shortcuts_window::footer`).
+    super::shortcuts_window::footer(ui, "shortcuts", |ui| {
+        ui.add_space(6.0);
+        if tab == 0 {
             if ui.button(tl!("Reset All to Defaults")).clicked() {
                 overrides.clear();
                 alt_overrides.clear();
                 chords.clear();
                 whens.clear();
-                message = tl!("All shortcuts reset to PhotoCraft defaults.").into();
-                message_warning = false;
             }
-            // A Photoshop set (`.kys`) fills the overrides; the file arrives after this frame
-            // and `kys_import` writes the dialog's fields then (#1163).
-            if ui.button(tl!("Import Shortcuts…")).on_hover_text(tl!("Load a keyboard shortcut set saved as .kys")).clicked()
-                && let Err(e) = crate::kys_import::import_dialog(app)
-            {
-                message = e;
-                message_warning = false;
-            }
-        });
-    } else if ui.button(tl!("Show All Menu Items")).clicked() {
-        hidden.clear();
-        colors.clear();
-    }
-    super::shortcuts_when::strip(ui, &t, tab, &items, &mut whens, &mut when_edit);
-    if !message.is_empty() {
-        ui.label(RichText::new(&message).color(if message_warning { t.warning } else { t.text_dim }));
-    }
-    // The conflict describes the bindings as the capture left them: any later change (Use
-    // Default, Delete, ×, Reset All, another command or set) makes it stale, and it goes.
-    let state = conflict_state(&overrides, &alt_overrides, &selected, f.get("activeSet"));
-    if conflict.as_ref().and_then(|c| c.get("state")).is_some_and(|s| s.as_u64() != Some(state)) {
-        conflict = None;
-    }
-    if tab == 0
-        && let Some(c) = conflict.clone()
-    {
-        let (key, with, command) =
-            (c["shortcut"].as_str().unwrap_or_default(), c["with"].as_str().unwrap_or_default(), c["command"].as_str().unwrap_or_default());
-        ui.horizontal(|ui| {
-            if ui.button(tl!("Accept and Go to Conflict")).on_hover_text(tl!("Take the shortcut from the other command and select it")).clicked() {
-                let holders: Vec<String> = serde_json::from_value(c["holders"].clone()).unwrap_or_else(|_| vec![with.to_string()]);
-                for holder in &holders {
-                    let def = items.iter().find(|i| i.0 == *holder).and_then(|i| i.3.clone());
-                    let cur = eff(&overrides, holder, &def);
-                    if cur.as_deref().and_then(prefs::normalize_shortcut).as_deref() == Some(key) {
-                        overrides.insert(holder.clone(), String::new());
+        } else if ui.button(tl!("Show All Menu Items")).clicked() {
+            hidden.clear();
+            colors.clear();
+        }
+        super::shortcuts_when::strip(ui, &t, tab, &items, &mut whens, &mut when_edit);
+        if !message.is_empty() {
+            ui.label(RichText::new(&message).color(if message_warning { t.warning } else { t.text_dim }));
+        }
+        // The conflict describes the bindings as the recording left them: any later change (the
+        // reset icon, Remove Shortcut, ×, Reset All, another command or set) makes it stale, and it goes.
+        let state = conflict_state(&overrides, &alt_overrides, &selected, f.get("activeSet"));
+        if conflict.as_ref().and_then(|c| c.get("state")).is_some_and(|s| s.as_u64() != Some(state)) {
+            conflict = None;
+        }
+        if tab == 0
+            && let Some(c) = conflict.clone()
+        {
+            let (key, with, command) =
+                (c["shortcut"].as_str().unwrap_or_default(), c["with"].as_str().unwrap_or_default(), c["command"].as_str().unwrap_or_default());
+            ui.horizontal(|ui| {
+                if ui.button(tl!("Accept and Go to Conflict")).on_hover_text(tl!("Take the shortcut from the other command and select it")).clicked() {
+                    let holders: Vec<String> = serde_json::from_value(c["holders"].clone()).unwrap_or_else(|_| vec![with.to_string()]);
+                    for holder in &holders {
+                        let def = items.iter().find(|i| i.0 == *holder).and_then(|i| i.3.clone());
+                        let cur = eff(&overrides, holder, &def);
+                        if cur.as_deref().and_then(prefs::normalize_shortcut).as_deref() == Some(key) {
+                            overrides.insert(holder.clone(), String::new());
+                        }
+                        let keys = eff_alts(&alt_overrides, holder, eff(&overrides, holder, &def).as_deref());
+                        if keys.iter().any(|k| k == key) {
+                            alt_overrides.insert(holder.clone(), keys.into_iter().filter(|k| k != key).collect());
+                        }
                     }
-                    let keys = eff_alts(&alt_overrides, holder, eff(&overrides, holder, &def).as_deref());
-                    if keys.iter().any(|k| k == key) {
-                        alt_overrides.insert(holder.clone(), keys.into_iter().filter(|k| k != key).collect());
-                    }
+                    selected = with.to_string();
+                    filter.clear();
+                    message = tl!("Choose a new shortcut for this command, or leave it without one.").into();
+                    message_warning = false;
+                    conflict = None;
                 }
-                selected = with.to_string();
-                filter.clear();
-                message = tl!("Choose a new shortcut for this command, or leave it without one.").into();
-                message_warning = false;
-                conflict = None;
-            }
-            if ui.button(tl!("Undo Changes")).on_hover_text(tl!("Put this command's shortcuts back as they were")).clicked() {
-                match c["main"].as_str() {
-                    Some(m) => overrides.insert(command.to_string(), m.to_string()),
-                    None => overrides.remove(command),
-                };
-                match serde_json::from_value::<Vec<String>>(c["alternates"].clone()) {
-                    Ok(list) => alt_overrides.insert(command.to_string(), list),
-                    Err(_) => alt_overrides.remove(command),
-                };
-                selected = command.to_string();
-                message = tl!("Changes undone.").into();
-                message_warning = false;
-                conflict = None;
-            }
-        });
-    }
-    super::shortcuts_chord::conflict_row(ui, f, &mut chords, (&mut selected, &mut filter), (&mut message, &mut message_warning));
+                if ui.button(tl!("Undo Changes")).on_hover_text(tl!("Put this command's shortcuts back as they were")).clicked() {
+                    match c["main"].as_str() {
+                        Some(m) => overrides.insert(command.to_string(), m.to_string()),
+                        None => overrides.remove(command),
+                    };
+                    match serde_json::from_value::<Vec<String>>(c["alternates"].clone()) {
+                        Ok(list) => alt_overrides.insert(command.to_string(), list),
+                        Err(_) => alt_overrides.remove(command),
+                    };
+                    selected = command.to_string();
+                    message.clear();
+                    message_warning = false;
+                    conflict = None;
+                }
+            });
+        }
+        super::shortcuts_chord::conflict_row(ui, f, &mut chords, (&mut selected, &mut filter), (&mut message, &mut message_warning));
+    });
     super::shortcuts_when::store(f, &when_edit);
     f.insert("chords".into(), json!(chords));
     f.insert("when".into(), json!(whens));
@@ -567,6 +558,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     f.insert("colors".into(), json!(colors));
     f.insert("selected".into(), json!(selected));
     f.insert("capture".into(), json!(capture));
+    f.insert("__recSteps".into(), json!(if capture { rec_steps } else { Vec::new() }));
     if capture {
         f.insert("captureMods".into(), capture_mods_json(capture_mods));
     } else {
