@@ -3,7 +3,7 @@
 
 use std::io::Write;
 
-use photocraft_ml::{Model, model_path, models_dir};
+use photocraft_ml::{Model, install_dir, model_location};
 
 use crate::Result;
 use crate::args::{ModelsAction, ModelsArgs};
@@ -20,12 +20,13 @@ fn chosen(name: &str) -> Vec<Model> {
 pub(crate) fn models(a: &ModelsArgs, out: &mut dyn Write) -> Result {
     match &a.action {
         ModelsAction::List => {
-            let dir = models_dir();
             for model in Model::ALL {
-                let path = dir
-                    .as_ref()
+                // Where it is installed, else where a download would put it.
+                let found = model_location(model);
+                let path = found.as_ref().map(|l| l.dir.clone()).or_else(|| install_dir(model));
+                let path = path
                     .map_or_else(|| format!("{} (models directory unavailable)", model.file_name()), |dir| dir.join(model.file_name()).display().to_string());
-                let installed = if model_path(model).is_some() { "yes" } else { "no" };
+                let installed = found.map_or_else(|| "no".to_string(), |l| format!("yes ({})", l.source.label()));
                 writeln!(out, "{}\t{}\t{path}\tinstalled: {installed}", model.label(), model.licence())?;
             }
         }
@@ -82,7 +83,7 @@ mod tests {
         assert_eq!(run.code, 0, "{}", run.stderr);
         assert_eq!(run.stdout.lines().count(), Model::ALL.len());
         for model in Model::ALL {
-            let status = if model_path(model).is_some() { "yes" } else { "no" };
+            let status = model_location(model).map_or_else(|| "no".to_string(), |l| format!("yes ({})", l.source.label()));
             let line = run.stdout.lines().find(|line| line.contains(model.label())).expect("a line per model");
             assert!(line.contains(model.licence()) && line.contains(model.file_name()));
             assert!(line.ends_with(&format!("installed: {status}")));

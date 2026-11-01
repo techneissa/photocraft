@@ -11,7 +11,8 @@
 //!   composited back so only the hole changes.
 //!
 //! Models are **not** in the repository or the binary. They are looked up by [`model_path`] in
-//! `PHOTOCRAFT_MODELS_DIR`, else the per-user data folder (see [`models_dir`]); an absent model is
+//! `PHOTOCRAFT_MODELS_DIR` if set, else the folder shared by the Craft apps
+//! (`ArtCraft/models/<model-id>/`), else the old `PhotoCraft/models` (see `store.rs`); an absent model is
 //! [`MlError::ModelMissing`], and callers fall back to the classical algorithms. Licences and
 //! sources are listed in `ATTRIBUTION.md` and `docs/ml.md`.
 //!
@@ -36,7 +37,7 @@ pub use inpaint::{INPAINT_SIZE, inpaint, inpaint_with};
 pub use install::{download, remove};
 pub use ram::{check_memory, min_total_memory, physical_memory};
 pub use segment::{SEGMENT_SIZE, segment_subject, segment_subject_with};
-pub use store::{Model, disable_models, model_path, models_dir, models_disabled};
+pub use store::{Located, MODELS_DIR_VAR, Model, ModelFile, Source, disable_models, install_dir, model_location, model_path, models_dir, models_disabled};
 
 use std::fmt;
 

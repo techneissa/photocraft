@@ -9,21 +9,27 @@ PhotoCraft's optional ML features run local ONNX models through the `photocraft-
 
 ## Install
 
-In the app, **Edit › Preferences › AI Models** lists the models with their size and licence, and downloads (with progress and cancel) or removes each one; nothing is fetched until you click Download, and no image ever leaves the computer. On the command line, `photocraft-cli models fetch` downloads the models into the resolved models directory (`photocraft-cli models list` shows what is installed). Both verify the size and SHA-256 before installing. To install manually, set `PHOTOCRAFT_MODELS_DIR` and fetch either or both files:
+In the app, **Edit › Preferences › AI Models** lists the models with their size and licence, and downloads (with progress and cancel) or removes each one; nothing is fetched until you click Download, and no image ever leaves the computer. On the command line, `photocraft-cli models fetch` downloads the models into the resolved models directory (`photocraft-cli models list` shows what is installed). Both verify the size and SHA-256 before installing. To install manually, put the files in the model's folder in the shared models folder (below), or in a folder named by `PHOTOCRAFT_MODELS_DIR`:
 
 ```sh
-export PHOTOCRAFT_MODELS_DIR="$HOME/Library/Application Support/PhotoCraft/models"
-mkdir -p "$PHOTOCRAFT_MODELS_DIR"
-curl -L --fail -o "$PHOTOCRAFT_MODELS_DIR/birefnet_lite.onnx" https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx
-curl -L --fail -o "$PHOTOCRAFT_MODELS_DIR/lama_fp32.onnx" https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx
+models="$HOME/Library/Application Support/ArtCraft/models"
+mkdir -p "$models/birefnet-lite" "$models/lama"
+curl -L --fail -o "$models/birefnet-lite/birefnet_lite.onnx" https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx
+curl -L --fail -o "$models/lama/lama_fp32.onnx" https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx
 ```
 
-The app reads `PHOTOCRAFT_MODELS_DIR` when set. Otherwise it uses the per-user data directory: macOS `~/Library/Application Support/PhotoCraft/models`, Linux `$XDG_DATA_HOME/photocraft/models` (or `~/.local/share/photocraft/models`), and Windows `%APPDATA%\PhotoCraft\models`. The app checks the expected file size before loading a model; a missing or truncated file is treated as unavailable.
+A model is looked for in this order, and the first folder that holds all of its files (each with the published size and SHA-256) wins:
 
-| File | Model and input | Published size | SHA-256 | License | Source file |
+1. `PHOTOCRAFT_MODELS_DIR`, when set (then no other folder is used): `<dir>/<model-id>/`, else the files directly in `<dir>`.
+2. The folder shared by the Craft apps, so a model is never downloaded twice: macOS `~/Library/Application Support/ArtCraft/models/<model-id>/`, Linux `$XDG_DATA_HOME/artcraft/models/<model-id>/` (or `~/.local/share/artcraft/models/...`), Windows `%APPDATA%\ArtCraft\models\<model-id>\`.
+3. The old folder, read only, with the files directly in it: macOS `~/Library/Application Support/PhotoCraft/models`, Linux `$XDG_DATA_HOME/photocraft/models`, Windows `%APPDATA%\PhotoCraft\models`.
+
+New downloads go into the first folder of step 1 or 2. Nothing is ever written to or deleted from the old folder. Preferences › AI Models and `photocraft-cli models list` say which folder each model was found in. The model ids are `birefnet-lite` and `lama`. A model may have several files, each with its own pinned size and SHA-256; it counts as installed only when all of them are there.
+
+| File (in the model folder) | Model and input | Published size | SHA-256 | License | Source file |
 |---|---|---:|---|---|---|
-| `birefnet_lite.onnx` | BiRefNet-lite, 1024 × 1024 | 224,005,088 bytes | `5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333` | MIT | [onnx-community/BiRefNet_lite-ONNX](https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/blob/main/onnx/model.onnx) |
-| `lama_fp32.onnx` | LaMa, 512 × 512 | 208,044,816 bytes | `1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6` | Apache-2.0 | [Carve/LaMa-ONNX](https://huggingface.co/Carve/LaMa-ONNX/blob/main/lama_fp32.onnx) |
+| `birefnet-lite/birefnet_lite.onnx` | BiRefNet-lite, 1024 × 1024 | 224,005,088 bytes | `5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333` | MIT | [onnx-community/BiRefNet_lite-ONNX](https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/blob/main/onnx/model.onnx) |
+| `lama/lama_fp32.onnx` | LaMa, 512 × 512 | 208,044,816 bytes | `1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6` | Apache-2.0 | [Carve/LaMa-ONNX](https://huggingface.co/Carve/LaMa-ONNX/blob/main/lama_fp32.onnx) |
 
 ## Runtime and licences
 
