@@ -38,6 +38,9 @@ impl Sam3Backend for Fake {
             }
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
+        if cancel() {
+            return Err(photocraft_ml::MlError::Cancelled);
+        }
         let token = self.encodes.fetch_add(1, Ordering::SeqCst) + 1;
         *self.current() = Some(token);
         Ok(EncodedImage { token, w: rgb.w, h: rgb.h })
