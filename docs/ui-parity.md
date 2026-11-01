@@ -113,7 +113,7 @@ Triangle and Curvature Pen (minus legacy Rounded Rectangle and Targeted Adjustme
 | ⇧ square/circle, ⌥ from centre, live W × H readout (marquee) | done | `marquee_tests.rs` |
 | ⇧ add, ⌥ subtract, ⇧⌥ intersect from modifiers at press | done | tested for the marquee (add, subtract, ⇧⌥ intersect: `marquee_tests.rs`), Lasso (all three: `lasso_ui/tests.rs`) and Polygonal Lasso (`polygon_lasso_tests.rs`) (BUG-208-4) |
 | Space repositions the marquee while dragging | done | `hold_keys.rs` |
-| Polygonal Lasso ⇧ snaps to 45° | missing | #2352 |
+| Polygonal Lasso ⇧ snaps to 45° | done | a ⇧-click places the vertex at the nearest 45° direction from the last one (document coordinates, so zoom, rotation and mirroring cannot skew it), and the rubber band shows it; `polygon_lasso_tests.rs` (`shift_constrains_polygonal_lasso_segments_but_unmodified_clicks_remain_free`, `shift_polygonal_lasso_snap_has_all_eight_directions_and_handles_zero_length`), #2352 |
 | Autoscroll at the window edge while selecting | missing | #2231 |
 | Single-pixel rows and columns kept on release | partial | #2391 |
 | Esc deselects / ⌘Z undoes the last selection | partial | #2674, #1432 |
