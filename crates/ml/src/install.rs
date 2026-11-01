@@ -24,6 +24,9 @@ type Fetch<'a> = &'a dyn Fn(&ModelFile) -> Result<Box<dyn Read>, MlError>;
 /// Returns the path of the model's first file. Blocking: call it from a worker thread.
 pub fn download(model: Model, progress: &dyn Fn(u64, u64), cancel: Cancel<'_>) -> Result<PathBuf, MlError> {
     let dir = install_dir(model).ok_or_else(|| MlError::Download("cannot locate the models folder; set PHOTOCRAFT_MODELS_DIR".into()))?;
+    if !model.downloadable() {
+        return Err(MlError::Download(no_download(model, &dir)));
+    }
     let client = std::cell::OnceCell::new();
     let fetch = |file: &ModelFile| -> Result<Box<dyn Read>, MlError> {
         if client.get().is_none() {
@@ -42,6 +45,12 @@ pub fn download(model: Model, progress: &dyn Fn(u64, u64), cancel: Cancel<'_>) -
         Ok(Box::new(response))
     };
     download_files(&dir, model, &fetch, progress, cancel)
+}
+
+/// What to tell the user about a model with no public download.
+pub(crate) fn no_download(model: Model, dir: &Path) -> String {
+    let names: Vec<&str> = model.files().iter().map(|f| f.name).collect();
+    format!("the {} model has no public download; put {} into {}", model.label(), names.join(", "), dir.display())
 }
 
 /// [`download`] with the bytes of each file from `fetch`.
@@ -76,7 +85,11 @@ fn install_all(dir: &Path, files: &[ModelFile], fetch: Fetch<'_>, progress: &dyn
 /// Delete the installed files of `model` (and any leftover partial download) from the folder
 /// downloads go into and from the shared or custom folder it was found in. The old `PhotoCraft`
 /// folder is read only and never touched. Removing a model that is not installed is not an error.
+/// A model with no public download ([`Model::downloadable`]) is never removed: its files were put there by hand.
 pub fn remove(model: Model) -> Result<(), MlError> {
+    if !model.downloadable() {
+        return Err(MlError::Download(format!("the {} files were put there by hand and cannot be downloaded again; delete them yourself", model.label())));
+    }
     let target = install_dir(model).ok_or_else(|| MlError::Download("cannot locate the models folder".into()))?;
     let mut dirs = vec![target];
     if let Some(found) = model_location(model).filter(|l| l.source != Source::Old)
@@ -364,5 +377,15 @@ mod tests {
         // Nothing to clear is fine.
         clear_stale_part(&path)?;
         Ok(())
+    }
+
+    /// SAM 3 has no public download: asking for one says where to put the files, and neither a
+    /// download nor a removal touches the folder (the files may be the only copy).
+    #[test]
+    fn a_model_without_a_download_is_neither_fetched_nor_removed() {
+        let e = download(Model::Sam3, &|_, _| {}, &never).unwrap_err().to_string();
+        assert!(e.contains("no public download") && e.contains("model.safetensors, vocab.json, merges.txt"), "{e}");
+        let e = remove(Model::Sam3).unwrap_err().to_string();
+        assert!(e.contains("put there by hand"), "{e}");
     }
 }

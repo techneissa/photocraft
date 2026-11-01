@@ -165,6 +165,7 @@ fn powers(model: Model) -> &'static str {
     match model {
         Model::BirefnetLite => tl!("Select Subject, Remove Background"),
         Model::Lama => tl!("Remove Subject"),
+        Model::Sam3 => tl!("Selection by click or by text"),
     }
 }
 
@@ -211,6 +212,13 @@ fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, found: impl Fn(Model) -> 
                 ui.label(RichText::new(crate::i18n::fmt(tl!("Found in: {place}"), &[("place", place(source))])).color(t.text_dim));
             }
             match state.phase {
+                // No public download (SAM 3): say where the files go instead of a Download button.
+                Phase::Idle if !row.model.downloadable() => {
+                    ui.label(tl!("No public download. Put these files in the folder below:"));
+                    ui.label(RichText::new(row.model.files().iter().map(|f| f.name).collect::<Vec<_>>().join(", ")).color(t.text_dim));
+                    let folder = photocraft_ml::install_dir(row.model).map_or_else(|| tl!("The models folder").to_string(), |d| d.display().to_string());
+                    ui.add(egui::Label::new(RichText::new(folder).color(t.text_dim)).selectable(true));
+                }
                 Phase::Idle => {
                     if widgets::secondary_button(ui, tl!("Download"), 0.0).clicked() {
                         row.start_with(photocraft_ml::download);
@@ -232,8 +240,9 @@ fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, found: impl Fn(Model) -> 
                         row.cancel();
                     }
                 }
-                // The old folder is read only: nothing there can be removed from this page.
-                Phase::Installed if row.source == Some(Source::Old) => {}
+                // The old folder is read only: nothing there can be removed from this page. Files put
+                // there by hand (SAM 3, no public download) are not removed either: they may be the only copy.
+                Phase::Installed if row.source == Some(Source::Old) || !row.model.downloadable() => {}
                 Phase::Installed => {
                     ui.horizontal(|ui| {
                         if widgets::secondary_button(ui, if row.confirm_remove { tl!("Confirm remove") } else { tl!("Remove") }, 0.0).clicked() {
@@ -259,6 +268,11 @@ mod tests {
     use super::*;
     use std::sync::mpsc;
     use std::time::Instant;
+
+    /// The models PhotoCraft can download (SAM 3, put in its folder by hand, is not one).
+    fn downloadable() -> impl Iterator<Item = Model> {
+        Model::ALL.into_iter().filter(|m| m.downloadable())
+    }
 
     fn wait_for(job: &ModelJob, predicate: impl Fn(&State) -> bool) {
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -391,7 +405,7 @@ mod tests {
         });
         harness.run_steps(2);
         use egui_kittest::kittest::Queryable;
-        assert_eq!(harness.get_all_by_label("Download").count(), Model::ALL.len());
+        assert_eq!(harness.get_all_by_label("Download").count(), downloadable().count());
         assert_eq!(harness.get_all_by_label("Not installed").count(), Model::ALL.len());
         for model in Model::ALL {
             harness.get_by_label(model.label());
@@ -401,7 +415,8 @@ mod tests {
     #[test]
     fn dynamic_labels_are_translated_in_complete_languages() {
         for lang in crate::i18n::Lang::all().filter(|lang| lang.complete_menus()) {
-            for label in std::iter::once("AI Models").chain(Model::ALL.into_iter().map(Model::label)) {
+            // SAM 3 (the fork's) is English only.
+            for label in std::iter::once("AI Models").chain(downloadable().map(Model::label)) {
                 assert!(crate::i18n::has(lang, label), "{}: missing {label}", lang.code());
             }
         }
@@ -447,9 +462,21 @@ mod tests {
         use egui_kittest::kittest::Queryable;
         let harness = installed_page(|model| Some(if model == Model::Lama { Source::Shared } else { Source::Custom }));
         harness.get_by_label("Found in: Shared Folder");
-        harness.get_by_label("Found in: Custom Folder");
-        assert_eq!(harness.get_all_by_label("Remove").count(), Model::ALL.len());
+        assert_eq!(harness.get_all_by_label("Found in: Custom Folder").count(), Model::ALL.len() - 1);
+        assert_eq!(harness.get_all_by_label("Remove").count(), downloadable().count());
         assert_eq!(harness.query_all_by_label("Download").count(), 0);
+    }
+
+    #[test]
+    fn sam3_says_where_to_put_its_files_and_is_never_removed_from_here() {
+        use egui_kittest::kittest::Queryable;
+        let page = installed_page(|_| None);
+        page.get_by_label("No public download. Put these files in the folder below:");
+        page.get_by_label("model.safetensors, vocab.json, merges.txt");
+        assert_eq!(page.get_all_by_label("Download").count(), Model::ALL.len() - 1, "no Download button for SAM 3");
+        let page = installed_page(|_| Some(Source::Shared));
+        assert_eq!(page.query_all_by_label("Remove").count(), Model::ALL.len() - 1, "no Remove button for SAM 3");
+        assert_eq!(page.query_all_by_label("No public download. Put these files in the folder below:").count(), 0);
     }
 
     #[test]

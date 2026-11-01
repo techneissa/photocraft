@@ -13,7 +13,8 @@ fn chosen(name: &str) -> Vec<Model> {
     match name {
         "birefnet" => vec![Model::BirefnetLite],
         "lama" => vec![Model::Lama],
-        _ => Model::ALL.to_vec(),
+        // The models PhotoCraft can download (SAM 3 has no public download).
+        _ => Model::ALL.into_iter().filter(|m| m.downloadable()).collect(),
     }
 }
 
@@ -56,7 +57,7 @@ mod tests {
 
     #[test]
     fn model_names_pick_the_models() {
-        assert_eq!(chosen("all"), Model::ALL.to_vec());
+        assert_eq!(chosen("all"), vec![Model::BirefnetLite, Model::Lama], "SAM 3 has no public download");
         assert_eq!(chosen("birefnet"), vec![Model::BirefnetLite]);
         assert_eq!(chosen("lama"), vec![Model::Lama]);
     }
