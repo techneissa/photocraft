@@ -61,13 +61,19 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
    `docs/parity-checklist.md` and `docs/scorecard.md`, and the official parity docs (`docs/gaps.md`,
    `docs/*-parity.md`, `ROADMAP.md`) alone; then two feature branches never clash on shared notes.
 5. `git push mine feat/<name>` and open a pull request to `custom`; Fork CI checks it. Merge it (GitHub's button,
-   or `git switch custom && git merge --no-ff feat/<name> && git push mine custom`). If the feature added
-   commands, run `cargo xtask parity` on `custom` and commit `docs/parity-checklist.md`. Then run
-   `update-photocraft.sh`.
+   or `git switch custom && git merge --no-ff feat/<name> && git push mine custom`). After a single merge, build and
+   test nothing on this Mac: Fork CI checks `custom`.
+6. Once per batch of merges, on `custom` on this Mac (techneissa, 2026-11-02: the Mac rebuilt the same code minutes
+   apart): if a feature added commands, `cargo xtask parity` and commit `docs/parity-checklist.md`; run
+   `fork/tests.sh` (the macOS-only tests Fork CI cannot run); push once; when GitHub's Fork build of that commit is
+   done, run `update-photocraft.sh`, which then downloads the app instead of building it.
 
-At most 3 feature lanes build at a time on this Mac (techneissa, 2026-11-02): it also builds the other Craft apps,
-and each new worktree compiles from scratch (about 10 to 25 minutes; sccache gave no hits across worktrees and was
-removed on 2026-11-02).
+**Lanes on this Mac** (techneissa, 2026-11-02): at most 3 feature lanes at a time. Each lane takes a free slot
+1, 2 or 3 and builds with `export CARGO_TARGET_DIR=$WORKSPACE/repos/photocraft/target/lane-<slot>` in place of
+`AGENTS.md`'s `target/agent-<name>`; one lane per slot at a time. The slot's build folder stays after the lane, so
+the next lane's new worktree recompiles only what differs. Measured 2026-11-02 on `photocraft`: clean build in an
+empty folder 537 crates, 6 min (22 min with the Mac's load near 100); a new worktree on a used slot 6 crates,
+100 s; a one-file change 10 s. sccache gave no hits across worktrees and was removed.
 
 ## The features
 
@@ -75,9 +81,9 @@ removed on 2026-11-02).
 
 To find which feature owns an official file: `grep -l '<path>' fork/*.md`.
 
-`docs/parity-checklist.md` is regenerated on `custom` after a merge (step 5); clashes there with an official
+`docs/parity-checklist.md` is regenerated on `custom` once per batch (step 6); clashes there with an official
 update are fixed by the update script (both sides kept).
 
-The tests of every feature, after a merge: run `fork/tests.sh`.
+The tests of every feature, once per batch: run `fork/tests.sh`.
 
 More: [GitHub builds](fork/github-builds.md), [Open as Layers interface (for LightCraft)](fork/open-as-layers-interface.md), [Known failures](fork/known-failures.md).
