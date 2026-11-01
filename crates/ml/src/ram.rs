@@ -1,18 +1,27 @@
 //! How much memory this computer has, and whether a model fits. tract builds BiRefNet-lite's
 //! optimised plan in about 9 GB (measured on a 24 MP photo: 8.7 to 9.5 GB resident at the peak,
-//! whatever the photo's size), and running out of memory there aborts the whole process, so a
-//! computer with too little memory is told no before the load, as an [`MlError::LowMemory`].
+//! whatever the photo's size), SAM 3 peaks at about 20 GB on the GPU, and running out of memory there
+//! aborts the whole process, so a computer with too little memory is told no before the load, as an
+//! [`MlError::LowMemory`].
 
 use crate::{MlError, Model};
 
 /// Total memory below which BiRefNet-lite is not loaded (its peak is about 9 GB).
 const BIREFNET_MIN_TOTAL: u64 = 12 << 30;
 
+/// Total memory below which SAM 3 is not loaded. Measured on an Apple-silicon Mac (Metal, release
+/// build, `/usr/bin/time -l` on `cargo run -p photocraft-sam3 --example sam3_probe`): 1.9 GB peak with
+/// the model loaded, 19.0 GB while an image is encoded, 20.3 GB with a text prompt too, whatever the
+/// photo's size (the model takes a 1008 px square). Metal lets a process use about three quarters of
+/// the memory, so a computer needs 32 GB for those 20 GB.
+const SAM3_MIN_TOTAL: u64 = 32 << 30;
+
 /// The total memory `model` needs this computer to have, in bytes (0: not measured, no limit).
 pub fn min_total_memory(model: Model) -> u64 {
     match model {
         Model::BirefnetLite => BIREFNET_MIN_TOTAL,
         Model::Lama => 0,
+        Model::Sam3 => SAM3_MIN_TOTAL,
     }
 }
 
@@ -79,6 +88,16 @@ mod tests {
         // Not told: the model loads rather than being refused on a guess; LaMa has no limit.
         assert!(check_total(Model::BirefnetLite, None).is_ok());
         assert!(check_total(Model::Lama, gb(1)).is_ok());
+    }
+
+    #[test]
+    fn sam3_needs_32_gb_of_total_memory() {
+        let gb = |n: u64| Some(n << 30);
+        assert_eq!(check_total(Model::Sam3, gb(16)), Err(MlError::LowMemory { have: 16 << 30, needs: 32 << 30 }));
+        assert!(check_total(Model::Sam3, gb(24)).is_err());
+        assert!(check_total(Model::Sam3, gb(32)).is_ok());
+        assert!(check_total(Model::Sam3, None).is_ok());
+        assert_eq!(min_total_memory(Model::Sam3), 32 << 30);
     }
 
     #[test]

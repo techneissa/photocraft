@@ -45,6 +45,16 @@ const LAMA_FILES: [ModelFile; 1] = [ModelFile {
     size: 208_044_816,
 }];
 
+/// SAM 3 (Segment Anything with Concepts, Meta): the `facebook/sam3` checkpoint in Hugging Face format. No download is
+/// public (the Hugging Face repository is gated: each user accepts Meta's SAM License there), so `url` is empty and the
+/// files are put into the model's folder by hand. `model.safetensors` is Hugging Face's own LFS hash; the two tokenizer
+/// files are pinned from the copies the Craft apps share.
+const SAM3_FILES: [ModelFile; 3] = [
+    ModelFile { name: "model.safetensors", url: "", sha256: "6d06f0a5f84e435071fe6603e61d0b4cc7b40e0d39d487cfd4d67d8cc11cc14a", size: 3_439_938_512 },
+    ModelFile { name: "vocab.json", url: "", sha256: "5047b556ce86ccaf6aa22b3ffccfc52d391ea4accdab9c2f2407da5b742d4363", size: 862_328 },
+    ModelFile { name: "merges.txt", url: "", sha256: "9fd691f7c8039210e0fced15865466c65820d09b63988b0174bfe25de299051a", size: 524_619 },
+];
+
 /// A model the editor can run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Model {
@@ -52,17 +62,20 @@ pub enum Model {
     BirefnetLite,
     /// big-lama, 512 px inpainting (Apache-2.0).
     Lama,
+    /// SAM 3, click and text prompts for object selection (SAM License; no public download).
+    Sam3,
 }
 
 impl Model {
     /// All supported models, in display/download order.
-    pub const ALL: [Self; 2] = [Self::BirefnetLite, Self::Lama];
+    pub const ALL: [Self; 3] = [Self::BirefnetLite, Self::Lama, Self::Sam3];
 
     /// Folder name inside a models folder, shared by every Craft app.
     pub fn id(self) -> &'static str {
         match self {
             Self::BirefnetLite => "birefnet-lite",
             Self::Lama => "lama",
+            Self::Sam3 => "sam3",
         }
     }
 
@@ -71,7 +84,14 @@ impl Model {
         match self {
             Self::BirefnetLite => &BIREFNET_FILES,
             Self::Lama => &LAMA_FILES,
+            Self::Sam3 => &SAM3_FILES,
         }
+    }
+
+    /// Whether PhotoCraft can download the model: every file has a published URL. A model that
+    /// cannot be (SAM 3) is put into its folder by hand, and PhotoCraft never deletes it.
+    pub fn downloadable(self) -> bool {
+        self.files().iter().all(|f| !f.url.is_empty())
     }
 
     /// Licence of the model weights.
@@ -79,6 +99,7 @@ impl Model {
         match self {
             Self::BirefnetLite => "MIT",
             Self::Lama => "Apache-2.0",
+            Self::Sam3 => "SAM License",
         }
     }
 
@@ -92,6 +113,7 @@ impl Model {
         match self {
             Self::BirefnetLite => "subject segmentation (BiRefNet-lite)",
             Self::Lama => "inpainting (LaMa)",
+            Self::Sam3 => "object selection (SAM 3)",
         }
     }
 
@@ -337,11 +359,23 @@ mod tests {
     fn model_ids_are_the_shared_folder_names() {
         assert_eq!(Model::BirefnetLite.id(), "birefnet-lite");
         assert_eq!(Model::Lama.id(), "lama");
+        assert_eq!(Model::Sam3.id(), "sam3");
         for model in Model::ALL {
             assert!(!model.files().is_empty());
             assert_eq!(model.size_bytes(), model.files().iter().map(|f| f.size).sum::<u64>());
             assert_eq!(model.file_name(), model.files().first().map(|f| f.name).unwrap_or_default());
         }
+    }
+
+    #[test]
+    fn sam3_is_three_pinned_files_with_no_download() {
+        let files = Model::Sam3.files();
+        assert_eq!(files.iter().map(|f| f.name).collect::<Vec<_>>(), ["model.safetensors", "vocab.json", "merges.txt"]);
+        assert_eq!(Model::Sam3.file_name(), "model.safetensors");
+        assert_eq!(Model::Sam3.size_bytes(), 3_439_938_512 + 862_328 + 524_619);
+        assert!(files.iter().all(|f| f.sha256.len() == 64 && f.sha256.bytes().all(|b| b.is_ascii_hexdigit())));
+        assert!(!Model::Sam3.downloadable(), "the Hugging Face repository is gated");
+        assert!(Model::BirefnetLite.downloadable() && Model::Lama.downloadable());
     }
 
     #[test]

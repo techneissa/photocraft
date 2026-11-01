@@ -24,15 +24,25 @@ A model is looked for in this order, and the first folder that holds all of its 
 2. The folder shared by the Craft apps, so a model is never downloaded twice: macOS `~/Library/Application Support/ArtCraft/models/<model-id>/`, Linux `$XDG_DATA_HOME/artcraft/models/<model-id>/` (or `~/.local/share/artcraft/models/...`), Windows `%APPDATA%\ArtCraft\models\<model-id>\`.
 3. The old folder, read only, with the files directly in it: macOS `~/Library/Application Support/PhotoCraft/models`, Linux `$XDG_DATA_HOME/photocraft/models`, Windows `%APPDATA%\PhotoCraft\models`.
 
-New downloads go into the first folder of step 1 or 2. Nothing is ever written to or deleted from the old folder. Preferences › AI Models and `photocraft-cli models list` say which folder each model was found in. The model ids are `birefnet-lite` and `lama`. A model may have several files, each with its own pinned size and SHA-256; it counts as installed only when all of them are there.
+New downloads go into the first folder of step 1 or 2. Nothing is ever written to or deleted from the old folder. Preferences › AI Models and `photocraft-cli models list` say which folder each model was found in. The model ids are `birefnet-lite`, `lama` and `sam3`. A model may have several files, each with its own pinned size and SHA-256; it counts as installed only when all of them are there.
 
 | File (in the model folder) | Model and input | Published size | SHA-256 | License | Source file |
 |---|---|---:|---|---|---|
 | `birefnet-lite/birefnet_lite.onnx` | BiRefNet-lite, 1024 × 1024 | 224,005,088 bytes | `5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333` | MIT | [onnx-community/BiRefNet_lite-ONNX](https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/blob/main/onnx/model.onnx) |
 | `lama/lama_fp32.onnx` | LaMa, 512 × 512 | 208,044,816 bytes | `1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6` | Apache-2.0 | [Carve/LaMa-ONNX](https://huggingface.co/Carve/LaMa-ONNX/blob/main/lama_fp32.onnx) |
 
+## SAM 3 (object selection by click or by text)
+
+`photocraft-sam3` (`crates/sam3`, L4, Apache-2.0 only) runs Meta's SAM 3 in pure Rust on candle 0.9.2: on the GPU through Metal on a Mac, on the CPU elsewhere. It is LightCraft's `crates/segment` (see [`ATTRIBUTION.md`](../ATTRIBUTION.md)). It gives the editor masks from positive and negative clicks and from a text prompt ("the red car"); nothing in the app uses it yet.
+
+The model id is `sam3`, in `ArtCraft/models/sam3/` (shared with LightCraft). It has three files, each pinned like the others, and it has **no download**: the Hugging Face repository is gated (each user accepts Meta's SAM License there). Put `model.safetensors` (3,439,938,512 bytes, `6d06f0a5…cc14a`), `vocab.json` and `merges.txt` into the folder yourself. Until they are all there, Preferences › AI Models shows where to put them (no Download button), and `photocraft-sam3` returns `MlError::ModelMissing`. PhotoCraft never deletes these files.
+
+The API is `Sam3Service`: `encode(&Rgb)` runs the image through the model once and returns an `ImageHandle`; `clicks(handle, &[Click])` and `text(handle, "sky", 0.5)` return a `Matte` (`w × h` coverage, `0..=1`) from that encoding; `unload()` frees the model and `unload_if_idle` / `spawn_idle_reaper` free it after 10 minutes without use. A model failure on the GPU is retried on the CPU; `PHOTOCRAFT_SAM3_CPU=1` keeps it on the CPU.
+
+Measured on an Apple-silicon Mac with 48 GB (release build, GPU, other builds running at the same time, so the times are the slow side): the model loads in under a second after the files are verified, an image encodes in about 5 s, a click answers in about 50 ms, a text prompt in 0.7 to 2 s. Peak memory: 1.9 GB with the model loaded, 19 GB while an image is encoded, 20.3 GB with a text prompt too, whatever the image's size (the model takes a 1008 px square). Computers with less than 32 GB of memory are refused (`ram.rs`). `crates/sam3/examples/sam3_probe.rs` and the ignored test `crates/sam3/tests/real_model.rs` repeat the measurement.
+
 ## Runtime and licences
 
 Inference runs on the CPU. A 1024-pixel inference can take tens of seconds; performance is being measured. Classical selection and patch-based filling remain available without model files.
 
-The model weights keep their upstream licences: BiRefNet-lite is MIT and LaMa is Apache-2.0. The runtime dependency, `tract-onnx` 0.23.9, is MIT OR Apache-2.0. Model files are not included in PhotoCraft distributions; see [`ATTRIBUTION.md`](../ATTRIBUTION.md).
+The model weights keep their upstream licences: BiRefNet-lite is MIT, LaMa is Apache-2.0 and SAM 3 is under Meta's SAM License. The runtime dependency, `tract-onnx` 0.23.9, is MIT OR Apache-2.0. Model files are not included in PhotoCraft distributions; see [`ATTRIBUTION.md`](../ATTRIBUTION.md).
