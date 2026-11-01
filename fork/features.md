@@ -1,6 +1,8 @@
 # The features
 
-One line per feature; each links to its `fork/<slug>.md`.
+One line per feature, newest last; each links to its `fork/<slug>.md`. `.gitattributes` merges this file
+with `merge=union`, so two branches that each add a line here never clash (git and GitHub's merge both keep
+both lines). Add a line at the end; never reorder or rewrap the others.
 
 - [Open as Layers](open-as-layers.md): opens the photos of a LightCraft `.pcstack` file as the layers of one new document. Branch `feat/open-as-layers`.
 - [Transform live blend](transform-live-blend.md): Free Transform, Warp, Puppet Warp and Perspective Warp show the moving layer with its blend mode, opacity and mask. Branch `feat/transform-live-blend`.

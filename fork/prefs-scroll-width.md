@@ -19,3 +19,7 @@ ui-egui `prefs/prefs_ui/fields.rs` (`auto_shrink`), `prefs_ui/shortcuts.rs` (`na
 ## Tests
 
 `prefs_ui`
+
+```bash
+cargo test -p photocraft-ui-egui --lib -- prefs_ui
+```

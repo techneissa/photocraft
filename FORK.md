@@ -48,15 +48,26 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
    - after each change, and once more at the end of the round: only the tests of the code it touched
      (`cargo test -p <crate> --lib <filter>`), `cargo clippy -p <crate> --all-targets -- -D warnings` for the crates it
      touched (the known official lints below excepted), and `cargo fmt --all --check`;
-   - the full suite runs on GitHub, not on this Mac: a push to `custom` starts Fork CI (`fork-ci.yml`), which runs the
-     official CI (`cargo xtask ci`) on `custom`. Check it with `gh run list -R techneissa/photocraft -w CI -b custom`
-     and fix a failure in the next round.
+   - the full suite runs on GitHub, not on this Mac: Fork CI (`fork-ci.yml`, `fork/ci.sh`: the steps of
+     `cargo xtask ci` on Linux) runs on every pull request to `custom` and every push to it, and skips the tests in
+     `fork/known-failures.txt`, so a red run is a new failure. Check it with
+     `gh run list -R techneissa/photocraft -w "Fork CI"` and fix a failure in the next round.
 
    This fork reads `AGENTS.md`'s "before you finish a task" list as the above: no `cargo xtask ci` on this Mac
-   (techneissa, 2026-10-29: the same tests ran several times per feature and loaded the Mac). The official CI runs on
+   (techneissa, 2026-10-29: the same tests ran several times per feature and loaded the Mac). Fork CI runs on
    Linux, so macOS-only tests (`macvision`, the real-Vision tests) run only in a lane's own filtered tests.
-4. `git switch custom && git merge --no-ff feat/<name>`, then `git push mine custom feat/<name>`.
-5. Write `fork/<slug>.md` (headings as in the other files), add its line to `fork/features.md` and its tests to `fork/tests.sh`; then run `update-photocraft.sh`. FORK.md never holds a feature's details.
+4. Write `fork/<slug>.md` (headings as in the other files; `fork/tests.sh` runs the commands in its `## Tests`
+   block) and add its line at the end of `fork/features.md`. Leave FORK.md, `fork/tests.sh`, the generated
+   `docs/parity-checklist.md` and `docs/scorecard.md`, and the official parity docs (`docs/gaps.md`,
+   `docs/*-parity.md`, `ROADMAP.md`) alone; then two feature branches never clash on shared notes.
+5. `git push mine feat/<name>` and open a pull request to `custom`; Fork CI checks it. Merge it (GitHub's button,
+   or `git switch custom && git merge --no-ff feat/<name> && git push mine custom`). If the feature added
+   commands, run `cargo xtask parity` on `custom` and commit `docs/parity-checklist.md`. Then run
+   `update-photocraft.sh`.
+
+At most 3 feature lanes build at a time on this Mac (techneissa, 2026-11-02): it also builds the other Craft apps.
+Every worktree shares one compiler cache (sccache, set in `~/.cargo/config.toml`, never in the repo's
+`.cargo/config.toml`), so a new worktree compiles only what changed.
 
 ## The features
 
@@ -64,9 +75,9 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
 
 To find which feature owns an official file: `grep -l '<path>' fork/*.md`.
 
-Every feature also has a row in `docs/parity-checklist.md` when it adds commands; clashes there are fixed by the
-update script (both sides kept).
+`docs/parity-checklist.md` is regenerated on `custom` after a merge (step 5); clashes there with an official
+update are fixed by the update script (both sides kept).
 
 The tests of every feature, after a merge: run `fork/tests.sh`.
 
-More: [GitHub builds](fork/github-builds.md), [Open as Layers interface (for LightCraft)](fork/open-as-layers-interface.md), [Known failures on this Mac](fork/known-failures.md).
+More: [GitHub builds](fork/github-builds.md), [Open as Layers interface (for LightCraft)](fork/open-as-layers-interface.md), [Known failures](fork/known-failures.md).
