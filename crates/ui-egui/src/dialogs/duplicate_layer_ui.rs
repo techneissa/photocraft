@@ -192,6 +192,94 @@ mod tests {
         assert_eq!(app.session.documents()[1].doc, card_before);
     }
 
+    /// A PNG file in `dir`: `w`×`h`, opaque white (a Background layer on opening) or, with `alpha`,
+    /// a transparent canvas with a red square (an RGBA PNG).
+    fn png_file(dir: &std::path::Path, name: &str, w: u32, alpha: bool) -> String {
+        let mut s = photocraft_engine::Session::new();
+        if alpha {
+            s.execute("file.new", json!({"width": w, "height": w, "background": "transparent"})).unwrap();
+            s.execute("select.rect", json!({"x": 1, "y": 1, "width": 3, "height": 3})).unwrap();
+            s.execute("edit.fill", json!({"color": "#ff0000"})).unwrap();
+        } else {
+            s.execute("file.new", json!({"width": w, "height": w, "background": "white"})).unwrap();
+        }
+        let path = dir.join(name);
+        std::fs::write(&path, photocraft_io::export(&s.active().unwrap().doc, "p.png", &Default::default()).unwrap().bytes).unwrap();
+        path.to_string_lossy().into_owned()
+    }
+
+    /// The Layers-row right-click menu's Duplicate: select the row, then invoke the command (which
+    /// opens the dialog), pick the destination, OK.
+    fn row_menu_duplicate_to(app: &mut PhotocraftApp, source: usize, layer: photocraft_doc::LayerId, destination: usize) {
+        app.session.set_active(source);
+        app.run("layer.select", json!({"layer": layer.0})).unwrap();
+        let ctx = egui::Context::default();
+        let dialog = crate::menus::invoke(app, &ctx, "layer.duplicate", json!({})).unwrap()["dialog"].as_u64().unwrap();
+        app.ui.dialog_mut(dialog).unwrap().fields.insert("destination".into(), json!(destination));
+        crate::dialogs::confirm(app, dialog).unwrap();
+        assert_eq!(app.session.active_index(), Some(destination));
+    }
+
+    /// techneissa's report, with PNGs opened from files and the Layers-row menu: two Duplicates of
+    /// layers of image 2 into image 1, with an edit in image 1 between them, leave image 1 with
+    /// all three layers and image 2 untouched; each Undo takes exactly one step.
+    #[test]
+    fn png_documents_take_two_row_menu_duplicates_from_another_png_with_an_edit_between() {
+        let dir = std::env::temp_dir().join(format!("photocraft-dup-png-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for (a_alpha, b_alpha, extra) in
+            [(false, false, 0), (false, true, 0), (true, false, 0), (true, true, 0), (false, false, 1), (true, false, 1), (false, true, 1)]
+        {
+            let services = crate::Services {
+                import: Some(Box::new(|name, bytes, opts| {
+                    photocraft_io::import_with_options(name, bytes, opts).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string())
+                })),
+                ..Default::default()
+            };
+            let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
+            app.open_path(&png_file(&dir, "one.png", 8, a_alpha)).unwrap();
+            app.open_path(&png_file(&dir, "two.png", 8, b_alpha)).unwrap();
+            assert_eq!(app.session.documents().len(), 2);
+            // `extra` more layers, painted, in each image (the layer rows techneissa right-clicked).
+            for doc in 0..2 {
+                for n in 0..extra {
+                    app.session.set_active(doc);
+                    app.run("layer.new.layer", json!({"name": format!("Paint {doc}.{n}")})).unwrap();
+                    app.run("select.rect", json!({"x": 2, "y": 2, "width": 3, "height": 3})).unwrap();
+                    app.run("edit.fill", json!({"color": "#0000ff"})).unwrap();
+                    app.run("select.deselect", json!({})).unwrap();
+                }
+            }
+            let tag = format!("A alpha {a_alpha}, B alpha {b_alpha}, {extra} extra");
+            let a_start = names(&app, 0);
+            let b_layers: Vec<_> = app.session.documents()[1].doc.walk().into_iter().map(|(_, _, l)| l.id).collect();
+            let b_before = app.session.documents()[1].doc.clone();
+            eprintln!("{tag}: A {a_start:?}, B {:?}", names(&app, 1));
+            // The panel lists the top layer first: the first row, then the second.
+            let first = *b_layers.last().unwrap();
+            let second = b_layers.iter().rev().nth(1).copied().unwrap_or(first);
+            row_menu_duplicate_to(&mut app, 1, first, 0);
+            assert_eq!(names(&app, 0).len(), a_start.len() + 1, "{tag}: {:?}", names(&app, 0));
+            // An edit in image 1: paint on the active layer.
+            app.run("select.rect", json!({"x":0,"y":0,"width":2,"height":2})).unwrap();
+            app.run("edit.fill", json!({"color": "#00ff00"})).unwrap();
+            app.run("select.deselect", json!({})).unwrap();
+            let a_before_second = app.session.documents()[0].doc.clone();
+            row_menu_duplicate_to(&mut app, 1, second, 0);
+            let a = &app.session.documents()[0].doc;
+            assert_eq!(a.walk().len(), a_before_second.walk().len() + 1, "{tag}: {:?}", names(&app, 0));
+            assert_eq!(a.walk().len(), a_start.len() + 2, "{tag}: {:?}", names(&app, 0));
+            for (_, _, l) in a_before_second.walk() {
+                assert!(a.layer(l.id) == Some(l), "{tag}: {} is unchanged", l.name);
+            }
+            assert!(app.session.documents()[1].doc == b_before, "{tag}: image 2 is untouched");
+            assert!(app.session.undo());
+            assert!(app.session.documents()[0].doc == a_before_second, "{tag}: one Undo takes the second copy");
+            assert!(app.session.documents()[1].doc == b_before, "{tag}: image 2 is untouched by Undo");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn a_new_destination_makes_a_named_document_holding_just_the_copy() {
         let mut app = make_app();
