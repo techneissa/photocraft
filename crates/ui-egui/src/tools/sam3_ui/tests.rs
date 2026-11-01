@@ -248,3 +248,41 @@ fn a_quick_selection_stroke_is_sam3_clicks() {
     tool_event(&mut app, ToolEvent::Up { x: 90.0, y: 80.0 }, egui::Modifiers::NONE);
     assert!(cov(&app, 70, 80) > 0.99 && cov(&app, 100, 80) > 0.99 && cov(&app, 100 + 40, 80) == 0.0, "SAM 3's mask, not GrabCut's");
 }
+
+/// The real model through the shell's own steps, timed: picking the tool until SAM 3 is ready,
+/// the hover preview and a click. By hand (needs the model and about 20 GB of memory):
+/// `PHOTOCRAFT_SAM3_IMAGE=photo.jpg PHOTOCRAFT_SAM3_POINT=990,900 cargo test -p photocraft-ui-egui --lib -- --ignored real_model --nocapture`
+#[test]
+#[ignore = "needs the SAM 3 model and about 20 GB of memory"]
+fn real_model_timings_in_the_shell() {
+    let file = std::env::var("PHOTOCRAFT_SAM3_IMAGE").expect("PHOTOCRAFT_SAM3_IMAGE=photo.jpg");
+    let point: Vec<f64> = std::env::var("PHOTOCRAFT_SAM3_POINT").expect("PHOTOCRAFT_SAM3_POINT=x,y").split(',').map(|v| v.trim().parse().unwrap()).collect();
+    let imported = photocraft_io::import("photo.jpg", &std::fs::read(file).unwrap()).unwrap();
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.session.add_document(imported.document, None);
+    app.ui.tool = Tool::ObjectSelection;
+    let t = std::time::Instant::now();
+    let mut frames = 0;
+    while step(&mut app, false, false) {
+        frames += 1;
+        std::thread::sleep(std::time::Duration::from_millis(16));
+    }
+    println!("pick tool → ready: {:?} ({frames} frames, status {:?}, bar: {})", t.elapsed(), app.session.sam3_status(false), app.ui.status);
+    assert_eq!(app.session.sam3_status(false), Sam3Status::Ready);
+    let t = std::time::Instant::now();
+    let mut now = 100.0;
+    let shown = loop {
+        let u = crate::object_finder::update(&mut app, Some([point[0], point[1]]), false, now);
+        if u.shown.is_some() || now > 130.0 {
+            break u.shown;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        now += 0.05;
+    };
+    println!("hover: pointer at rest → highlight {:?} (includes the {:?} debounce; the lookup is one click)", t.elapsed(), std::time::Duration::from_secs_f64(crate::object_finder::DEBOUNCE));
+    assert!(shown.is_some());
+    let t = std::time::Instant::now();
+    click(&mut app, (point[0], point[1]), egui::Modifiers::NONE);
+    println!("click: {:?} (journal: {:?})", t.elapsed(), app.session.journal.last().map(|(id, p)| (id.clone(), p.clone())));
+    assert!(app.session.active().unwrap().doc.selection.is_some());
+}
