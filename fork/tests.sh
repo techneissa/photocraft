@@ -22,3 +22,5 @@ cargo test -p photocraft-engine --test it -- smart_clipboard_sources
 cargo test -p photocraft-ui-egui --lib -- duplicate_layer_ui
 cargo test -p photocraft-ui-egui --lib -- place_photos file_dialog
 cargo test -p photocraft-sam3 --lib
+cargo test -p photocraft-algo --lib hair::
+cargo test -p photocraft-engine --lib -- hair_cmds select_mask_edits
