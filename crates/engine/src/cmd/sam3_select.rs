@@ -40,10 +40,12 @@ use crate::{EngineError, Result, Session};
 mod backend;
 mod boxed;
 mod mask;
+mod protect;
 mod subject;
 
 pub use backend::{EncodedImage, Mask, PointBox, PointClick, Sam3Backend};
 pub(crate) use boxed::{BoxRequest, select_box};
+pub use protect::{ProtectSource, ProtectSubject, SubjectFinder};
 pub(crate) use subject::{SubjectSam3, failure_note};
 
 /// The note for an explicit `sam3` choice with no model installed.
@@ -194,6 +196,8 @@ pub struct Sam3Select {
     entry: Entry,
     sequence: Option<Sequence>,
     capable: Option<(Instant, bool, bool)>,
+    /// A backend was installed with [`Session::set_sam3_backend`] (the shell's tests do, so they never load the model).
+    installed: bool,
 }
 
 impl std::fmt::Debug for Sam3Select {
@@ -351,7 +355,13 @@ impl Session {
         self.sam3.clear();
         self.sam3.sequence = None;
         self.sam3.capable = None;
+        self.sam3.installed = true;
         self.sam3.backend = Some(backend);
+    }
+
+    /// Whether [`Session::set_sam3_backend`] installed the backend (else it is the model).
+    pub fn sam3_backend_installed(&self) -> bool {
+        self.sam3.installed
     }
 
     /// Where SAM 3 stands for the active document sampling the selected layer (or, with
@@ -619,3 +629,5 @@ pub fn specs() -> Vec<crate::commands::CommandSpec> {
 mod tests;
 #[cfg(test)]
 mod tests_box;
+#[cfg(test)]
+mod tests_protect;

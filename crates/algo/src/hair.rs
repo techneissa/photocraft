@@ -133,6 +133,31 @@ pub fn refine_hair(
     canvas: Rect,
     radius: f32,
 ) -> Result<Option<Region>, HairError> {
+    refine_hair_protected(sampler, mask, content, canvas, radius, None)
+}
+
+/// How far (px) a protected subject's outline is pulled in before it counts as sure foreground
+/// (see [`refine_hair_protected`]): a fraction of the band radius, within 1 to 4 px.
+pub fn protect_erosion(radius: f32) -> f32 {
+    (effective_radius(radius).unwrap_or(DEFAULT_RADIUS) * PROTECT_ERODE_FRACTION).clamp(1.0, 4.0)
+}
+
+/// [`protect_erosion`]'s fraction of the radius.
+const PROTECT_ERODE_FRACTION: f32 = 0.15;
+
+/// [`refine_hair`] with a `protect` region (a subject mask from a model, in canvas coordinates):
+/// its pixels, pulled in by [`protect_erosion`], are sure foreground wherever the trimap would
+/// leave them to the matting, and stay fully selected in the result. Deep shadows at the
+/// selection's edge, which the colours read as background, are no longer cut away; strands outside
+/// the region are solved as before. `None` is exactly [`refine_hair`].
+pub fn refine_hair_protected(
+    sampler: &dyn Sampler,
+    mask: &(dyn Fn(Rect) -> Vec<f32> + Sync),
+    content: Rect,
+    canvas: Rect,
+    radius: f32,
+    protect: Option<&Region>,
+) -> Result<Option<Region>, HairError> {
     check_size(content, canvas, radius)?;
     let radius = effective_radius(radius)?;
     let bbox = hair_area(content, canvas, radius);
@@ -166,14 +191,20 @@ pub fn refine_hair(
             return (*t, vec![if first == 1.0 { 255 } else { 0 }; cw]);
         }
         let solve_rect = t.inflate(ctx).intersect(&canvas);
-        let tr = Trimap::new(&m, m_rect, solve_rect, radius);
+        let pin = protect.and_then(|p| pinned(p, m_rect, protect_erosion(radius)));
+        let tr = Trimap::new(&m, m_rect, solve_rect, radius, pin.as_deref());
         let has_unknown = tr.kind.contains(&UNKNOWN);
-        let alpha = if has_unknown {
+        let mut alpha = if has_unknown {
             let img = sampler.rgb(solve_rect);
             if img.w == tr.w && img.px.len() == tr.kind.len() { solve(&img, &tr.kind, &tr.init, radius).alpha } else { tr.init.clone() }
         } else {
             tr.init.clone()
         };
+        // The solver may free a sure pixel whose colour is far from its neighbours' (a deep shadow):
+        // a protected one stays fully selected.
+        for (a, _) in alpha.iter_mut().zip(&tr.pinned).filter(|(_, p)| **p) {
+            *a = 1.0;
+        }
         // The tile's core out of the solved rectangle.
         let mut out = Vec::with_capacity(cw);
         for yy in t.y0..t.y1 {
@@ -206,17 +237,50 @@ pub fn refine_hair(
     Ok(trim_region(Region { bbox, mask: out }))
 }
 
+/// Which pixels of `rect` (row-major) lie inside `protect` by more than `erosion` px, `None` when
+/// none do.
+fn pinned(protect: &Region, rect: Rect, erosion: f32) -> Option<Vec<bool>> {
+    let region = protect.bbox.intersect(&rect);
+    if region.is_empty() {
+        return None;
+    }
+    let (w, h) = (rect.width() as usize, rect.height() as usize);
+    let mut outside = vec![true; w * h];
+    let bw = protect.bbox.width() as usize;
+    let mut any = false;
+    for y in region.y0..region.y1 {
+        for x in region.x0..region.x1 {
+            let src = (y - protect.bbox.y0) as usize * bw + (x - protect.bbox.x0) as usize;
+            if protect.mask.get(src).is_some_and(|v| *v >= 128) {
+                if let Some(o) = outside.get_mut((y - rect.y0) as usize * w + (x - rect.x0) as usize) {
+                    *o = false;
+                    any = true;
+                }
+            }
+        }
+    }
+    if !any {
+        return None;
+    }
+    // Distance to the nearest pixel that is not protected; a pixel of the region's own edge is at 1.
+    let dist = edt(&outside, w, h);
+    let pins: Vec<bool> = dist.iter().zip(&outside).map(|(d, out)| !*out && *d > erosion).collect();
+    pins.contains(&true).then_some(pins)
+}
+
 /// The trimap of one solve rectangle, from a selection read over a larger one.
 struct Trimap {
     w: usize,
     kind: Vec<u8>,
+    /// The pixels a protected subject holds as sure foreground (all `false` without one).
+    pinned: Vec<bool>,
     /// Starting alpha: 1 and 0 where known, a ramp across the band where not.
     init: Vec<f32>,
 }
 
 impl Trimap {
     /// `m` is the selection over `m_rect` (row-major); the trimap covers `solve` inside it.
-    fn new(m: &[f32], m_rect: Rect, solve: Rect, radius: f32) -> Trimap {
+    fn new(m: &[f32], m_rect: Rect, solve: Rect, radius: f32, pin: Option<&[bool]>) -> Trimap {
         let (mw, mh) = (m_rect.width() as usize, m_rect.height() as usize);
         let inside: Vec<bool> = m.iter().map(|v| *v >= 0.5).collect();
         let mut edge = vec![false; mw * mh];
@@ -234,6 +298,7 @@ impl Trimap {
         let (w, h) = (solve.width() as usize, solve.height() as usize);
         let mut kind = vec![BACKGROUND; w * h];
         let mut init = vec![0.0f32; w * h];
+        let mut pinned = vec![false; w * h];
         let (ox, oy) = ((solve.x0 - m_rect.x0) as usize, (solve.y0 - m_rect.y0) as usize);
         for y in 0..h {
             for x in 0..w {
@@ -248,13 +313,20 @@ impl Trimap {
                     // Distance 0 is the edge pixel itself: half way.
                     let ramp = ((d + 0.5) / (2.0 * band)).min(0.5);
                     init[i] = if inn { 0.5 + ramp } else { 0.5 - ramp };
+                    // The protected subject is sure foreground, wherever the selection's edge puts it.
+                    if pin.and_then(|p| p.get(mi)).copied().unwrap_or(false) {
+                        kind[i] = FOREGROUND;
+                        init[i] = 1.0;
+                        pinned[i] = true;
+                    }
                 } else if inn {
                     kind[i] = FOREGROUND;
                     init[i] = 1.0;
+                    pinned[i] = pin.and_then(|p| p.get(mi)).copied().unwrap_or(false);
                 }
             }
         }
-        Trimap { w, kind, init }
+        Trimap { w, kind, pinned, init }
     }
 }
 

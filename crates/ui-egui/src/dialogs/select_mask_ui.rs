@@ -23,6 +23,8 @@
 //! Refine Hair is an edit like the tools': the selection so far becomes a trimap and its band is
 //! solved for alpha (`photocraft_algo::hair`), its width the Edge Detection radius.
 //!
+//! Refine Hair's Protect Subject box and its wait for SAM 3 are in [`protect`].
+//!
 //! Not here yet: Object Aware (a learned model, #2788) is shown but greyed out, and Photoshop's
 //! Presets.
 
@@ -41,6 +43,8 @@ use crate::canvas::ToolEvent;
 use crate::select_mask_view::Mode;
 use crate::theme::Tokens;
 use crate::widgets;
+
+mod protect;
 
 /// Longest side of the reduced copy the preview runs on (px), unless High Quality Preview.
 const PROXY_SIDE: usize = 1600;
@@ -404,6 +408,8 @@ pub struct SelectMaskWorkspace {
     /// The targeted layer mask is what is refined (`"target": "mask"`).
     target_mask: bool,
     pub opts: SmOpts,
+    /// Refine Hair's Protect Subject box and its wait for SAM 3.
+    protect: protect::ProtectUi,
     pub tool: SmTool,
     /// The tools W and L pick: the last of each slot used.
     w_tool: SmTool,
@@ -447,6 +453,7 @@ impl SelectMaskWorkspace {
             "size": self.size(),
             "hardness": self.hardness,
             "sampleAllLayers": self.sample_all,
+            "protectSubject": self.protect.on && self.protect.possible,
             "edits": self.edits.len(),
             "strokes": self.strokes.len(),
             "undo": self.undo.len(),
@@ -738,6 +745,7 @@ pub fn open(app: &mut PhotocraftApp) -> Result<(), String> {
         _ if mask_only || target_mask => opts.output = "layerMask".into(),
         _ => {}
     }
+    let protect = protect::ProtectUi::load(app);
     let mut w = SelectMaskWorkspace {
         layer,
         document,
@@ -745,6 +753,7 @@ pub fn open(app: &mut PhotocraftApp) -> Result<(), String> {
         revision,
         target_mask,
         opts,
+        protect,
         tool: SmTool::Quick,
         w_tool: SmTool::Quick,
         l_tool: SmTool::Lasso,
@@ -828,6 +837,9 @@ fn remember(app: &mut PhotocraftApp, opts: &SmOpts) {
 pub fn commit(app: &mut PhotocraftApp) -> Result<Value, String> {
     drop_stale(app)?;
     let w = app.distort.select_mask.as_mut().ok_or("Select and Mask is not open")?;
+    if w.protect.waiting() {
+        return Err(tl!("Refine Hair is waiting for SAM 3 (Esc stops it)").into());
+    }
     w.end_gesture();
     w.close_polygon();
     let (p, opts) = (commit_params(w), w.opts.clone());
@@ -882,6 +894,9 @@ pub fn enter(app: &mut PhotocraftApp) -> bool {
 
 /// Esc: drops a Polygonal Lasso polygon being drawn, else Cancel.
 pub fn escape(app: &mut PhotocraftApp) {
+    if protect::stop(app) {
+        return;
+    }
     match app.distort.select_mask.as_mut() {
         Some(w) if w.poly.is_some() => w.poly = None,
         _ => cancel(app),
@@ -1032,15 +1047,18 @@ struct Job {
     cache: Option<BaseCache>,
     proxy: Option<Arc<Document>>,
     display: Option<Arc<photocraft_engine::display_color::CanvasDisplay>>,
+    /// SAM 3 for Refine Hair's Protect Subject (the Sample All Layers choice it is encoded for).
+    protect: Option<(bool, photocraft_engine::sam3_select::SubjectFinder)>,
     texture_limit: usize,
     /// [`Shown::trail`] of this preview.
     trail: usize,
 }
 
-fn job(app: &PhotocraftApp) -> Option<Job> {
+fn job(app: &mut PhotocraftApp) -> Option<Job> {
     if stale(app).is_some() {
         return None;
     }
+    let protect = protect::finder(app);
     let w = app.distort.select_mask.as_ref()?;
     let st = app.session.active()?;
     let k = w.proxy_k();
@@ -1074,6 +1092,7 @@ fn job(app: &PhotocraftApp) -> Option<Job> {
         cache: w.preview.cache.clone(),
         proxy,
         display: crate::canvas::canvas_display(app, &st.doc, None).0,
+        protect,
         texture_limit: w.texture_limit,
         trail: match &w.gesture {
             Some(g) if w.opts.real_time => g.points.len(),
@@ -1209,7 +1228,11 @@ fn compute(job: Job, cancel: Option<&photocraft_engine::jobs::JobCtx>) -> Result
     };
     let scaled = |list: &[Value]| -> Result<Vec<select_mask_edits::SelectionEdit>, String> {
         let list: Vec<Value> = list.iter().map(|e| scale_edit(e, k)).collect();
-        select_mask_edits::parse(&json!({ "edits": list })).map_err(|e| e.to_string())
+        let mut edits = select_mask_edits::parse(&json!({ "edits": list })).map_err(|e| e.to_string())?;
+        if let Some((all, finder)) = &job.protect {
+            select_mask_edits::attach(&mut edits, k, &mut |a| (a == *all).then(|| finder.clone()));
+        }
+        Ok(edits)
     };
     // With no edits yet, the selection Select and Mask starts from is where the first one starts.
     let mut cache = BaseCache { k, revision: job.revision, edits: Vec::new(), base: start() };
@@ -1545,6 +1568,7 @@ fn options_bar(ui: &mut egui::Ui, w: &mut SelectMaskWorkspace) -> Option<Value> 
         if widgets::secondary_button(ui, tl!("Refine Hair"), 0.0).clicked() {
             edit = Some(json!({"tool": "refineHair", "radius": w.opts.radius, "sampleAllLayers": w.sample_all}));
         }
+        protect::checkbox(ui, w);
     }
     edit
 }
@@ -1823,6 +1847,7 @@ fn canvas_input(
 
 /// Draws the workspace (a full-window layer over the app).
 pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    protect::refresh(app);
     follow_revision(app);
     upload(app, ctx);
     let title = app.distort.select_mask.as_ref().map(|w| {
@@ -1962,6 +1987,10 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     for ev in events {
         pointer(app, ev, mods);
     }
+    // Refine Hair with Protect Subject on waits here for SAM 3.
+    let edit = edit.and_then(|e| protect::route(app, e));
+    protect::tick(app, ctx);
+    protect::persist(app);
     if let Some(w) = app.distort.select_mask.as_mut() {
         if let Some(e) = edit {
             w.add_edit(e);

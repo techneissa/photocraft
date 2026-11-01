@@ -90,3 +90,73 @@ fn a_dragged_rectangle_selects_the_disc_and_select_subject_stays_on_it() {
     println!("Select Subject {:?}: {r}", t.elapsed());
     assert!(coverage(&s, 20, 20) == 0.0 && coverage(&s, 620, 460) == 0.0, "the field is not the subject");
 }
+
+/// Refine Hair's Protect Subject on a portrait. The picture is the public-domain 1921 portrait in
+/// `fork/refine-hair.md` (Wikimedia Commons `CoraGoffin1921.jpg`), as raw 8-bit RGB:
+/// `PHOTOCRAFT_HAIR_RGB=cora.rgb PHOTOCRAFT_HAIR_SIZE=541x778 [PHOTOCRAFT_HAIR_OUT=dir]`; with the
+/// folder set, the selection and both Refine Hair alphas are written there as raw 8-bit bytes.
+#[test]
+#[ignore = "needs the SAM 3 model, about 20 GB of memory, and the portrait (PHOTOCRAFT_HAIR_RGB, PHOTOCRAFT_HAIR_SIZE)"]
+fn protect_subject_never_cuts_the_subject_and_leaves_the_strands_to_the_matting() {
+    let (Ok(path), Ok(size)) = (std::env::var("PHOTOCRAFT_HAIR_RGB"), std::env::var("PHOTOCRAFT_HAIR_SIZE")) else {
+        panic!("set PHOTOCRAFT_HAIR_RGB (raw 8-bit RGB) and PHOTOCRAFT_HAIR_SIZE (WxH)");
+    };
+    let (w, h) = size.split_once('x').map(|(a, b)| (a.parse::<i32>().unwrap(), b.parse::<i32>().unwrap())).expect("WxH");
+    let rgb = std::fs::read(path).unwrap();
+    assert_eq!(rgb.len(), (w * h * 3) as usize);
+    let mut s = Session::new();
+    s.execute("file.new", json!({"width": w, "height": h})).unwrap();
+    s.edit("paint", |doc, _| {
+        let bg = doc.layers[0].surface_mut().unwrap();
+        let ch = bg.channels();
+        let mut data = Vec::with_capacity((w * h) as usize * ch);
+        for p in rgb.chunks_exact(3) {
+            data.extend(p.iter().map(|v| f32::from(*v) / 255.0));
+            if ch == 4 {
+                data.push(1.0);
+            }
+        }
+        bg.write_region(photocraft_geom::Rect::new(0, 0, w, h), &data);
+        Ok(())
+    })
+    .unwrap();
+    let alpha = |s: &Session| -> Vec<f32> { (0..h).flat_map(|y| (0..w).map(move |x| (x, y))).map(|(x, y)| coverage(s, x, y)).collect() };
+    let dump = |name: &str, a: &[f32]| {
+        if let Ok(dir) = std::env::var("PHOTOCRAFT_HAIR_OUT") {
+            std::fs::write(format!("{dir}/{name}.a8"), a.iter().map(|v| (v * 255.0).round() as u8).collect::<Vec<u8>>()).unwrap();
+        }
+    };
+    let r = s.execute("select.subject", json!({})).unwrap();
+    println!("select.subject: {r}");
+    dump("selection", &alpha(&s));
+
+    // Refine Hair as before.
+    let t = Instant::now();
+    let r = s.execute("select.refineHair", json!({"radius": 14})).unwrap();
+    println!("refine hair, Protect Subject off {:?}: {r}", t.elapsed());
+    assert_eq!(r["protected"], false);
+    let off = alpha(&s);
+    dump("off", &off);
+    s.execute("edit.undo", json!({})).unwrap();
+
+    // With Protect Subject: the picture is encoded first (the same encoding Object Selection shares).
+    s.execute("prefs.set", json!({"path": "tools.objectSelectionEngine", "value": "sam3"})).unwrap();
+    let t = Instant::now();
+    s.sam3_prepare(false, photocraft_engine::sam3_select::Prepare::Force).unwrap();
+    assert_eq!(s.sam3_wait(false, Duration::from_secs(300)), Sam3Status::Ready);
+    println!("SAM 3 ready after {:?}", t.elapsed());
+    let t = Instant::now();
+    let r = s.execute("select.refineHair", json!({"radius": 14, "protectSubject": true})).unwrap();
+    println!("refine hair, Protect Subject on {:?}: {r}", t.elapsed());
+    assert_eq!(r["protected"], true, "{r}");
+    let on = alpha(&s);
+    dump("on", &on);
+
+    // It only ever adds: nothing the plain run kept is lost, and it does not swallow the backdrop.
+    let sum = |a: &[f32]| a.iter().sum::<f32>();
+    let lost = off.iter().zip(&on).filter(|(a, b)| **a > 0.5 && **b < 0.5).count();
+    let gained = on.iter().zip(&off).filter(|(a, b)| **a > 0.5 && **b < 0.5).count();
+    println!("selected px: off {:.0}, on {:.0}; lost {lost}, gained {gained}", sum(&off), sum(&on));
+    assert!(lost <= (sum(&off) * 0.002) as usize, "{lost} px lost");
+    assert!(sum(&on) >= sum(&off) - 1.0 && sum(&on) <= sum(&off) * 1.10, "the backdrop is not swallowed");
+}

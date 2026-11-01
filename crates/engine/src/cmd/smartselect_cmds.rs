@@ -667,10 +667,15 @@ fn refine_edge(s: &mut Session, p: &Value) -> Result<Value> {
     if decontaminate && matches!(output.as_str(), "selection" | "layerMask") {
         output = "newLayerWithMask".into();
     }
-    let edits = select_mask_edits::parse(p)?;
+    let mut edits = select_mask_edits::parse(p)?;
     // Before anything is painted: a thin stroke across a huge canvas paints few pixels but many tiles.
     select_mask_edits::check_size(&edits, d.doc.bounds())?;
     select_mask_edits::check_strokes(&strokes, d.doc.bounds())?;
+    // Refine Hair's Protect Subject: SAM 3's encoding when it is ready (else Refine Hair runs without).
+    select_mask_edits::attach(&mut edits, 1, &mut |all| match s.sam3_protect(all) {
+        sam3_select::ProtectSource::Ready(finder) => Some(finder),
+        _ => None,
+    });
     let region = with_sampler(s, b(p, "sampleAllLayers", false), |smp, doc| {
         let mask_surf = active.and_then(|id| doc.layer(id)).and_then(|l| l.mask.as_ref()).map(|m| &m.surface);
         let target_mask = p.get("target").and_then(Value::as_str) == Some("mask");

@@ -18,6 +18,7 @@ use photocraft_geom::Rect;
 use photocraft_raster::Surface;
 use serde_json::Value;
 
+use crate::sam3_select::{ProtectSubject, SubjectFinder};
 use crate::smartselect_cmds::with_doc_sampler;
 use crate::{EngineError, Result};
 
@@ -42,7 +43,8 @@ pub enum SelectionEdit {
     Subject { mode: SelectionMode, sample_all_layers: bool },
     /// The Refine Hair button: alpha for hair and fine edges in a band of `radius` px (0 = the
     /// default) each side of the selection's edge, by closed-form matting ([`hair`]).
-    RefineHair { radius: f32, sample_all_layers: bool },
+    /// `protect`: Protect Subject (see [`ProtectSubject`]).
+    RefineHair { radius: f32, sample_all_layers: bool, protect: ProtectSubject },
     /// Global Refinements › Clear Selection.
     Clear,
     /// Global Refinements › Invert.
@@ -171,9 +173,11 @@ pub fn parse(p: &Value) -> Result<Vec<SelectionEdit>> {
                 };
                 SelectionEdit::Subject { mode, sample_all_layers: flag(o, "sampleAllLayers", true)? }
             }
-            "refineHair" => {
-                SelectionEdit::RefineHair { radius: number(o, "radius", 0.0, 0.0..=1000.0)?, sample_all_layers: flag(o, "sampleAllLayers", false)? }
-            }
+            "refineHair" => SelectionEdit::RefineHair {
+                radius: number(o, "radius", 0.0, 0.0..=1000.0)?,
+                sample_all_layers: flag(o, "sampleAllLayers", false)?,
+                protect: if flag(o, "protectSubject", false)? { ProtectSubject::Asked } else { ProtectSubject::Off },
+            },
             "clear" => SelectionEdit::Clear,
             "invert" => SelectionEdit::Invert,
             other => return Err(bad(&format!("unknown edit tool `{other}`: quick|brush|lasso|object|subject|refineHair|clear|invert"))),
@@ -295,13 +299,19 @@ pub fn apply_one(doc: &Document, layer: Option<LayerId>, base: Option<Surface>, 
             let region = with_doc_sampler(doc, layer, *sample_all_layers, |smp, doc| subject::select_subject(smp, doc.bounds()));
             combine(region, *mode)
         }
-        SelectionEdit::RefineHair { radius, sample_all_layers } => {
+        SelectionEdit::RefineHair { radius, sample_all_layers, protect } => {
             // No selection, or a selection Refine Hair refuses (too large; `check_size` says so first):
             // as for any tool that finds nothing, the selection stays as it was.
             let sel = base.as_ref()?;
             let content = sel.content_bounds();
+            // Protect Subject: SAM 3's subject inside the selection's bounds. No answer (the
+            // encoding went, nothing found): Refine Hair runs as with it off.
+            let subject = match protect {
+                ProtectSubject::With(finder) => finder.find(content).ok().flatten(),
+                _ => None,
+            };
             let refined = with_doc_sampler(doc, layer, *sample_all_layers, |smp, doc| {
-                hair::refine_hair(smp, &matting::surface_reader(sel), content, doc.bounds(), *radius)
+                hair::refine_hair_protected(smp, &matting::surface_reader(sel), content, doc.bounds(), *radius, subject.as_ref())
             });
             match refined {
                 Ok(region) => region.as_ref().map(matting::region_surface),
@@ -310,6 +320,20 @@ pub fn apply_one(doc: &Document, layer: Option<LayerId>, base: Option<Surface>, 
         }
         SelectionEdit::Clear => None,
         SelectionEdit::Invert => invert(base.as_ref(), canvas),
+    }
+}
+
+/// Gives each Refine Hair edit that asked for Protect Subject the finder for its sampling choice
+/// (`finder(sample_all_layers)`, `None` when SAM 3 is not ready for it: the edit then runs as with
+/// Protect Subject off). `k` is how many times smaller than the encoded canvas the document the
+/// edits will be applied to is (1 for the document itself, the preview's reduction otherwise).
+pub fn attach(edits: &mut [SelectionEdit], k: u32, finder: &mut dyn FnMut(bool) -> Option<SubjectFinder>) {
+    for e in edits {
+        if let SelectionEdit::RefineHair { sample_all_layers, protect: protect @ ProtectSubject::Asked, .. } = e
+            && let Some(f) = finder(*sample_all_layers)
+        {
+            *protect = ProtectSubject::With(f.reduced(k));
+        }
     }
 }
 
@@ -356,8 +380,8 @@ mod tests {
         ]});
         let edits = parse(&p).expect("valid edits");
         assert_eq!(edits.len(), 10);
-        assert_eq!(edits[8], SelectionEdit::RefineHair { radius: 12.0, sample_all_layers: true });
-        assert_eq!(edits[9], SelectionEdit::RefineHair { radius: 0.0, sample_all_layers: false });
+        assert_eq!(edits[8], SelectionEdit::RefineHair { radius: 12.0, sample_all_layers: true, protect: ProtectSubject::Off });
+        assert_eq!(edits[9], SelectionEdit::RefineHair { radius: 0.0, sample_all_layers: false, protect: ProtectSubject::Off });
         assert_eq!(edits[0], SelectionEdit::Quick { points: vec![(1.0, 2.0)], size: 12.0, add: false, sample_all_layers: true });
         assert_eq!(edits[1], SelectionEdit::Brush { points: vec![(1.0, 2.0), (3.0, 4.0)], size: 30.0, hardness: 50.0, add: true });
         assert_eq!(edits[3], SelectionEdit::Object { area: ObjectArea::Rect(Rect::new(5, 5, 10, 10)), add: true, sample_all_layers: false });
