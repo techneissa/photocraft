@@ -302,6 +302,7 @@ pub use tools::move_hover;
 pub use tools::move_lock;
 pub use tools::move_mods;
 pub use tools::object_finder;
+pub(crate) use tools::sam3_ui;
 use tools::paint_picker;
 use tools::path_components;
 pub use tools::perspective_crop_ui;
@@ -401,6 +402,8 @@ pub struct PhotocraftApp {
     pub(crate) move_distance: Option<move_distance::Cache>,
     /// Object Selection › Object Finder: the hover preview (`object_finder`).
     pub(crate) object_finder: Option<object_finder::Finder>,
+    /// SAM 3 for Object Selection and Quick Selection: what the status bar was told (`sam3_ui`).
+    pub(crate) sam3_ui: sam3_ui::Sam3Ui,
     /// A blend mode hovered in the Layers panel, shown live (`blend_preview`).
     pub(crate) blend_preview: Option<blend_preview::BlendPreview>,
     /// Layers panel drag: temporary reordered document displayed until mouse release.

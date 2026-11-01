@@ -63,6 +63,7 @@ impl PhotocraftApp {
             move_hover: None,
             move_distance: None,
             object_finder: None,
+            sam3_ui: Default::default(),
             blend_preview: None,
             reorder_preview: None,
             reorder_preview_hit: false,
