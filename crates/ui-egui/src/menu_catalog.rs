@@ -35,7 +35,7 @@ pub static CATALOG: &[(&[&str], &str, Option<&str>, &str)] = &[
     (&["File", "Export"], "Render Video…", None, "file.export.renderVideo"),
     (&["File", "Generate"], "Image Assets", None, "file.generate.imageAssets"),
     (&["File"], "---", None, "---"),
-    (&["File"], "Place Embedded…", None, "file.placeEmbedded"),
+    (&["File"], "Place Embedded…", Some("Cmd+Shift+P"), "file.placeEmbedded"),
     (&["File"], "Place Linked…", None, "file.placeLinked"),
     (&["File"], "---", None, "---"),
     (&["File"], "Package…", None, "file.package"),

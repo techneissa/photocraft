@@ -490,6 +490,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 actions.push((crate::double_exposure::COMMAND.into(), Value::Null));
             }
         }
+        crate::place_photos::footer_button(app, ui, &mut actions);
         let fx = fx_button(ui, 26.0, tl!("Add a layer style"));
         crate::press_menu::show(&fx, |ui, menu| {
             ui.set_min_width(180.0);

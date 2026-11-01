@@ -258,7 +258,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "file.placeEmbedded",
             "Place Embedded…",
             &["File"],
-            None,
+            Some("Cmd+Shift+P"),
             r##"{"path":str,"scale":%? (default: fit when larger than the canvas),"fit":bool? (default: Preferences > General > Resize Image During Place),"smartObject":bool? (default: Preferences > General > Always Create Smart Objects When Placing),"center":[x,y]?}"##,
             native_doc,
             |s, p| place(s, p, false)

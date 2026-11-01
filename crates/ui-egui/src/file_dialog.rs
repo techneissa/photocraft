@@ -377,7 +377,7 @@ pub(crate) fn last_used_dir(recent: &[String]) -> Option<String> {
 }
 
 /// The name and bytes of the single file an open dialog answered with.
-fn read_picked(answer: FileDialogAnswer) -> Result<(String, Vec<u8>), String> {
+pub(crate) fn read_picked(answer: FileDialogAnswer) -> Result<(String, Vec<u8>), String> {
     match answer {
         FileDialogAnswer::Contents(name, bytes) => Ok((name, bytes)),
         FileDialogAnswer::ContentsMany(files) => files.into_iter().next().ok_or_else(|| CANCELLED.into()),

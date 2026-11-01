@@ -59,6 +59,7 @@ pub use state::{Tool, UiState};
 
 mod app;
 mod input;
+mod place_photos;
 mod prefs;
 mod services;
 mod text;

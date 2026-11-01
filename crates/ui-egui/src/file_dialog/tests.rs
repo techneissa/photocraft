@@ -889,7 +889,7 @@ fn smart_source(app: &PhotocraftApp, id: u64) -> photocraft_doc::SmartSource {
 }
 
 #[test]
-fn place_embedded_uses_the_single_file_picker_and_accepts_contents() {
+fn place_embedded_uses_the_multi_file_picker_and_accepts_contents() {
     let (mut app, open, _) = app();
     let ctx = egui::Context::default();
     assert!(menus::is_enabled(&app, "file.placeEmbedded"));
@@ -899,7 +899,7 @@ fn place_embedded_uses_the_single_file_picker_and_accepts_contents() {
     // Cancel leaves the document alone and does not report an error.
     menus::invoke(&mut app, &ctx, "file.placeEmbedded", json!({})).unwrap();
     app.poll_file_dialog(&ctx, None);
-    assert!(matches!(open.borrow().as_slice(), [(FileDialogRequest::Open { multiple: false, .. }, _)]));
+    assert!(matches!(open.borrow().as_slice(), [(FileDialogRequest::Open { multiple: true, .. }, _)]));
     answer(&open, None);
     app.poll_file_dialog(&ctx, None);
     assert_eq!(app.session.active().unwrap().doc.layers.len(), layers_before);

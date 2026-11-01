@@ -286,6 +286,9 @@ pub(super) fn front(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, para
                 Err(e) => return Some(Err(e)),
             };
             let linked = id == "file.placeLinked";
+            if !linked {
+                return Some(crate::place_photos::pick(app, ctx, doc));
+            }
             let ctx = ctx.clone();
             Some(app.pick_file_bytes(move |app, name, bytes| {
                 if app.ui.transform.is_some() {
