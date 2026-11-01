@@ -421,7 +421,7 @@ fn a_preview_of_an_old_revision_is_dropped() {
     open(&mut app).unwrap();
     selected(&mut app);
     assert!(ws(&app).preview.pending.is_some());
-    let j = job(&app).unwrap();
+    let j = job(&mut app).unwrap();
     let old = j.revision;
     let late = compute(j, None);
     app.session.execute("select.all", json!({})).unwrap();

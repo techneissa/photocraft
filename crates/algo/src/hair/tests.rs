@@ -193,7 +193,7 @@ fn tiles_agree_with_one_solve() {
     let radius = 16.0;
     let tiled = hair_alpha(&img, &mask, radius);
     // One solve over the whole picture with the same trimap.
-    let tr = Trimap::new(&mask, Rect::new(0, 0, w as i32, h as i32), Rect::new(0, 0, w as i32, h as i32), radius);
+    let tr = Trimap::new(&mask, Rect::new(0, 0, w as i32, h as i32), Rect::new(0, 0, w as i32, h as i32), radius, None);
     let whole = solve(&img, &tr.kind, &tr.init, radius);
     let diff = mae(&tiled, &whole.alpha, |_| true);
     let worst = tiled.iter().zip(&whole.alpha).map(|(a, b)| (a - b).abs()).fold(0.0f32, f32::max);
@@ -309,7 +309,7 @@ fn extreme_colours_keep_alpha_in_range() {
     let got = hair_alpha(&img, &mask, 8.0);
     assert!(got.iter().all(|a| (0.0..=1.0).contains(a)));
     let nan = RgbImage::from_fn(w, h, |x, _| if x == 31 { [f32::NAN; 3] } else { [0.4; 3] });
-    let tr = Trimap::new(&mask, Rect::new(0, 0, w as i32, h as i32), Rect::new(0, 0, w as i32, h as i32), 8.0);
+    let tr = Trimap::new(&mask, Rect::new(0, 0, w as i32, h as i32), Rect::new(0, 0, w as i32, h as i32), 8.0, None);
     let s = solve(&nan, &tr.kind, &tr.init, 8.0);
     assert!(s.alpha.iter().all(|a| (0.0..=1.0).contains(a)), "NaN colours");
 }
@@ -344,4 +344,94 @@ fn time_24mp() {
         t.elapsed().as_secs_f32(),
         got.iter().filter(|v| **v > 0.0 && **v < 1.0).count()
     );
+}
+
+/// A subject (skin) on a backdrop as dark as a deep shadow, with a shadow inside the subject that
+/// touches its edge, as under a nose: the colours read it as backdrop. Returns the picture, the
+/// selection (the whole subject, shadow included), the shadow's rectangle and a strand outside.
+fn shadow_scene() -> (RgbImage, Vec<f32>, Rect, Rect) {
+    let (w, h) = (120usize, 90usize);
+    let subject = Rect::new(30, 20, 90, 70);
+    let shadow = Rect::new(30, 35, 42, 55);
+    let strand = Rect::new(92, 40, 112, 42);
+    let img = RgbImage::from_fn(w, h, |x, y| {
+        let (xi, yi) = (x as i32, y as i32);
+        let wobble = 0.015 * (0.7 * x as f32).sin() * (0.5 * y as f32).cos();
+        if shadow.contains(xi, yi) {
+            [0.09 + wobble, 0.08 + wobble, 0.08 + wobble]
+        } else if subject.contains(xi, yi) {
+            [0.80 + wobble, 0.60 + wobble, 0.50 + wobble]
+        } else if strand.contains(xi, yi) {
+            [0.45, 0.30, 0.18]
+        } else {
+            [0.10 + wobble, 0.10 + wobble, 0.11 + wobble]
+        }
+    });
+    let mask = (0..w * h).map(|i| if subject.contains((i % w) as i32, (i / w) as i32) { 1.0 } else { 0.0 }).collect();
+    (img, mask, shadow, strand)
+}
+
+fn protected_alpha(img: &RgbImage, mask: &[f32], radius: f32, protect: Option<&Region>) -> Vec<f32> {
+    let (w, h) = (img.w, img.h);
+    let canvas = Rect::new(0, 0, w as i32, h as i32);
+    let read = reader(mask, w, h);
+    let smp = ImageSampler { img, origin: (0, 0) };
+    let region = refine_hair_protected(&smp, &read, canvas, canvas, radius, protect).expect("refine").expect("something selected");
+    (0..w * h).map(|i| region.at((i % w) as i32, (i / w) as i32)).collect()
+}
+
+/// Protect Subject: with it off a shadow at the selection's edge is cut away (its colours are the
+/// backdrop's); with the subject's mask given it stays fully selected, and the strand off the
+/// subject is solved as before.
+#[test]
+fn a_protected_subject_keeps_a_shadow_at_its_edge() {
+    let (img, mask, shadow, strand) = shadow_scene();
+    let (w, h) = (img.w, img.h);
+    let subject = Region { bbox: Rect::new(30, 20, 90, 70), mask: vec![255; 60 * 50] };
+    let off = protected_alpha(&img, &mask, 10.0, None);
+    let on = protected_alpha(&img, &mask, 10.0, Some(&subject));
+    let mean = |a: &[f32], r: Rect| {
+        let (mut s, mut n) = (0.0f32, 0u32);
+        for y in r.y0..r.y1 {
+            for x in r.x0..r.x1 {
+                s += a[y as usize * w + x as usize];
+                n += 1;
+            }
+        }
+        s / n as f32
+    };
+    // The three columns inside the subject's own edge pixel, which stays the matting's to decide.
+    let notch = Rect::new(shadow.x0 + 1, shadow.y0, shadow.x0 + 4, shadow.y1);
+    println!("shadow at the edge: off {:.3}, on {:.3}", mean(&off, notch), mean(&on, notch));
+    assert!(mean(&off, notch) < 0.5, "without protection the shadow is cut: {}", mean(&off, notch));
+    assert!(mean(&on, notch) > 0.99, "with it the shadow stays: {}", mean(&on, notch));
+    // Nothing off the subject changes much: the strand is solved the same way.
+    let worst = (0..w * h).filter(|i| (*i % w) as i32 >= 92).map(|i| (on[i] - off[i]).abs()).fold(0.0f32, f32::max);
+    println!("strand: off {:.3}, on {:.3}, worst change right of the subject {worst:.3}", mean(&off, strand), mean(&on, strand));
+    assert!(worst < 0.05, "{worst}");
+    // `None` and a region that holds nothing are today's Refine Hair.
+    let nothing = Region { bbox: Rect::new(0, 0, 4, 4), mask: vec![0; 16] };
+    assert_eq!(protected_alpha(&img, &mask, 10.0, Some(&nothing)), off);
+    let plain = {
+        let canvas = Rect::new(0, 0, w as i32, h as i32);
+        let read = reader(&mask, w, h);
+        let smp = ImageSampler { img: &img, origin: (0, 0) };
+        let region = refine_hair(&smp, &read, canvas, canvas, 10.0).unwrap().unwrap();
+        (0..w * h).map(|i| region.at((i % w) as i32, (i / w) as i32)).collect::<Vec<_>>()
+    };
+    assert_eq!(plain, off);
+}
+
+/// The outline is pulled in before it counts: a pixel at the subject's own edge is not pinned.
+#[test]
+fn the_protected_outline_is_eroded() {
+    let rect = Rect::new(0, 0, 30, 30);
+    let subject = Region { bbox: Rect::new(5, 5, 25, 25), mask: vec![255; 400] };
+    let pins = pinned(&subject, rect, 2.0).expect("some pixels");
+    let at = |x: usize, y: usize| pins[y * 30 + x];
+    assert!(!at(5, 15) && !at(6, 15) && at(7, 15), "two pixels in from the left edge");
+    assert!(at(15, 15) && !at(24, 15) && !at(4, 15));
+    assert!(pinned(&Region { bbox: Rect::new(40, 40, 44, 44), mask: vec![255; 16] }, rect, 2.0).is_none(), "off the rectangle");
+    assert_eq!(protect_erosion(0.0), 1.5);
+    assert_eq!((protect_erosion(1.0), protect_erosion(64.0)), (1.0, 4.0));
 }

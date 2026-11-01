@@ -86,26 +86,37 @@ pub fn confirm(app: &mut PhotocraftApp, fields: &Map<String, Value>) -> Result<V
     if let Some(name) = fields.get("name").and_then(Value::as_str) {
         params.insert("name".into(), json!(name));
     }
-    match fields.get("destination") {
+    let (result, destination) = match fields.get("destination") {
         Some(Value::String(s)) if s == "new" => {
             if let Some(doc_name) = fields.get("documentName").and_then(Value::as_str).filter(|n| !n.is_empty()) {
                 params.insert("documentName".into(), json!(doc_name));
             }
             params.insert("document".into(), json!("new"));
-            app.run_command("layer.duplicate", Value::Object(params))
+            (app.run_command("layer.duplicate", Value::Object(params))?, None)
         }
         Some(Value::Number(n)) => {
             let destination =
                 n.as_u64().and_then(|i| usize::try_from(i).ok()).filter(|i| *i < app.session.documents().len()).ok_or("no destination document")?;
             if destination == index {
-                app.run_command("layer.duplicate", Value::Object(params))
+                (app.run_command("layer.duplicate", Value::Object(params))?, Some(destination))
             } else {
                 params.insert("document".into(), json!(destination));
-                app.run_command("layer.copyToDocument", Value::Object(params))
+                (app.run_command("layer.copyToDocument", Value::Object(params))?, Some(destination))
             }
         }
-        _ => Err("no destination document".into()),
+        _ => return Err("no destination document".into()),
+    };
+    // Say where the copy went, also when it is the document it came from: a copy that landed in the
+    // current document instead of the other one was easy to miss.
+    let name = match destination {
+        Some(i) => app.session.documents().get(i).map(|d| d.doc.name.clone()),
+        None => app.session.active().map(|st| st.doc.name.clone()),
+    };
+    if let Some(name) = name {
+        app.ui.status = crate::i18n::fmt(tl!("Duplicated to {document}"), &[("document", &name)]);
+        app.ui.status_error = false;
     }
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -327,5 +338,41 @@ mod tests {
         app.run("layer.new.layerViaCopy", json!({})).unwrap();
         assert!(app.ui.dialogs.is_empty());
         assert_eq!(app.session.active().unwrap().doc.layer_count(), 4);
+    }
+
+    /// techneissa lost a copy that went into the current document instead of the other one: the
+    /// status bar names the document that received it, in every case.
+    #[test]
+    fn ok_says_which_document_received_the_copy() {
+        let mut app = make_app();
+        app.session.execute("file.new", json!({"width":8,"height":8,"name":"Card"})).unwrap();
+        app.session.set_active(0);
+        // The current document (the dialog's default).
+        let dialog = invoke(&mut app);
+        crate::dialogs::confirm(&mut app, dialog).unwrap();
+        assert_eq!(app.ui.status, "Duplicated to Poster");
+        assert!(!app.ui.status_error);
+        // Another document.
+        app.session.set_active(0);
+        let dialog = invoke(&mut app);
+        app.ui.dialog_mut(dialog).unwrap().fields.insert("destination".into(), json!(1));
+        crate::dialogs::confirm(&mut app, dialog).unwrap();
+        assert_eq!(app.ui.status, "Duplicated to Card");
+        // A new document, under the name typed.
+        app.session.set_active(0);
+        let dialog = invoke(&mut app);
+        {
+            let fields = &mut app.ui.dialog_mut(dialog).unwrap().fields;
+            fields.insert("destination".into(), json!("new"));
+            fields.insert("documentName".into(), json!("Proof"));
+        }
+        crate::dialogs::confirm(&mut app, dialog).unwrap();
+        assert_eq!(app.ui.status, "Duplicated to Proof");
+        // A refused copy keeps its error and says nothing about a destination.
+        app.ui.status.clear();
+        let dialog = invoke(&mut app);
+        app.ui.dialog_mut(dialog).unwrap().fields.insert("destination".into(), json!(9));
+        assert!(crate::dialogs::confirm(&mut app, dialog).is_err());
+        assert!(app.ui.status.is_empty());
     }
 }

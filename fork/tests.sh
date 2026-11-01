@@ -26,5 +26,6 @@ cargo test -p photocraft-algo --lib hair::
 cargo test -p photocraft-engine --lib -- hair_cmds select_mask_edits
 cargo test -p photocraft-engine --lib -- sam3_select smartselect
 cargo test -p photocraft-ui-egui --lib -- sam3_ui object_finder retouch_ui
+cargo test -p photocraft-ui-egui --lib -- select_mask_ui
 cargo test -p photocraft-ui-egui --lib -- ai_models
 cargo test -p photocraft-ui-egui --lib -- shortcuts_window shortcuts_search shortcuts_rows shortcuts_menus shortcut_capture shortcuts_upgrade kys_import prefs_ui color_picker_preview
