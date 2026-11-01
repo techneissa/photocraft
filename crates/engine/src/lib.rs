@@ -98,6 +98,7 @@ pub use cmd::fx_visibility_cmds;
 pub use cmd::gallery_cmds;
 pub use cmd::gradient_fill_cmds;
 pub use cmd::group_view_cmds;
+pub use cmd::hair_cmds;
 pub use cmd::history_cmds;
 pub use cmd::history_menu_cmds;
 pub use cmd::history_options_cmds;

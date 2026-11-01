@@ -38,6 +38,7 @@ pub mod faces;
 pub mod features;
 mod fxutil;
 mod gallery;
+pub mod hair;
 pub mod hdr;
 pub mod histogram;
 mod image;

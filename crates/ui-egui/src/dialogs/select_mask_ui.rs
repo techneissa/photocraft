@@ -20,8 +20,11 @@
 //! view ([`crate::select_mask_view::preview_proxy`]). With Real-Time Refinement the stroke being
 //! drawn joins the preview while the pointer moves; without, when it is released.
 //!
-//! Not here yet: Refine Hair (#2671) and Object Aware (a learned model, #2788) are shown but greyed
-//! out, and Photoshop's Presets.
+//! Refine Hair is an edit like the tools': the selection so far becomes a trimap and its band is
+//! solved for alpha (`photocraft_algo::hair`), its width the Edge Detection radius.
+//!
+//! Not here yet: Object Aware (a learned model, #2788) is shown but greyed out, and Photoshop's
+//! Presets.
 
 use std::sync::Arc;
 
@@ -1007,6 +1010,10 @@ fn scale_edit(e: &Value, k: u32) -> Value {
     if let Some(size) = o.get("size").and_then(Value::as_f64) {
         o.insert("size".into(), json!((size / k).max(1.0)));
     }
+    // Refine Hair's band: 0 stays the default radius, which is then taken on the reduced copy too.
+    if let Some(radius) = o.get("radius").and_then(Value::as_f64).filter(|r| *r > 0.0) {
+        o.insert("radius".into(), json!((radius / k).max(1.0)));
+    }
     e
 }
 
@@ -1534,10 +1541,10 @@ fn options_bar(ui: &mut egui::Ui, w: &mut SelectMaskWorkspace) -> Option<Value> 
         if widgets::secondary_button(ui, tl!("Select Subject"), 0.0).clicked() {
             edit = Some(json!({"tool": "subject", "sampleAllLayers": w.sample_all}));
         }
-        // Refine Hair needs hair detection PhotoCraft doesn't have yet (#2671): greyed, saying so.
-        ui.add_enabled_ui(false, |ui| widgets::secondary_button(ui, tl!("Refine Hair"), 0.0))
-            .inner
-            .on_disabled_hover_text(tl!("Refine Hair needs hair detection, which isn't available yet"));
+        // Refine Hair (#2671): alpha for hair in a band as wide as the Edge Detection radius.
+        if widgets::secondary_button(ui, tl!("Refine Hair"), 0.0).clicked() {
+            edit = Some(json!({"tool": "refineHair", "radius": w.opts.radius, "sampleAllLayers": w.sample_all}));
+        }
     }
     edit
 }
