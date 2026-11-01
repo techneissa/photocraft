@@ -84,6 +84,7 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
 - [Context menus page size](fork/context-menus-resize.md): the Context Menus page keeps the size the Preferences window is dragged to. Branch `fix/context-menus-resize`.
 - [Arabic AI Models text](fork/arabic-ai-models.md): Arabic text for the AI Models page. Branch `custom`.
 - [Place Photos](fork/place-photos.md): Place Embedded on ⇧⌘P, several photos at once, a Place Photo button in the Layers panel. Branch `feat/place-photos`.
+- [SAM 3](fork/sam3.md): LightCraft's SAM 3 model code, click and text masks, no UI yet. Branch `feat/sam3`.
 
 To find which feature owns an official file: `grep -l '<path>' fork/*.md`.
 
