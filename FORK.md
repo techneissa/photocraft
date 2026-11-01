@@ -65,9 +65,9 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
    commands, run `cargo xtask parity` on `custom` and commit `docs/parity-checklist.md`. Then run
    `update-photocraft.sh`.
 
-At most 3 feature lanes build at a time on this Mac (techneissa, 2026-11-02): it also builds the other Craft apps.
-Every worktree shares one compiler cache (sccache, set in `~/.cargo/config.toml`, never in the repo's
-`.cargo/config.toml`), so a new worktree compiles only what changed.
+At most 3 feature lanes build at a time on this Mac (techneissa, 2026-11-02): it also builds the other Craft apps,
+and each new worktree compiles from scratch (about 10 to 25 minutes; sccache gave no hits across worktrees and was
+removed on 2026-11-02).
 
 ## The features
 
