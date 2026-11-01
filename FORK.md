@@ -86,6 +86,7 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
 - [Place Photos](fork/place-photos.md): Place Embedded on ⇧⌘P, several photos at once, a Place Photo button in the Layers panel. Branch `feat/place-photos`.
 - [SAM 3](fork/sam3.md): LightCraft's SAM 3 model code, click and text masks, no UI yet. Branch `feat/sam3`.
 - [Refine Hair](fork/refine-hair.md): Select and Mask's Refine Hair button, closed-form matting in the edge band. Branch `feat/refine-hair`.
+- [SAM 3 click select](fork/sam3-click-select.md): Object Selection and Quick Selection select with SAM 3 (click, ⇧/⌥ refine, hover), with a Classic fallback and an engine preference. Branch `feat/sam3-click-select`.
 
 To find which feature owns an official file: `grep -l '<path>' fork/*.md`.
 
