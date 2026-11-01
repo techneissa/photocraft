@@ -4138,6 +4138,9 @@ curves	Smooth	Εξομάλυνση
 	There is no color table to save.	Δεν υπάρχει πίνακας χρωμάτων για αποθήκευση.
 @plural	Saved {n} color to {file}|Saved {n} colors to {file}	Αποθηκεύτηκε {n} χρώμα στο {file}|Αποθηκεύτηκαν {n} χρώματα στο {file}
 	GPU adapter	Προσαρμογέας GPU
+smartSvg	AI/PDF/EPS contents will be edited as SVG. Saving replaces the embedded source; format-specific features may change.	Το περιεχόμενο AI/PDF/EPS θα υποστεί επεξεργασία ως SVG. Η αποθήκευση αντικαθιστά την ενσωματωμένη πηγή· οι ιδιότητες του αρχικού τύπου αρχείου μπορεί να αλλάξουν.
+
+# Styles panel: Import / Export Styles (.asl)
 	Import Styles…	Εισαγωγή στιλ…
 	Export Selected Styles…	Εξαγωγή επιλεγμένων στιλ…
 	Export Styles…	Εξαγωγή στιλ…
@@ -4188,6 +4191,7 @@ curves	Smooth	Εξομάλυνση
 	Font size presets	Προεπιλογές μεγέθους γραμματοσειράς
 	Leading presets	Προεπιλογές διάστιχου
 	Tracking presets	Προεπιλογές διαστήματος χαρακτήρων
+	Invalid numeric entry. An integer between {min}% and {max}% is required. Previous value was inserted.	Μη έγκυρη αριθμητική τιμή. Απαιτείται ακέραιος αριθμός μεταξύ {min}% και {max}%. Εισήχθη η προηγούμενη τιμή.
 # Optional local AI model management
 	AI Models	Μοντέλα AI
 	Models are optional and run entirely on this computer. Downloading fetches the model file from Hugging Face; no images or documents are ever uploaded. Without a model, Select Subject, Remove Background and Remove Subject use the built-in (non-AI) methods.	Τα μοντέλα είναι προαιρετικά και εκτελούνται εξ ολοκλήρου σε αυτόν τον υπολογιστή. Η λήψη φέρνει το αρχείο μοντέλου από το Hugging Face· δεν μεταφορτώνονται ποτέ εικόνες ή έγγραφα. Χωρίς μοντέλο, οι λειτουργίες Επιλογή θέματος, Αφαίρεση φόντου και Αφαίρεση θέματος χρησιμοποιούν τις ενσωματωμένες μεθόδους χωρίς AI.
@@ -4219,4 +4223,9 @@ curves	Smooth	Εξομάλυνση
 	Select and Mask was closed: its document is no longer the active one	Η Επιλογή και μάσκα έκλεισε: το έγγραφό της δεν είναι πλέον το ενεργό
 	Select and Mask was closed: another layer was selected	Η Επιλογή και μάσκα έκλεισε: επιλέχθηκε άλλο επίπεδο
 	Select Layer Under Cursor	Επιλογή επιπέδου κάτω από τον δρομέα
+
+# Shape Fill/Stroke popover and colour swatches opening the Color Picker
+	Recently Used Colors	Χρώματα που χρησιμοποιήθηκαν πρόσφατα
+	Stop Color	Χρώμα στάσης
+	Shapes can't use patterns yet	Τα σχήματα δεν μπορούν ακόμη να χρησιμοποιούν μοτίβα
 	Edit Brush…	Επεξεργασία πινέλου…
