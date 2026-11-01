@@ -120,7 +120,8 @@ pub fn open_bytes(app: &mut PhotocraftApp, name: &str, bytes: &[u8]) -> Result<V
     import_text(app, name, text)
 }
 
-/// The dialog's Import Shortcuts… button: ask for the file, then fill the dialog.
+/// Ask for a `.kys` file, then fill the open Keyboard Shortcuts dialog (it had a button until the
+/// JSON icons took the dialog's import).
 pub fn import_dialog(app: &mut PhotocraftApp) -> Result<Value, String> {
     app.pick_file_bytes(|app, name, bytes| open_bytes(app, &name, &bytes))
 }

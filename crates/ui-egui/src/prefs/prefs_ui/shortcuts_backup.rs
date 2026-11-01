@@ -31,7 +31,7 @@ fn unstage(f: &mut Map<String, Value>, p: &Preferences) {
     f.insert("when".into(), json!(p.shortcut_when));
     f.insert("selected".into(), json!(""));
     f.insert("capture".into(), json!(false));
-    f.insert("captureChord".into(), json!(false));
+    f.insert("__recSteps".into(), json!([]));
     f.insert("conflict".into(), Value::Null);
     f.insert("chordConflict".into(), Value::Null);
     f.insert("whenEdit".into(), Value::Null);

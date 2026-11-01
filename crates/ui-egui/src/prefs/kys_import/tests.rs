@@ -115,11 +115,11 @@ fn an_unreadable_shortcut_is_reported_not_imported() {
     assert_eq!(p.unreadable, vec!["Undo".to_string()]);
 }
 
-/// The dialog's Import Shortcuts… button: the chosen file fills the overrides (a key
-/// equal to the default clears its override), reports what it did, and OK applies the set like
+/// Importing a `.kys` file while the dialog is open (the button is gone, the entry point stays):
+/// the chosen file fills the overrides (a key equal to the default clears its override), reports what it did, and OK applies the set like
 /// hand-made changes, taking a moved key from its old owner.
 #[test]
-fn import_button_fills_the_dialog_and_ok_applies_the_set() {
+fn importing_a_kys_file_fills_the_dialog_and_ok_applies_the_set() {
     let answers = vec![Some(FileDialogAnswer::Contents("/sets/texcuts.kys".into(), SAMPLE.as_bytes().to_vec()))];
     let services = crate::Services { file_dialog: Some(crate::file_dialog::fake(answers).0), ..Default::default() };
     let mut h = Harness::builder().with_size(egui::vec2(1100.0, 760.0)).with_max_steps(64).build_eframe(|cc| {
@@ -134,7 +134,7 @@ fn import_button_fills_the_dialog_and_ok_applies_the_set() {
     h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("filter".into(), json!("gaussian"));
     h.state_mut().ui.dialog_mut(id).unwrap().fields.insert("messageWarning".into(), json!(true));
     h.run_steps(2);
-    h.get_by_label("Import Shortcuts…").click();
+    crate::kys_import::import_dialog(h.state_mut()).unwrap();
     h.run_steps(3);
     let field = |h: &Harness<'_, PhotocraftApp>, name: &str| -> Value {
         h.state().ui.dialogs.iter().find(|d| d.id == id).unwrap().fields.get(name).cloned().unwrap_or(Value::Null)

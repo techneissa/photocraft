@@ -25,7 +25,7 @@ pub use bar::menu_bar;
 use bar::pointer_reaches_title;
 pub use invoke::{apply_workspace, invoke};
 pub(crate) use invoke::{invoke_unguarded, panel_alias};
-pub(crate) use items::ItemCache;
+pub(crate) use items::{ItemCache, menu_tint};
 pub use items::{MenuItem, is_live, menu_items};
 pub use render::alt_click;
 #[cfg(test)]
