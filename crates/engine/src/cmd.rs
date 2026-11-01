@@ -90,6 +90,7 @@ pub mod fx_visibility_cmds;
 pub mod gallery_cmds;
 pub mod gradient_fill_cmds;
 pub mod group_view_cmds;
+pub mod hair_cmds;
 pub mod history_cmds;
 pub mod history_menu_cmds;
 pub mod history_options_cmds;
@@ -1275,6 +1276,7 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::float_cmds::specs());
     v.extend(crate::vector_cmds::specs());
     v.extend(crate::path_edit_cmds::specs());
+    v.extend(crate::hair_cmds::specs());
     v.extend(crate::smartselect_cmds::specs());
     v.extend(crate::cutout_cmds::specs());
     v.extend(crate::remove_subject_cmds::specs());

@@ -272,6 +272,10 @@ fn edits_scale_to_the_reduced_copy() {
     assert_eq!(scale_edit(&e, 3), json!({"tool": "quick", "points": [[10.0, 20.0]], "size": 10.0, "rect": [1.0, 2.0, 3.0, 4.0], "point": [5.0, 1.0]}));
     assert_eq!(scale_edit(&json!({"size": 2.0}), 4)["size"], json!(1.0), "never below a pixel");
     assert_eq!(scale_edit(&json!("x"), 2), json!("x"));
+    // Refine Hair's radius scales with the copy; 0 (the default radius) stays 0.
+    assert_eq!(scale_edit(&json!({"tool": "refineHair", "radius": 40.0}), 4)["radius"], json!(10.0));
+    assert_eq!(scale_edit(&json!({"tool": "refineHair", "radius": 2.0}), 4)["radius"], json!(1.0));
+    assert_eq!(scale_edit(&json!({"tool": "refineHair", "radius": 0.0}), 4)["radius"], json!(0.0));
 }
 
 /// With Real-Time Refinement the stroke being drawn is in the preview before it is released.
@@ -576,7 +580,13 @@ fn renders_photoshops_layout() {
     ] {
         assert!(h.query_by_label_contains(label).is_some(), "{label} is shown");
     }
-    assert!(h.get_by_label("Refine Hair").accesskit_node().is_disabled(), "Refine Hair is greyed out");
+    assert!(!h.get_by_label("Refine Hair").accesskit_node().is_disabled(), "Refine Hair can be used");
+    h.get_by_label("Refine Hair").click();
+    h.run_steps(2);
+    let edits = h.state().distort.select_mask.as_ref().map(|w| w.edits.clone()).unwrap_or_default();
+    assert_eq!(edits.len(), 1, "Refine Hair is one edit");
+    assert_eq!(edits[0]["tool"], "refineHair");
+    h.state_mut().distort.select_mask.as_mut().unwrap().edits.clear();
     h.get_by_label("Brush Tool (B)").click();
     h.run_steps(2);
     assert_eq!(h.state().distort.select_mask.as_ref().map(|w| w.tool), Some(SmTool::Brush));
@@ -649,7 +659,7 @@ fn panning_shows_the_hand() {
     assert_eq!(h.output().platform_output.cursor_icon, egui::CursorIcon::Grab);
 }
 
-/// The greyed Object Aware and Refine Hair say why they can't be used.
+/// The greyed Object Aware says why it can't be used.
 #[test]
 fn greyed_controls_explain_themselves() {
     let mut app = app_with_selection();
@@ -666,16 +676,15 @@ fn greyed_controls_explain_themselves() {
     );
     PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
     h.run_steps(4);
-    for (label, why) in [("Object Aware", "segmentation model"), ("Refine Hair", "hair detection")] {
-        assert!(h.get_by_label(label).accesskit_node().is_disabled(), "{label} is greyed");
-        assert!(h.query_by_label_contains(why).is_none(), "{label}: no tooltip before hovering");
-        let at = h.get_by_label(label).rect().center();
-        h.hover_at(at);
-        h.run_steps(8);
-        assert!(h.query_by_label_contains(why).is_some(), "{label}: hovering says why");
-        h.hover_at(egui::pos2(700.0, 450.0));
-        h.run_steps(4);
-    }
+    let (label, why) = ("Object Aware", "segmentation model");
+    assert!(h.get_by_label(label).accesskit_node().is_disabled(), "{label} is greyed");
+    assert!(h.query_by_label_contains(why).is_none(), "{label}: no tooltip before hovering");
+    let at = h.get_by_label(label).rect().center();
+    h.hover_at(at);
+    h.run_steps(8);
+    assert!(h.query_by_label_contains(why).is_some(), "{label}: hovering says why");
+    h.hover_at(egui::pos2(700.0, 450.0));
+    h.run_steps(4);
 }
 
 fn call(app: &mut PhotocraftApp, method: &str, params: Value) -> Value {

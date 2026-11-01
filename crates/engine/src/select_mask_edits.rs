@@ -10,9 +10,9 @@
 
 use std::collections::BTreeSet;
 
-use photocraft_algo::matting;
 use photocraft_algo::segment::{grabcut, quick, subject};
 use photocraft_algo::selection::{self as sel, Region, SelectionMode, combine_region};
+use photocraft_algo::{hair, matting};
 use photocraft_doc::{Document, LayerId};
 use photocraft_geom::Rect;
 use photocraft_raster::Surface;
@@ -40,6 +40,9 @@ pub enum SelectionEdit {
     Object { area: ObjectArea, add: bool, sample_all_layers: bool },
     /// The Select Subject button.
     Subject { mode: SelectionMode, sample_all_layers: bool },
+    /// The Refine Hair button: alpha for hair and fine edges in a band of `radius` px (0 = the
+    /// default) each side of the selection's edge, by closed-form matting ([`hair`]).
+    RefineHair { radius: f32, sample_all_layers: bool },
     /// Global Refinements › Clear Selection.
     Clear,
     /// Global Refinements › Invert.
@@ -121,7 +124,8 @@ pub fn parse(p: &Value) -> Result<Vec<SelectionEdit>> {
     let mut edits = Vec::with_capacity(list.len());
     for e in list {
         let o = e.as_object().ok_or_else(|| bad("each edit must be an object with a tool"))?;
-        let tool = o.get("tool").and_then(Value::as_str).ok_or_else(|| bad("each edit needs a tool: quick|brush|lasso|object|subject|clear|invert"))?;
+        let tool =
+            o.get("tool").and_then(Value::as_str).ok_or_else(|| bad("each edit needs a tool: quick|brush|lasso|object|subject|refineHair|clear|invert"))?;
         let edit = match tool {
             "quick" => SelectionEdit::Quick {
                 points: points(o, 1, &mut total)?,
@@ -167,9 +171,12 @@ pub fn parse(p: &Value) -> Result<Vec<SelectionEdit>> {
                 };
                 SelectionEdit::Subject { mode, sample_all_layers: flag(o, "sampleAllLayers", true)? }
             }
+            "refineHair" => {
+                SelectionEdit::RefineHair { radius: number(o, "radius", 0.0, 0.0..=1000.0)?, sample_all_layers: flag(o, "sampleAllLayers", false)? }
+            }
             "clear" => SelectionEdit::Clear,
             "invert" => SelectionEdit::Invert,
-            other => return Err(bad(&format!("unknown edit tool `{other}`: quick|brush|lasso|object|subject|clear|invert"))),
+            other => return Err(bad(&format!("unknown edit tool `{other}`: quick|brush|lasso|object|subject|refineHair|clear|invert"))),
         };
         edits.push(edit);
     }
@@ -198,6 +205,11 @@ pub fn check_size(edits: &[SelectionEdit], canvas: Rect) -> Result<()> {
         let tiles = match e {
             SelectionEdit::Brush { points, size, .. } => matting::painted_tiles(points, *size, canvas, sel::MAX_PAINTED_TILES),
             SelectionEdit::Lasso { points, .. } => sel::polygon_edge_tiles(points, canvas, sel::MAX_PAINTED_TILES),
+            // Refine Hair's result lies within the canvas: refused here when even that is too large.
+            SelectionEdit::RefineHair { radius, .. } => {
+                hair::check_size(canvas, canvas, *radius).map_err(|e| bad(&e.to_string()))?;
+                continue;
+            }
             _ => continue,
         };
         all.extend(tiles.ok_or_else(|| bad("a brush or lasso edit crosses too many tiles of the canvas"))?);
@@ -283,6 +295,19 @@ pub fn apply_one(doc: &Document, layer: Option<LayerId>, base: Option<Surface>, 
             let region = with_doc_sampler(doc, layer, *sample_all_layers, |smp, doc| subject::select_subject(smp, doc.bounds()));
             combine(region, *mode)
         }
+        SelectionEdit::RefineHair { radius, sample_all_layers } => {
+            // No selection, or a selection Refine Hair refuses (too large; `check_size` says so first):
+            // as for any tool that finds nothing, the selection stays as it was.
+            let sel = base.as_ref()?;
+            let content = sel.content_bounds();
+            let refined = with_doc_sampler(doc, layer, *sample_all_layers, |smp, doc| {
+                hair::refine_hair(smp, &matting::surface_reader(sel), content, doc.bounds(), *radius)
+            });
+            match refined {
+                Ok(region) => region.as_ref().map(matting::region_surface),
+                Err(_) => base.clone(),
+            }
+        }
         SelectionEdit::Clear => None,
         SelectionEdit::Invert => invert(base.as_ref(), canvas),
     }
@@ -326,9 +351,13 @@ mod tests {
             {"tool": "subject", "mode": "add"},
             {"tool": "clear"},
             {"tool": "invert"},
+            {"tool": "refineHair", "radius": 12, "sampleAllLayers": true},
+            {"tool": "refineHair"},
         ]});
         let edits = parse(&p).expect("valid edits");
-        assert_eq!(edits.len(), 8);
+        assert_eq!(edits.len(), 10);
+        assert_eq!(edits[8], SelectionEdit::RefineHair { radius: 12.0, sample_all_layers: true });
+        assert_eq!(edits[9], SelectionEdit::RefineHair { radius: 0.0, sample_all_layers: false });
         assert_eq!(edits[0], SelectionEdit::Quick { points: vec![(1.0, 2.0)], size: 12.0, add: false, sample_all_layers: true });
         assert_eq!(edits[1], SelectionEdit::Brush { points: vec![(1.0, 2.0), (3.0, 4.0)], size: 30.0, hardness: 50.0, add: true });
         assert_eq!(edits[3], SelectionEdit::Object { area: ObjectArea::Rect(Rect::new(5, 5, 10, 10)), add: true, sample_all_layers: false });
@@ -365,6 +394,10 @@ mod tests {
             json!([{"tool": "object", "rect": [1, 2, 3]}]),
             json!([{"tool": "object", "point": [1, "y"]}]),
             json!([{"tool": "subject", "mode": "intersect"}]),
+            json!([{"tool": "refineHair", "radius": -1}]),
+            json!([{"tool": "refineHair", "radius": 1001}]),
+            json!([{"tool": "refineHair", "radius": "wide"}]),
+            json!([{"tool": "refineHair", "sampleAllLayers": 1}]),
             json!([{"tool": "brush", "points": many_points}]),
             json!(many_edits),
             // Each within the limit, together past it.
