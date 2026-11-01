@@ -251,11 +251,11 @@ fn pinned(protect: &Region, rect: Rect, erosion: f32) -> Option<Vec<bool>> {
     for y in region.y0..region.y1 {
         for x in region.x0..region.x1 {
             let src = (y - protect.bbox.y0) as usize * bw + (x - protect.bbox.x0) as usize;
-            if protect.mask.get(src).is_some_and(|v| *v >= 128) {
-                if let Some(o) = outside.get_mut((y - rect.y0) as usize * w + (x - rect.x0) as usize) {
-                    *o = false;
-                    any = true;
-                }
+            if protect.mask.get(src).is_some_and(|v| *v >= 128)
+                && let Some(o) = outside.get_mut((y - rect.y0) as usize * w + (x - rect.x0) as usize)
+            {
+                *o = false;
+                any = true;
             }
         }
     }

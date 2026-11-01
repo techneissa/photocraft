@@ -6,9 +6,11 @@ Copy Layers to Document refuses a destination with a running background job (a f
 
 A test (`png_documents_take_two_row_menu_duplicates_from_another_png_with_an_edit_between`) opens PNG files with and without alpha, runs the Layers-row menu's Duplicate twice from image 2 into image 1 with a fill in image 1 between them, and checks that every layer survives, image 2 is untouched and each Undo takes one step. The row menu runs the same `layer.duplicate` dialog as the Layer menu; the context menu editor changes no command or params.
 
+After OK, Layer ▸ Duplicate Layer… (and the Layers-row Duplicate, which opens the same dialog) shows `Duplicated to <document name>` in the status bar, also when the copy went into the current document or a new one; the default destination stays Photoshop's (the current document). techneissa lost a copy that went into the current document instead of the other one. Test `ok_says_which_document_received_the_copy`.
+
 ## Branch
 
-`fix/duplicate-to-other-doc`
+`fix/duplicate-to-other-doc`; the status note is on `feat/dup-note-protect-subject`
 
 ## Own files
 
@@ -16,7 +18,7 @@ none
 
 ## Hooks in official files
 
-engine `cmd/layer_copy_cmds.rs` (9 lines in `copy_to_document`; from the PRs: +5, +17), `cmd/edit_cmds.rs` (PR #10008: `linked_sources_to_land`; paste-side mask move removed); tests in `layer_copy_cmds/tests.rs`, ui-egui `dialogs/duplicate_layer_ui.rs` (2 tests)
+engine `cmd/layer_copy_cmds.rs` (9 lines in `copy_to_document`; from the PRs: +5, +17), `cmd/edit_cmds.rs` (PR #10008: `linked_sources_to_land`; paste-side mask move removed); tests in `layer_copy_cmds/tests.rs`, ui-egui `dialogs/duplicate_layer_ui.rs` (2 tests; the status note: 12 lines in `confirm`, 1 test)
 
 ## Tests
 

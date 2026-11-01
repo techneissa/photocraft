@@ -69,7 +69,7 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
 - [AI Select Subject and Remove Subject](fork/select-subject-ai.md): upstream AI models (BiRefNet-lite and LaMa) joined with the macOS cutout under one engine preference. Branch `feat/select-subject-ai`.
 - [Shared models folder](fork/shared-models.md): the AI models live in one folder shared by the Craft apps. Branch `feat/shared-models`.
 - [Upstream select and mask fixes](fork/upstream-select-mask.md): four upstream fixes taken early, for mask filters, mask copy and paste, the Polygonal Lasso and Select › Modify previews. Branch `feat/upstream-select-mask`.
-- [Copy Layers to Document](fork/duplicate-to-other-doc.md): refuses a destination with a running background job; two upstream PRs taken early. Branch `fix/duplicate-to-other-doc`.
+- [Copy Layers to Document](fork/duplicate-to-other-doc.md): refuses a destination with a running background job; two upstream PRs taken early; Duplicate Layer… says where the copy went ("Duplicated to …"). Branches `fix/duplicate-to-other-doc`, `feat/dup-note-protect-subject`.
 - [PSD font scan](fork/psd-open-font-scan.md): PSD files with a big font collection open without the long font scan. Branch `fix/psd-open-font-scan`.
 - [Top bar items](fork/topbar-items.md): show or hide the top bar's Logo, Document Title, Workspace, Search and Appearance Mode. Branch `feat/topbar-items`.
 - [Assign Shortcut and command palette](fork/assign-shortcut-palette.md): Assign Shortcut… on right-click, and the command palette on ⌘P as well as ⌘F. Branch `feat/assign-shortcut-palette`.
@@ -85,7 +85,7 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
 - [Arabic AI Models text](fork/arabic-ai-models.md): Arabic text for the AI Models page. Branch `custom`.
 - [Place Photos](fork/place-photos.md): Place Embedded on ⇧⌘P, several photos at once, a Place Photo button in the Layers panel. Branch `feat/place-photos`.
 - [SAM 3](fork/sam3.md): LightCraft's SAM 3 model code, click and text masks, no UI yet. Branch `feat/sam3`.
-- [Refine Hair](fork/refine-hair.md): Select and Mask's Refine Hair button, closed-form matting in the edge band. Branch `feat/refine-hair`.
+- [Refine Hair](fork/refine-hair.md): Select and Mask's Refine Hair button, closed-form matting in the edge band; a Protect Subject box keeps the subject SAM 3 finds. Branches `feat/refine-hair`, `feat/dup-note-protect-subject`.
 - [SAM 3 click select](fork/sam3-click-select.md): Object Selection and Quick Selection select with SAM 3 (click, ⇧/⌥ refine, hover), with a Classic fallback and an engine preference. Branch `feat/sam3-click-select`.
 - [SAM 3 box and Select Subject](fork/sam3-box-subject.md): Object Selection's dragged rectangle is SAM 3's box prompt, `sam3` joins the Select Subject engine preference, Swedish AI Models text. Branch `feat/sam3-box-subject`.
 
