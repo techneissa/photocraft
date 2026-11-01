@@ -14,6 +14,8 @@ Free Transform, Warp, Puppet Warp and Perspective Warp show the moving layer in 
 
 ## Hooks in official files
 
+- ui-egui `dialogs/color_picker_preview/tests.rs` (`free_transform_keeps_its_preview_while_the_text_colour_picker_is_open` also accepts the live preview key `1 << 46` + n; upstream test from #9757)
+
 gpu `lib.rs`, `kit.rs`, `setup.rs`, `encode.rs`, `cells.rs` (also a `get` for a pool slot), `plan.rs`, `plan/types.rs`, `plan/planner.rs`; ui-egui `canvas/display.rs`, `navigator.rs`, `textures.rs`, `paint.rs`, `gpu_canvas.rs`, `gpu_canvas/resources.rs`, `tools/transform_tool.rs` + `begin.rs` + `draw.rs` + `tests.rs`, `puppet_ui.rs`, `perspective_ui.rs`, `distort_ui.rs`, `lib.rs`, `canvas/tests.rs`; deleted `transform_fx.rs` and `transform_fx_tests.rs` (as the PR does); `docs/ui-parity.md`
 
 ## Tests

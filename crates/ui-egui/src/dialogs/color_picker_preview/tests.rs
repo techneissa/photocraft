@@ -225,7 +225,9 @@ fn free_transform_keeps_its_preview_while_the_text_colour_picker_is_open() {
     // placement under it would show the text twice.
     let (_, key) = crate::canvas::display_doc(&mut app, 0);
     let session = app.transform_preview.as_ref().expect("the transform preview").session;
-    assert_eq!(key, (1 << 40) + session, "the canvas keeps drawing the Free Transform preview");
+    // Fork (fork/transform-live-blend.md): the live transform preview keys are `1 << 46` + n.
+    let live = (1u64 << 46..(1u64 << 46) + (1u64 << 40)).contains(&key);
+    assert!(key == (1 << 40) + session || live, "the canvas keeps drawing the Free Transform preview");
     assert!(display_doc(&mut app, 0).is_none());
 }
 
