@@ -33,7 +33,7 @@ pub fn prompting(fields: &Map<String, Value>) -> bool {
 /// Whether a text field had keyboard focus at the end of the last frame. egui lets go of the focus
 /// when Esc arrives, before any widget looks, so the frame's own answer would always be "no".
 fn typing_id() -> egui::Id {
-    egui::Id::new("prefs-close-keys-typing")
+    egui::Id::unique("prefs-close-keys-typing")
 }
 
 /// Call once at the end of a frame of dialogs, for [`esc_closes`].
@@ -64,7 +64,7 @@ pub fn show_prompt(app: &mut PhotocraftApp, ctx: &egui::Context, id: u64) {
     ];
     let row: Vec<DialogButton> = buttons.iter().map(|b| DialogButton::new(b.0, b.1, b.2).focus(b.0 == ButtonRole::Default)).collect();
     let mut answer = None;
-    let modal = egui::Modal::new(egui::Id::new(("prefs-close-prompt", id))).show(ctx, |ui| {
+    let modal = egui::Modal::new(egui::Id::unique(("prefs-close-prompt", id))).show(ctx, |ui| {
         ui.set_max_width(380.0);
         ui.label(egui::RichText::new(tl!("Unsaved changes")).font(crate::theme::semibold(15.0)));
         ui.add_space(4.0);
