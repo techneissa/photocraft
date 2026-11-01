@@ -416,7 +416,12 @@ pub fn finish_object_selection(app: &mut PhotocraftApp, start: [f64; 2], end: [f
             (false, true) => "subtract",
             (false, false) => "replace",
         };
-        let r = app.run("select.object", json!({"point": [end[0], end[1]], "mode": mode, "sampleAllLayers": sample_all}));
+        let mut p = json!({"point": [end[0], end[1]], "mode": mode, "sampleAllLayers": sample_all});
+        // With SAM 3, ⇧ and ⌥ add a positive or negative point to the mask the last click made.
+        if mods.shift != mods.alt {
+            p["refine"] = json!(if mods.shift { "add" } else { "subtract" });
+        }
+        let r = app.run("select.object", p);
         crate::object_finder::clear(app);
         report_smart_result(app, r, tl!("No object found there — drag a rectangle around it"));
         return;
@@ -457,13 +462,17 @@ pub fn report_smart_result(app: &mut PhotocraftApp, res: Result<Value, String>, 
 }
 
 /// The engine's note for a smart selection (its own English words), in the user's language.
-fn smart_note(note: &str) -> &str {
+pub(crate) fn smart_note(note: &str) -> &str {
     match note {
         "macOS cutout unavailable, used Classic" => tl!("macOS cutout unavailable, used Classic"),
         "macOS cutout failed, used Classic" => tl!("macOS cutout failed, used Classic"),
         photocraft_engine::smartselect_cmds::MODEL_MISSING => tl!("AI model not installed, used Classic (Preferences › AI Models)"),
         photocraft_engine::smartselect_cmds::MODEL_FAILED => tl!("AI model failed, used Classic"),
         photocraft_engine::smartselect_cmds::MODEL_NO_MEMORY => tl!("Not enough memory for the AI model, used Classic"),
+        photocraft_engine::sam3_select::NOT_INSTALLED => tl!("SAM 3 not installed, used Classic (Preferences › AI Models)"),
+        photocraft_engine::sam3_select::NO_MEMORY => tl!("Not enough memory for SAM 3, used Classic"),
+        photocraft_engine::sam3_select::FAILED => tl!("SAM 3 failed, used Classic"),
+        photocraft_engine::sam3_select::NOT_READY => tl!("SAM 3 is still preparing, used Classic"),
         other => tl!(other),
     }
 }

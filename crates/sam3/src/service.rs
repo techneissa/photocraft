@@ -273,6 +273,17 @@ impl Sam3Service {
         self.answer(image, Prompt::Text(text, threshold.clamp(0.0, 1.0)))
     }
 
+    /// Whether `image` is still the encoded image: `false` after another image, a
+    /// [`Sam3Service::release`], an unload (also the idle one) or a failed model. Answers at once;
+    /// while a request is running it says `true` (that request decides).
+    pub fn is_current(&self, image: ImageHandle) -> bool {
+        match self.state.try_lock() {
+            Ok(st) => st.image.as_ref().is_some_and(|c| c.id == image.id),
+            Err(TryLockError::Poisoned(p)) => p.into_inner().image.as_ref().is_some_and(|c| c.id == image.id),
+            Err(TryLockError::WouldBlock) => true,
+        }
+    }
+
     /// Forget the encoded image (the model stays loaded).
     pub fn release(&self, image: ImageHandle) {
         let mut st = lock(&self.state);

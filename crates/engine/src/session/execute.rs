@@ -291,6 +291,9 @@ impl Session {
             // Free the mask early; a stale entry would only miss (it is keyed by pixels).
             self.subject_cache = Default::default();
             self.object_finder = Default::default();
+            if let Some(id) = self.active().map(|st| st.doc.id) {
+                self.sam3_forget_doc(id);
+            }
         }
         Ok(r)
     }

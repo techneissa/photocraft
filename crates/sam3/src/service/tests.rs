@@ -100,3 +100,18 @@ fn a_matte_is_the_logits_resampled_to_the_image() {
     let none = Matte::from_prediction(&Prediction { logits: vec![-10.0; MASK_SIDE * MASK_SIDE], score: 0.1 }, 4, 4);
     assert!(none.alpha.iter().all(|a| *a < 0.001));
 }
+
+#[test]
+fn a_handle_is_current_until_the_image_is_released_or_unloaded() {
+    let s = Sam3Service::with_dir("/nonexistent/sam3");
+    let handle = ImageHandle { id: 7, w: 4, h: 4 };
+    assert!(!s.is_current(handle), "nothing is encoded");
+    lock(&s.state).image = Some(Cached { id: 7, w: 4, h: 4, rgb: vec![0; 48], enc: None });
+    assert!(s.is_current(handle));
+    assert!(!s.is_current(ImageHandle { id: 8, w: 4, h: 4 }), "another image");
+    s.release(handle);
+    assert!(!s.is_current(handle));
+    lock(&s.state).image = Some(Cached { id: 7, w: 4, h: 4, rgb: vec![0; 48], enc: None });
+    s.unload();
+    assert!(!s.is_current(handle), "unloading (the idle reaper too) forgets the image");
+}

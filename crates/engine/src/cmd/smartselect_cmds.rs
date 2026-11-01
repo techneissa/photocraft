@@ -10,6 +10,7 @@ use photocraft_doc::{Document, Layer, LayerContent, LayerId, LayerMask};
 use photocraft_geom::Rect;
 use serde_json::{Value, json};
 
+use super::sam3_select::{self, Attempt, Request};
 use super::smartselect_macos::{self, Step};
 use crate::commands::CommandSpec;
 use crate::prefs::SubjectEngine;
@@ -113,12 +114,35 @@ fn quick_selection(s: &mut Session, p: &Value) -> Result<Value> {
         _ => SelectionMode::Add,
     };
     let enhance = b(p, "enhanceEdge", false);
-    let region = with_sampler(s, b(p, "sampleAllLayers", false), |smp, doc| {
+    // SAM 3, when its encoding of this picture is ready: the stroke's points are its clicks
+    // (⌥ strokes exclude); GrabCut below is the fallback.
+    let all_layers = b(p, "sampleAllLayers", false);
+    let request = Request {
+        points: sam3_select::stroke(&pts),
+        negative: m == SelectionMode::Subtract,
+        refine: m != SelectionMode::Replace,
+        mode: m,
+        label: "Quick Selection",
+        all_layers,
+    };
+    let note = match sam3_select::click(s, &request)? {
+        Attempt::Done(done) => return Ok(done),
+        Attempt::Classic(note) => note,
+    };
+    let region = with_sampler(s, all_layers, |smp, doc| {
         let canvas = doc.bounds();
         let r = quick::quick_select(smp, canvas, &pts, size)?;
         if enhance { matting::refine_mask(smp, &matting::region_reader(&r), r.bbox, canvas, &ENHANCE) } else { Some(r) }
     })?;
-    apply(s, "Quick Selection", region.as_ref(), m)
+    with_note(apply(s, "Quick Selection", region.as_ref(), m)?, note)
+}
+
+/// `out` with the status-bar `note` (why the Classic finder answered), when there is one.
+fn with_note(mut out: Value, note: Option<&'static str>) -> Result<Value> {
+    if let (Some(note), Some(o)) = (note, out.as_object_mut()) {
+        o.insert("note".into(), note.into());
+    }
+    Ok(out)
 }
 
 fn rect_param(p: &Value) -> Option<Rect> {
@@ -245,6 +269,26 @@ fn object_at_point(s: &mut Session, p: &Value, (x, y): (f32, f32)) -> Result<Val
     let all_layers = b(p, "sampleAllLayers", false);
     let d = s.active().ok_or(EngineError::NoDocument)?;
     check_sampled_pixels(&d.doc, d.active_layer, all_layers, Rect::from_xywh(x.floor() as i32, y.floor() as i32, 1, 1))?;
+    // SAM 3, when its encoding of this picture is ready: ⇧ / ⌥ (`"refine"`) add a positive or
+    // negative point to the mask the last click made. Otherwise the Object Finder below answers.
+    let refine = match p.get("refine").map(Value::as_str) {
+        None | Some(None) => None,
+        Some(Some(r @ ("add" | "subtract"))) => Some(r),
+        Some(Some(_)) => return Err(bad("select.object", "\"refine\" is add or subtract")),
+    };
+    let request = Request {
+        points: vec![(x, y)],
+        negative: refine == Some("subtract"),
+        refine: refine.is_some(),
+        mode: mode(p, "replace"),
+        label: "Object Selection",
+        all_layers,
+    };
+    let note = match sam3_select::click(s, &request)? {
+        Attempt::Done(done) => return Ok(done),
+        Attempt::Classic(note) => note,
+    };
+    let d = s.active().ok_or(EngineError::NoDocument)?;
     let target = sampled_target(&d.doc, d.active_layer, all_layers);
     let region = match s.object_finder.lookup(&d.doc, target, x, y) {
         Some(r) => Some(r),
@@ -262,7 +306,7 @@ fn object_at_point(s: &mut Session, p: &Value, (x, y): (f32, f32)) -> Result<Val
         let doc = std::sync::Arc::clone(&d.doc);
         s.object_finder.follow(&doc);
     }
-    Ok(out)
+    with_note(out, note)
 }
 
 fn object_selection(s: &mut Session, p: &Value) -> Result<Value> {
@@ -333,7 +377,7 @@ fn subject_model_available() -> bool {
 /// For each of `len` canvas pixels, the two pixels of the `small_len`-pixel matte it lies between
 /// (the matte is the canvas shrunk by `step`) and the weight of the second: bilinear taps at the
 /// pixel centres, clamped at the edges.
-fn stretch_taps(len: usize, small_len: usize, step: usize) -> Vec<(usize, usize, f32)> {
+pub(super) fn stretch_taps(len: usize, small_len: usize, step: usize) -> Vec<(usize, usize, f32)> {
     let last = small_len.saturating_sub(1);
     (0..len)
         .map(|i| {
@@ -713,7 +757,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "select.object",
             "Object Selection",
             [],
-            r##"{"rect":[x,y,w,h] | "point":[x,y],"mode":"replace|add|subtract|intersect"="replace","sampleAllLayers":bool=false} (point: the Object Finder's object under the point, as hovering previews it)"##,
+            r##"{"rect":[x,y,w,h] | "point":[x,y],"mode":"replace|add|subtract|intersect"="replace","refine":"add|subtract" (with point: continue the SAM 3 mask the last click made, adding a positive or negative point),"sampleAllLayers":bool=false} (point: the Object Finder's object under the point, as hovering previews it; with SAM 3 ready (`select.objectPrepare`, preference tools.objectSelectionEngine) the object SAM 3 finds there)"##,
             has_doc,
             object_selection
         ),

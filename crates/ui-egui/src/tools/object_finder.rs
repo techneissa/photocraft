@@ -5,7 +5,9 @@
 //!
 //! The lookup is `photocraft_engine::smartselect_cmds::find_object`, run after the pointer has
 //! been still for [`DEBOUNCE`] seconds on a worker thread (inline on the web), so the UI never
-//! waits for it. Results go into the session's `object_finder` cache, which the click reuses and
+//! waits for it. Once SAM 3 has encoded the picture (`sam3_ui`) the lookup is SAM 3's instead:
+//! one click mask per place the pointer rests (about 40 ms, same worker thread, same debounce),
+//! kept apart from the Classic results in the session's cache. Results go into the session's `object_finder` cache, which the click reuses and
 //! which serves every point of an object already found; it is keyed by the document's pixels,
 //! so an edit drops it. The preview itself is keyed by document revision, sampled layer and
 //! Sample All Layers, and clears when the pointer leaves the canvas, the tool changes, a button
@@ -16,6 +18,7 @@ use std::sync::Arc;
 use egui::{Color32, TextureOptions, pos2};
 use photocraft_algo::selection::Region;
 use photocraft_doc::{DocId, Document, LayerId};
+use photocraft_engine::sam3_select::{HoverSource, Prepare, Sam3Status};
 use photocraft_engine::smartselect_cmds::{empty_sampled_area, find_object, sampled_target};
 
 use crate::PhotocraftApp;
@@ -29,6 +32,8 @@ const TEX_MAX: usize = 768;
 
 /// A lookup running off the UI thread.
 struct Job {
+    /// SAM 3's lookup (else Classic's): a lookup of the other kind is dropped when the engine changes.
+    sam3: bool,
     at: [i32; 2],
     doc: Arc<Document>,
     rx: std::sync::mpsc::Receiver<Option<Region>>,
@@ -46,6 +51,8 @@ pub(crate) struct Finder {
     job: Option<Job>,
     /// Points already looked up that found nothing (the background).
     misses: Vec<[i32; 2]>,
+    /// SAM 3: the pixel the last lookup was started for.
+    looked: Option<[i32; 2]>,
     shown: Option<Arc<Region>>,
     texture: Option<(usize, egui::TextureHandle)>,
 }
@@ -91,7 +98,8 @@ pub(crate) fn update(app: &mut PhotocraftApp, at: Option<[f64; 2]>, pressed: boo
     let px = [at[0].floor() as i32, at[1].floor() as i32];
     let fresh = app.object_finder.as_ref().is_some_and(|f| f.doc == doc && f.revision == revision && f.target == target && f.all_layers == all_layers);
     if !fresh {
-        app.object_finder = Some(Finder { doc, revision, target, all_layers, at: px, since: now, job: None, misses: Vec::new(), shown: None, texture: None });
+        app.object_finder =
+            Some(Finder { doc, revision, target, all_layers, at: px, since: now, job: None, misses: Vec::new(), looked: None, shown: None, texture: None });
     }
     let doc_arc = Arc::clone(&st.doc);
     // The click reports an empty sampled layer; the hover says so too instead of showing nothing.
@@ -103,6 +111,17 @@ pub(crate) fn update(app: &mut PhotocraftApp, at: Option<[f64; 2]>, pressed: boo
     if f.at != px {
         f.at = px;
         f.since = now;
+    }
+    // SAM 3, once it has encoded this picture; a model it freed while idle comes back with the pointer.
+    if let Some(source) = app.session.sam3_hover_source(all_layers) {
+        return update_sam3(app, source, px, at, now);
+    }
+    if app.session.sam3_status(all_layers) == Sam3Status::Unloaded {
+        let _ = app.session.sam3_prepare(all_layers, Prepare::Force);
+    }
+    let Some(f) = app.object_finder.as_mut() else { return Update::default() };
+    if f.job.as_ref().is_some_and(|j| j.sam3) {
+        f.job = None;
     }
     // A finished lookup: remember it (only for the pixels it was computed from).
     if let Some(job) = &f.job {
@@ -136,6 +155,53 @@ pub(crate) fn update(app: &mut PhotocraftApp, at: Option<[f64; 2]>, pressed: boo
     Update { shown: f.shown.clone(), busy, hint: None }
 }
 
+/// [`update`] with SAM 3: the object it finds at the pixel the pointer rests on, looked up again
+/// for every new resting place. The old highlight stays until the new answer is in.
+fn update_sam3(app: &mut PhotocraftApp, source: HoverSource, px: [i32; 2], at: [f64; 2], now: f64) -> Update {
+    let Some(f) = app.object_finder.as_mut() else { return Update::default() };
+    if f.job.as_ref().is_some_and(|j| !j.sam3) {
+        f.job = None;
+    }
+    if let Some(job) = &f.job {
+        match job.rx.try_recv() {
+            Ok(found) => {
+                f.shown = found.map(Arc::new);
+                f.job = None;
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => {}
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => f.job = None,
+        }
+    }
+    let settled = now - f.since >= DEBOUNCE;
+    let new_place = f.looked != Some(px);
+    if f.job.is_none() && settled && new_place && app.session.active().is_some_and(|st| st.doc.bounds().contains(px[0], px[1])) {
+        let doc = app.session.active().map(|st| Arc::clone(&st.doc));
+        if let (Some(doc), Some(f)) = (doc, app.object_finder.as_mut()) {
+            f.looked = Some(px);
+            f.job = Some(spawn_sam3(source, doc, px, at));
+        }
+    }
+    let Some(f) = app.object_finder.as_ref() else { return Update::default() };
+    Update { shown: f.shown.clone(), busy: f.job.is_some() || (f.looked != Some(px) && !settled), hint: None }
+}
+
+fn spawn_sam3(source: HoverSource, doc: Arc<Document>, px: [i32; 2], at: [f64; 2]) -> Job {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let work = move || {
+        let _ = tx.send(source.find(at[0] as f32, at[1] as f32).ok().flatten());
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let spawned = std::thread::Builder::new().name("object-finder-sam3".into()).spawn(work);
+        if spawned.is_err() {
+            // No thread: the receiver reports Disconnected and the next rest retries.
+        }
+    }
+    #[cfg(target_arch = "wasm32")]
+    work();
+    Job { sam3: true, at: px, doc, rx }
+}
+
 fn spawn(doc: Arc<Document>, layer: Option<LayerId>, all_layers: bool, px: [i32; 2], at: [f64; 2]) -> Job {
     let (tx, rx) = std::sync::mpsc::channel();
     let work = {
@@ -153,7 +219,7 @@ fn spawn(doc: Arc<Document>, layer: Option<LayerId>, all_layers: bool, px: [i32;
     }
     #[cfg(target_arch = "wasm32")]
     work();
-    Job { at: px, doc, rx }
+    Job { sam3: false, at: px, doc, rx }
 }
 
 /// Clears the preview (a tool switch or an edit made elsewhere is caught by [`update`] too).

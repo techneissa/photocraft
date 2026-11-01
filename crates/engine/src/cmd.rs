@@ -130,6 +130,7 @@ pub mod redeye_cmds;
 pub(crate) mod remove_subject_cmds;
 pub mod render_cmds;
 pub mod retouch_cmds;
+pub mod sam3_select;
 pub mod sample_cmds;
 pub mod sampler_cmds;
 pub mod select_extra_cmds;
@@ -1278,6 +1279,7 @@ fn build() -> Vec<CommandSpec> {
     v.extend(crate::path_edit_cmds::specs());
     v.extend(crate::hair_cmds::specs());
     v.extend(crate::smartselect_cmds::specs());
+    v.extend(crate::sam3_select::specs());
     v.extend(crate::cutout_cmds::specs());
     v.extend(crate::remove_subject_cmds::specs());
     v.extend(crate::symmetry_cmds::specs());

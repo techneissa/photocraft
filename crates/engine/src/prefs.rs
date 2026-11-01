@@ -90,6 +90,12 @@ choice!(
     /// Classic with a note while it is not installed) or `classic` (PhotoCraft's own, any system).
     SubjectEngine { Auto = "auto", MacOs = "macos", Model = "model", Classic = "classic" } default Auto
 );
+choice!(
+    /// What the Object Selection and Quick Selection tools select with: `auto` (SAM 3 when its
+    /// model is installed and the computer has the memory for it, else Classic), `sam3` (SAM 3;
+    /// Classic with a note while it cannot run) or `classic` (PhotoCraft's own GrabCut, any system).
+    ObjectEngine { Auto = "auto", Sam3 = "sam3", Classic = "classic" } default Auto
+);
 choice!(UiFontSize { Tiny = "tiny", Small = "small", Medium = "medium", Large = "large" } default Small);
 choice!(LogDestination { Metadata = "metadata", TextFile = "textFile", Both = "both" } default Metadata);
 choice!(LogDetail { SessionsOnly = "sessionsOnly", Concise = "concise", Detailed = "detailed" } default Concise);
@@ -425,6 +431,8 @@ pub struct Tools {
     pub nudge_bundle_pause_ms: u32,
     /// What Select ▸ Subject cuts the subject out with ([`SubjectEngine`]).
     pub select_subject_engine: SubjectEngine,
+    /// What the Object Selection and Quick Selection tools select with ([`ObjectEngine`]).
+    pub object_selection_engine: ObjectEngine,
 }
 
 impl Default for Tools {
@@ -446,6 +454,7 @@ impl Default for Tools {
             bundle_nudges: true,
             nudge_bundle_pause_ms: 1000,
             select_subject_engine: SubjectEngine::Auto,
+            object_selection_engine: ObjectEngine::Auto,
         }
     }
 }
