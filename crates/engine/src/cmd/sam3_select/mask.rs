@@ -16,8 +16,17 @@ pub(crate) const ENCODE_SIDE: usize = 2016;
 /// The mask's most pixels (the canvas box it is expanded into), as for the neural subject mask.
 const MAX_MASK_PX: usize = 64_000_000;
 
-/// Coverage below this is not selected: the sigmoid's far tail is not an edge.
-const CUT: f32 = 1.0 / 64.0;
+/// The model's coverage is a sigmoid, soft wherever it is unsure (white cloth against a white
+/// wall reads 0.6 inside the object): below `LO` is not selected, above `HI` is selected fully, and
+/// the part between stretches over the whole range, so the inside is solid and the edge keeps a
+/// narrow soft ramp.
+const LO: f32 = 0.2;
+const HI: f32 = 0.8;
+
+/// The selection coverage (`0..=255`) of the model's coverage `v`.
+fn shape(v: f32) -> u8 {
+    if v <= LO { 0 } else { (((v - LO) / (HI - LO)).clamp(0.0, 1.0) * 255.0).round() as u8 }
+}
 
 /// The step (canvas pixels per encoded pixel) that brings `canvas` within [`ENCODE_SIDE`].
 pub(crate) fn step_for(canvas: Rect) -> usize {
@@ -59,7 +68,7 @@ pub(crate) fn to_region(mask: &Mask, canvas: Rect, step: usize) -> Result<Option
     // The mask pixels that count, then the canvas box they reach (a bilinear tap reaches one more).
     let (mut c0, mut r0, mut c1, mut r1) = (usize::MAX, usize::MAX, 0usize, 0usize);
     for (r, row) in mask.alpha.chunks_exact(mask.w).enumerate() {
-        if let (Some(a), Some(b)) = (row.iter().position(|v| *v >= CUT), row.iter().rposition(|v| *v >= CUT)) {
+        if let (Some(a), Some(b)) = (row.iter().position(|v| *v > LO), row.iter().rposition(|v| *v > LO)) {
             c0 = c0.min(a);
             c1 = c1.max(b + 1);
             r0 = r0.min(r);
@@ -90,7 +99,7 @@ pub(crate) fn to_region(mask: &Mask, canvas: Rect, step: usize) -> Result<Option
             let top = at(row0, x0) + (at(row0, x1) - at(row0, x0)) * tx;
             let bottom = at(row1, x0) + (at(row1, x1) - at(row1, x0)) * tx;
             let v = top + (bottom - top) * ty;
-            *o = if v < CUT { 0 } else { (v.clamp(0.0, 1.0) * 255.0).round() as u8 };
+            *o = shape(v);
         }
     });
     let bbox = Rect::new(canvas.x0 + bx0 as i32, canvas.y0 + by0 as i32, canvas.x0 + bx1 as i32, canvas.y0 + by1 as i32);

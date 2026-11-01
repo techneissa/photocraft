@@ -102,10 +102,10 @@ impl Sam3Backend for Fake {
         let mut alpha = vec![0.0; w * h];
         for y in 0..h {
             for x in 0..w {
-                // 1 - distance beyond the radius, so the rim is two pixels of partial coverage
+                // the rim is six pixels of partial coverage
                 let cover = |c: &PointClick| {
                     let (dx, dy) = (x as f32 + 0.5 - c.x * w as f32, y as f32 + 0.5 - c.y * h as f32);
-                    ((R - (dx * dx + dy * dy).sqrt()) / 2.0 + 0.5).clamp(0.0, 1.0)
+                    ((R - (dx * dx + dy * dy).sqrt()) / 6.0 + 0.5).clamp(0.0, 1.0)
                 };
                 let on = clicks.iter().filter(|c| c.positive).map(&cover).fold(0.0f32, f32::max);
                 let off = clicks.iter().filter(|c| !c.positive).map(&cover).fold(0.0f32, f32::max);
@@ -533,7 +533,7 @@ fn the_mask_keeps_partial_coverage_and_trims_to_the_object() {
     let m = mask_of(40, 30, |x, _| if x < 10 { 0.0 } else if x == 10 { 0.5 } else if x < 20 { 1.0 } else { 0.0 });
     let r = to_region(&m, Rect::new(0, 0, 40, 30), 1).unwrap().unwrap();
     assert_eq!(r.bbox, Rect::new(10, 0, 20, 30));
-    assert_eq!(r.at(10, 5), 128.0 / 255.0);
+    assert_eq!(r.at(10, 5), 128.0 / 255.0, "0.5 stays 0.5");
     assert_eq!(r.at(15, 5), 1.0);
     assert_eq!(r.at(25, 5), 0.0);
 }
@@ -568,4 +568,21 @@ fn steps_and_points_of_a_stroke() {
     assert_eq!(spread(&line[..3], 6).len(), 3);
     assert_eq!(spread(&line, 1), vec![(0.0, 0.0)]);
     assert!(spread(&line, 0).is_empty() && spread(&[], 6).is_empty());
+}
+
+#[test]
+fn unsure_coverage_is_stretched_so_the_inside_is_solid_and_the_haze_goes() {
+    let m = mask_of(30, 10, |x, _| match x {
+        0..=4 => 0.1,
+        5..=9 => 0.3,
+        10..=14 => 0.5,
+        15..=19 => 0.7,
+        _ => 0.9,
+    });
+    let r = to_region(&m, Rect::new(0, 0, 30, 10), 1).unwrap().unwrap();
+    assert_eq!(r.at(2, 5), 0.0, "0.1: not selected");
+    assert!((r.at(7, 5) - 1.0 / 6.0).abs() < 0.01, "0.3 → {}", r.at(7, 5));
+    assert!((r.at(12, 5) - 0.5).abs() < 0.01);
+    assert!((r.at(17, 5) - 5.0 / 6.0).abs() < 0.01);
+    assert_eq!(r.at(25, 5), 1.0, "0.9: solid");
 }
