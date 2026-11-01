@@ -55,12 +55,13 @@ fn run(s: &mut Session, p: &Value) -> Result<Value> {
     let refine = p.get("refine").and_then(Value::as_bool).unwrap_or(true);
     let area = subject_area(layer, doc.bounds(), sample_all);
     let engine = engine_param(s, p)?;
+    let sam3 = (engine == crate::prefs::SubjectEngine::Sam3).then(|| s.sam3_subject(sample_all));
     crate::jobs::edit_job(
         s,
         "Remove Background",
         move |doc, _, ctx| {
             // Cancel reaches the model and the min cuts inside Select Subject, so Esc doesn't wait.
-            let found = ctx.stage(0.1, 0.6, "Finding subject", |ctl| find_subject_region(doc, Some(id), sample_all, area, engine, ctl))?;
+            let found = ctx.stage(0.1, 0.6, "Finding subject", |ctl| find_subject_region(doc, Some(id), sample_all, area, engine, sam3.as_ref(), ctl))?;
             let (mut region, used) = (found.region.ok_or_else(|| EngineError::Other("no subject found".into()))?, found.used);
             if ctx.cancelled() {
                 return Err(EngineError::Cancelled);
@@ -94,7 +95,7 @@ pub fn specs() -> Vec<CommandSpec> {
         label: "Remove Background",
         menu: &[],
         shortcut: None,
-        params: r##"{"layer":id?,"sampleAllLayers":bool=false,"refine":bool=true,"engine":"auto|macos|model|classic"=the preference tools.selectSubjectEngine} → {layer,bounds} (adds a layer mask from Select Subject; the Background becomes a normal layer)"##,
+        params: r##"{"layer":id?,"sampleAllLayers":bool=false,"refine":bool=true,"engine":"auto|macos|model|sam3|classic"=the preference tools.selectSubjectEngine} → {layer,bounds} (adds a layer mask from Select Subject; the Background becomes a normal layer)"##,
         enabled,
         run,
         journal: true,

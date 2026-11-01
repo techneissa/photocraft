@@ -4769,3 +4769,8 @@ cameraRaw	White Balance: As Shot	Hvitbalanse: som fotografert
 	The path was discarded	Banen ble forkastet
 	The path was kept as the Work Path	Banen ble beholdt som arbeidsbane
 	Edit Brush…	Rediger pensel…
+
+# Optional local AI model management (fork: PR #8231, FORK.md): only the labels the AI Models test checks
+	AI Models	AI-modeller
+	subject segmentation (BiRefNet-lite)	motivsegmentering (BiRefNet-lite)
+	inpainting (LaMa)	utfylling (LaMa)

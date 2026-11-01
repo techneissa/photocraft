@@ -11,21 +11,28 @@ use crate::prefs::ObjectEngine;
 const R: f32 = 30.0;
 
 #[derive(Default)]
-struct State {
-    next: u64,
-    current: Option<u64>,
-    size: (usize, usize),
-    encodes: usize,
-    released: usize,
+pub(super) struct State {
+    pub(super) next: u64,
+    pub(super) current: Option<u64>,
+    pub(super) size: (usize, usize),
+    pub(super) encodes: usize,
+    pub(super) released: usize,
     /// Every call of `clicks`.
-    calls: Vec<Vec<PointClick>>,
-    fail_encode: bool,
-    fail_clicks: bool,
+    pub(super) calls: Vec<Vec<PointClick>>,
+    pub(super) fail_encode: bool,
+    pub(super) fail_clicks: bool,
+    /// Every call of `boxed`.
+    pub(super) boxes: Vec<(PointBox, Vec<PointClick>)>,
+    pub(super) fail_boxes: bool,
+    /// Every call of `text`, and the rectangles (normalised) the concepts it knows are found in.
+    pub(super) texts: Vec<String>,
+    pub(super) concepts: Vec<(String, (f32, f32, f32, f32))>,
+    pub(super) fail_text: bool,
 }
 
 /// A backend whose mask is the union of the discs around positive clicks minus those around negative
 /// ones, soft at the rim. `gate`: while closed, `encode` waits (then honours `cancel`).
-struct Fake {
+pub(super) struct Fake {
     present: bool,
     memory: bool,
     state: Mutex<State>,
@@ -33,25 +40,25 @@ struct Fake {
 }
 
 impl Fake {
-    fn new() -> Arc<Self> {
+    pub(super) fn new() -> Arc<Self> {
         Arc::new(Self { present: true, memory: true, state: Mutex::default(), gate: (Mutex::new(true), Condvar::new()) })
     }
 
-    fn with(present: bool, memory: bool) -> Arc<Self> {
+    pub(super) fn with(present: bool, memory: bool) -> Arc<Self> {
         Arc::new(Self { present, memory, state: Mutex::default(), gate: (Mutex::new(true), Condvar::new()) })
     }
 
-    fn state(&self) -> std::sync::MutexGuard<'_, State> {
+    pub(super) fn state(&self) -> std::sync::MutexGuard<'_, State> {
         self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    fn set_gate(&self, open: bool) {
+    pub(super) fn set_gate(&self, open: bool) {
         *self.gate.0.lock().unwrap() = open;
         self.gate.1.notify_all();
     }
 
     /// The service's idle unload.
-    fn unload(&self) {
+    pub(super) fn unload(&self) {
         self.state().current = None;
     }
 }
@@ -114,6 +121,43 @@ impl Sam3Backend for Fake {
         }
         Ok(Mask { w, h, alpha })
     }
+    fn boxed(&self, image: EncodedImage, rect: PointBox, extra: &[PointClick]) -> std::result::Result<Mask, MlError> {
+        let mut st = self.state();
+        st.boxes.push((rect, extra.to_vec()));
+        if st.fail_boxes {
+            return Err(MlError::Backend("boom".into()));
+        }
+        if st.current != Some(image.token) {
+            return Err(MlError::BadInput("the image is no longer encoded".into()));
+        }
+        // the main object fills the box except for a margin of four pixels, soft at the rim; the
+        // extra clicks add or cut discs as for `clicks`
+        let (w, h) = (image.w, image.h);
+        let mut m = rect_mask(w, h, (rect.x0, rect.y0, rect.x1, rect.y1), 4.0);
+        for c in extra {
+            for y in 0..h {
+                for x in 0..w {
+                    let (dx, dy) = (x as f32 + 0.5 - c.x * w as f32, y as f32 + 0.5 - c.y * h as f32);
+                    let cover = ((R - (dx * dx + dy * dy).sqrt()) / 6.0 + 0.5).clamp(0.0, 1.0);
+                    if let Some(a) = m.alpha.get_mut(y * w + x) {
+                        *a = if c.positive { a.max(cover) } else { (*a - cover).max(0.0) };
+                    }
+                }
+            }
+        }
+        Ok(m)
+    }
+    fn text(&self, image: EncodedImage, text: &str, _threshold: f32) -> std::result::Result<Option<Mask>, MlError> {
+        let mut st = self.state();
+        st.texts.push(text.to_string());
+        if st.fail_text {
+            return Err(MlError::Backend("boom".into()));
+        }
+        if st.current != Some(image.token) {
+            return Err(MlError::BadInput("the image is no longer encoded".into()));
+        }
+        Ok(st.concepts.iter().find(|(name, _)| name == text).map(|(_, r)| rect_mask(image.w, image.h, *r, 2.0)))
+    }
     fn release(&self, image: EncodedImage) {
         let mut st = self.state();
         if st.current == Some(image.token) {
@@ -123,40 +167,54 @@ impl Sam3Backend for Fake {
     }
 }
 
+/// A mask that fills `rect` (normalised corners) but for `inset` pixels, with a six-pixel soft rim.
+pub(super) fn rect_mask(w: usize, h: usize, rect: (f32, f32, f32, f32), inset: f32) -> Mask {
+    let (x0, y0, x1, y1) = (rect.0 * w as f32 + inset, rect.1 * h as f32 + inset, rect.2 * w as f32 - inset, rect.3 * h as f32 - inset);
+    let mut alpha = vec![0.0; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
+            let inside = (px - x0).min(x1 - px).min(py - y0).min(y1 - py);
+            alpha[y * w + x] = (inside / 6.0 + 0.5).clamp(0.0, 1.0);
+        }
+    }
+    Mask { w, h, alpha }
+}
+
 /// A 400 × 200 grey document with a session that uses `fake`.
-fn session(fake: &Arc<Fake>) -> Session {
+pub(super) fn session(fake: &Arc<Fake>) -> Session {
     let mut s = Session::new();
     s.execute("file.new", json!({"width": 400, "height": 200})).unwrap();
     s.set_sam3_backend(fake.clone());
     s
 }
 
-fn ready(fake: &Arc<Fake>) -> Session {
+pub(super) fn ready(fake: &Arc<Fake>) -> Session {
     let mut s = session(fake);
     let r = s.execute("select.objectPrepare", json!({"wait": true})).unwrap();
     assert_eq!(r["status"], "ready", "{r}");
     s
 }
 
-fn cov(s: &Session, x: i32, y: i32) -> f32 {
+pub(super) fn cov(s: &Session, x: i32, y: i32) -> f32 {
     s.active().unwrap().doc.selection.as_ref().map_or(0.0, |m| m.sample_channel(x, y, 0))
 }
 
-fn click(s: &mut Session, x: f32, y: f32, extra: Value) -> Value {
+pub(super) fn click(s: &mut Session, x: f32, y: f32, extra: Value) -> Value {
     let mut p = json!({"point": [x, y]});
     p.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
     s.execute("select.object", p).unwrap()
 }
 
-fn pixel_edit(s: &mut Session) {
+pub(super) fn pixel_edit(s: &mut Session) {
     s.execute("paint.pencil", json!({"points": [[5, 5], [30, 5]], "size": 4, "color": "#000000"})).unwrap();
 }
 
-fn undo(s: &mut Session) {
+pub(super) fn undo(s: &mut Session) {
     s.execute("edit.undo", json!({})).unwrap();
 }
 
-fn status(s: &mut Session) -> Sam3Status {
+pub(super) fn status(s: &mut Session) -> Sam3Status {
     s.sam3_status(false)
 }
 

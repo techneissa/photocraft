@@ -4770,3 +4770,8 @@ cameraRaw	White Balance: As Shot	Valkotasapaino: kuvauksen mukainen
 	The path was discarded	Polku hylättiin
 	The path was kept as the Work Path	Polku säilytettiin työpolkuna
 	Edit Brush…	Muokkaa sivellintä…
+
+# Optional local AI model management (fork: PR #8231, FORK.md): only the labels the AI Models test checks
+	AI Models	Tekoälymallit
+	subject segmentation (BiRefNet-lite)	kohteen segmentointi (BiRefNet-lite)
+	inpainting (LaMa)	täyttö (LaMa)

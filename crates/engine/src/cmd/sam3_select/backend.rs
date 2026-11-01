@@ -14,6 +14,15 @@ pub struct PointClick {
     pub positive: bool,
 }
 
+/// A box on the encoded image, normalised to it (`0..=1`, top-left and bottom-right corners).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PointBox {
+    pub x0: f32,
+    pub y0: f32,
+    pub x1: f32,
+    pub y1: f32,
+}
+
 /// A predicted mask over the encoded image: `w × h` coverage, `0..=1`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Mask {
@@ -48,6 +57,16 @@ pub trait Sam3Backend: Send + Sync + 'static {
     fn is_current(&self, image: EncodedImage) -> bool;
     /// The object the `clicks` select (at least one).
     fn clicks(&self, image: EncodedImage, clicks: &[PointClick]) -> Result<Mask, MlError>;
+    /// The main object inside `rect`, refined by `extra` clicks (may be empty): SAM's box prompt.
+    /// Backends without box prompts answer [`MlError::Unsupported`], so the Classic finder runs.
+    fn boxed(&self, _image: EncodedImage, _rect: PointBox, _extra: &[PointClick]) -> Result<Mask, MlError> {
+        Err(MlError::Unsupported)
+    }
+    /// Every instance of the concept `text` names, merged into one mask (`None`: nothing scores
+    /// above `threshold`). About 0.7 s (2.5 s the first time: the text encoder loads).
+    fn text(&self, _image: EncodedImage, _text: &str, _threshold: f32) -> Result<Option<Mask>, MlError> {
+        Err(MlError::Unsupported)
+    }
     /// Forget `image` (the model stays loaded until it has been idle). May wait for a running request.
     fn release(&self, image: EncodedImage);
 }
@@ -134,6 +153,19 @@ impl Sam3Backend for Real {
         let clicks: Vec<photocraft_sam3::Click> = clicks.iter().map(|c| photocraft_sam3::Click { x: c.x, y: c.y, positive: c.positive }).collect();
         let m = self.service.clicks(handle, &clicks)?;
         Ok(Mask { w: m.w, h: m.h, alpha: m.alpha })
+    }
+
+    fn boxed(&self, image: EncodedImage, rect: PointBox, extra: &[PointClick]) -> Result<Mask, MlError> {
+        let handle = self.handle(image)?;
+        let rect = photocraft_sam3::BoxPrompt { x0: rect.x0, y0: rect.y0, x1: rect.x1, y1: rect.y1 };
+        let extra: Vec<photocraft_sam3::Click> = extra.iter().map(|c| photocraft_sam3::Click { x: c.x, y: c.y, positive: c.positive }).collect();
+        let m = self.service.boxed(handle, rect, &extra)?;
+        Ok(Mask { w: m.w, h: m.h, alpha: m.alpha })
+    }
+
+    fn text(&self, image: EncodedImage, text: &str, threshold: f32) -> Result<Option<Mask>, MlError> {
+        let handle = self.handle(image)?;
+        Ok(self.service.text(handle, text, threshold)?.map(|m| Mask { w: m.w, h: m.h, alpha: m.alpha }))
     }
 
     fn release(&self, image: EncodedImage) {

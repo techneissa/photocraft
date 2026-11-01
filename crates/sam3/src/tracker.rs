@@ -35,6 +35,16 @@ pub struct Click {
     pub positive: bool,
 }
 
+/// A box prompt: two corners (top-left, bottom-right) normalized to the image (0..1). SAM's prompt
+/// encoder embeds them as points labelled 2 and 3 (`point_embed` rows 2 and 3).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BoxPrompt {
+    pub x0: f32,
+    pub y0: f32,
+    pub x1: f32,
+    pub y1: f32,
+}
+
 /// A predicted mask: 288 × 288 logits over the (squared) model input, and its quality.
 pub struct Prediction {
     pub logits: Vec<f32>,
@@ -188,26 +198,35 @@ impl Tracker {
         Ok(Features { image: l2.clone(), s0: self.conv_s0.forward(l0)?, s1: self.conv_s1.forward(l1)? })
     }
 
-    /// Sparse prompt embeddings `[1, n + 1, 256]` (a padding point closes the list).
-    fn embed_clicks(&self, clicks: &[Click]) -> Result<Tensor> {
+    /// Sparse prompt embeddings `[1, n + 1, 256]`: the clicks, then the box's two corners (labels 2
+    /// and 3) when there is one, then one padding point (SAM always closes the list with it).
+    fn embed_prompts(&self, clicks: &[Click], boxed: Option<BoxPrompt>) -> Result<Tensor> {
         let point_embed = to_vec(&self.point_embed)?;
         let not_a_point = to_vec(&self.not_a_point)?;
-        let mut rows = Vec::with_capacity((clicks.len() + 1) * HIDDEN);
-        for c in clicks {
-            // the reference shifts pixel coordinates (in the 1008² input) by half a pixel
-            let (x, y) = ((c.x * IMAGE as f32 + 0.5) / IMAGE as f32, (c.y * IMAGE as f32 + 0.5) / IMAGE as f32);
-            let e = self.point_pe.encode(x, y);
-            let label = usize::from(c.positive);
+        let mut rows = Vec::with_capacity((clicks.len() + 3) * HIDDEN);
+        // the reference shifts pixel coordinates (in the 1008² input) by half a pixel
+        let shift = |v: f32| (v * IMAGE as f32 + 0.5) / IMAGE as f32;
+        let mut push = |x: f32, y: f32, label: usize| {
+            let e = self.point_pe.encode(shift(x), shift(y));
             rows.extend(e.iter().enumerate().map(|(i, v)| v + point_embed.get(label * HIDDEN + i).copied().unwrap_or(0.0)));
+        };
+        for c in clicks {
+            push(c.x, c.y, usize::from(c.positive));
+        }
+        let mut count = clicks.len();
+        if let Some(b) = boxed {
+            push(b.x0, b.y0, 2);
+            push(b.x1, b.y1, 3);
+            count += 2;
         }
         rows.extend_from_slice(&not_a_point);
-        Ok(Tensor::from_vec(rows, (1, clicks.len() + 1, HIDDEN), &self.device)?)
+        Ok(Tensor::from_vec(rows, (1, count + 1, HIDDEN), &self.device)?)
     }
 
-    /// Predict masks for `clicks`. `multimask`: the three alternatives (best by predicted IoU is
-    /// returned), else the single-mask output with SAM 2's stability fallback.
-    pub fn predict(&self, f: &Features, clicks: &[Click], multimask: bool) -> Result<Prediction> {
-        let sparse = self.embed_clicks(clicks)?;
+    /// Predict masks for `clicks` and an optional `boxed` prompt. `multimask`: the three alternatives
+    /// (best by predicted IoU is returned), else the single-mask output with SAM 2's stability fallback.
+    pub fn predict(&self, f: &Features, clicks: &[Click], boxed: Option<BoxPrompt>, multimask: bool) -> Result<Prediction> {
+        let sparse = self.embed_prompts(clicks, boxed)?;
         let tokens = Tensor::cat(&[self.output_tokens.unsqueeze(0)?, sparse], 1)?; // [1, T, 256]
         let image = f.image.broadcast_add(&self.no_mask)?; // dense prompt: "no mask"
         let (b, c, h, w) = image.dims4()?;

@@ -59,3 +59,34 @@ fn a_click_on_a_disc_selects_the_disc() {
     s.execute("edit.undo", json!({})).unwrap();
     assert_eq!(coverage(&s, 320, 240), 0.0);
 }
+
+#[test]
+#[ignore = "needs the SAM 3 model and about 20 GB of memory"]
+fn a_dragged_rectangle_selects_the_disc_and_select_subject_stays_on_it() {
+    let mut s = session();
+    s.execute("prefs.set", json!({"path": "tools.objectSelectionEngine", "value": "sam3"})).unwrap();
+    s.sam3_prepare(false, photocraft_engine::sam3_select::Prepare::Force).unwrap();
+    assert_eq!(s.sam3_wait(false, Duration::from_secs(300)), Sam3Status::Ready);
+
+    // a rectangle around the disc, with a margin of 10 px
+    let t = Instant::now();
+    let r = s.execute("select.object", json!({"rect": [190, 110, 260, 260]})).unwrap();
+    println!("rectangle {:?}: {r}", t.elapsed());
+    assert_eq!(r["engine"], "sam3");
+    assert!(coverage(&s, 320, 240) > 0.8 && coverage(&s, 380, 260) > 0.8, "the disc is selected");
+    assert!(coverage(&s, 195, 115) == 0.0 && coverage(&s, 20, 20) == 0.0, "the margin and the field are not");
+    let area: f32 = (0..480).flat_map(|y| (0..640).map(move |x| (x, y))).map(|(x, y)| coverage(&s, x, y)).sum();
+    let disc = std::f32::consts::PI * 120.0 * 120.0;
+    assert!((area / disc - 1.0).abs() < 0.15, "selected {area} px against the disc's {disc}");
+    // ⌥-drag around the same object takes it off again
+    s.execute("select.object", json!({"rect": [190, 110, 260, 260], "mode": "subtract"})).unwrap();
+    assert!(coverage(&s, 320, 240) < 0.05 && coverage(&s, 380, 260) < 0.05, "the object is taken off");
+
+    // Select Subject with SAM 3 on the shared encoding: whatever it picks lies on the disc
+    let _ = s.execute("select.deselect", json!({}));
+    s.execute("prefs.set", json!({"path": "tools.selectSubjectEngine", "value": "sam3"})).unwrap();
+    let t = Instant::now();
+    let r = s.execute("select.subject", json!({})).unwrap();
+    println!("Select Subject {:?}: {r}", t.elapsed());
+    assert!(coverage(&s, 20, 20) == 0.0 && coverage(&s, 620, 460) == 0.0, "the field is not the subject");
+}

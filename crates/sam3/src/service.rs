@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 
 use photocraft_ml::{Cancel, MAX_SIDE, MlError, Model, Rgb};
 
-use crate::{Click, Encoded, Error, MASK_SIDE, Prediction, Sam3, mask};
+use crate::{BoxPrompt, Click, Encoded, Error, MASK_SIDE, Prediction, Sam3, mask};
 
 /// Free the model after this long without a request (the idle reaper, [`Sam3Service::spawn_idle_reaper`]).
 pub const IDLE_UNLOAD: Duration = Duration::from_secs(10 * 60);
@@ -62,6 +62,7 @@ impl Matte {
 #[derive(Clone, Copy)]
 enum Prompt<'a> {
     Clicks(&'a [Click]),
+    Boxed(BoxPrompt, &'a [Click]),
     Text(&'a str, f32),
 }
 
@@ -258,6 +259,23 @@ impl Sam3Service {
         }
         let clicks: Vec<Click> = clicks.iter().map(|c| Click { x: c.x.clamp(0.0, 1.0), y: c.y.clamp(0.0, 1.0), positive: c.positive }).collect();
         self.answer(image, Prompt::Clicks(&clicks))?.ok_or_else(|| MlError::Backend("the model returned no mask".into()))
+    }
+
+    /// The main object inside the box `rect` (corners normalized to the image, `0..=1`, in any order;
+    /// an empty box is `MlError::BadInput`), refined by `extra` clicks (positive ones add to it,
+    /// negative ones cut from it; may be empty).
+    pub fn boxed(&self, image: ImageHandle, rect: BoxPrompt, extra: &[Click]) -> Result<Matte, MlError> {
+        let coords = [rect.x0, rect.y0, rect.x1, rect.y1];
+        if coords.iter().any(|v| !v.is_finite()) || extra.iter().any(|c| !c.x.is_finite() || !c.y.is_finite()) {
+            return Err(MlError::BadInput("a box or click is not a position".into()));
+        }
+        let [x0, y0, x1, y1] = coords.map(|v| v.clamp(0.0, 1.0));
+        let rect = BoxPrompt { x0: x0.min(x1), y0: y0.min(y1), x1: x0.max(x1), y1: y0.max(y1) };
+        if rect.x1 <= rect.x0 || rect.y1 <= rect.y0 {
+            return Err(MlError::BadInput("the box is empty".into()));
+        }
+        let extra: Vec<Click> = extra.iter().map(|c| Click { x: c.x.clamp(0.0, 1.0), y: c.y.clamp(0.0, 1.0), positive: c.positive }).collect();
+        self.answer(image, Prompt::Boxed(rect, &extra))?.ok_or_else(|| MlError::Backend("the model returned no mask".into()))
     }
 
     /// Every instance of the concept `text` names ("the red car", "sky"), merged into one matte;
@@ -467,6 +485,7 @@ impl Sam3Service {
         };
         match prompt {
             Prompt::Clicks(clicks) => model.segment_clicks(enc, clicks).map(Some).map_err(from_sam3),
+            Prompt::Boxed(rect, clicks) => model.segment_boxed(enc, rect, clicks).map(Some).map_err(from_sam3),
             Prompt::Text(text, threshold) => model.segment_text(enc, text, threshold).map_err(from_sam3),
         }
     }

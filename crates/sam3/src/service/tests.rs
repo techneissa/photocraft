@@ -78,6 +78,20 @@ fn clicks_and_prompts_are_checked() {
 }
 
 #[test]
+fn boxes_are_checked_before_any_load() {
+    let s = Sam3Service::with_dir("/nonexistent/sam3");
+    let h = ImageHandle { id: 1, w: 2, h: 2 };
+    let b = |x0, y0, x1, y1| BoxPrompt { x0, y0, x1, y1 };
+    assert!(matches!(s.boxed(h, b(f32::NAN, 0.0, 1.0, 1.0), &[]), Err(MlError::BadInput(m)) if m.contains("not a position")));
+    assert!(matches!(s.boxed(h, b(0.2, 0.2, 1.0, 1.0), &[Click { x: f32::INFINITY, y: 0.0, positive: true }]), Err(MlError::BadInput(_))));
+    assert!(matches!(s.boxed(h, b(0.5, 0.2, 0.5, 0.9), &[]), Err(MlError::BadInput(m)) if m == "the box is empty"));
+    // outside the image: clamped to a line, so empty
+    assert!(matches!(s.boxed(h, b(1.5, 0.0, 2.0, 1.0), &[]), Err(MlError::BadInput(m)) if m == "the box is empty"));
+    // a good box (corners in any order) reaches the image check
+    assert!(matches!(s.boxed(h, b(0.9, 0.8, 0.1, 0.2), &[]), Err(MlError::BadInput(m)) if m.contains("encode it again")));
+}
+
+#[test]
 fn unload_and_idle_with_nothing_loaded_do_nothing() {
     let s = Sam3Service::with_dir("/nonexistent/sam3");
     assert!(!s.unload_if_idle(Duration::ZERO));

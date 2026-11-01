@@ -403,7 +403,8 @@ pub fn content_aware_move_params(app: &PhotocraftApp, offset: [i64; 2]) -> Value
 /// highlighted (#4087; ⇧ adds, ⌥ subtracts, ⇧⌥ intersects, otherwise replaces). With it off it
 /// falls back to a Quick Selection dab at
 /// the brush size instead of looking dead (⌥ subtracts, otherwise it adds). Larger drags
-/// run the rectangle GrabCut (⌥ subtracts, ⇧ adds, otherwise replaces).
+/// run the rectangle GrabCut (⌥ subtracts, ⇧ adds, otherwise replaces); with SAM 3 ready the
+/// rectangle is its box prompt and the main object inside it the selection, with the same modes.
 pub fn finish_object_selection(app: &mut PhotocraftApp, start: [f64; 2], end: [f64; 2], mods: egui::Modifiers) {
     let (x, y) = (start[0].min(end[0]), start[1].min(end[1]));
     let (w, h) = ((end[0] - start[0]).abs(), (end[1] - start[1]).abs());

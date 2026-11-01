@@ -87,8 +87,9 @@ choice!(
     /// What Select ▸ Subject cuts the subject out with: `auto` (the Mac's own cutout where there is
     /// one, else the AI model when it is installed, else Classic), `macos` (the Mac's own cutout;
     /// Classic with a note where there is none), `model` (the AI model of Preferences ▸ AI Models;
-    /// Classic with a note while it is not installed) or `classic` (PhotoCraft's own, any system).
-    SubjectEngine { Auto = "auto", MacOs = "macos", Model = "model", Classic = "classic" } default Auto
+    /// Classic with a note while it is not installed), `sam3` (SAM 3 with the text prompts "person",
+    /// then "main subject"; Classic with a note while it cannot run) or `classic` (PhotoCraft's own, any system).
+    SubjectEngine { Auto = "auto", MacOs = "macos", Model = "model", Sam3 = "sam3", Classic = "classic" } default Auto
 );
 choice!(
     /// What the Object Selection and Quick Selection tools select with: `auto` (SAM 3 when its

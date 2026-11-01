@@ -7,7 +7,7 @@ use photocraft_algo::selection::Region;
 use photocraft_geom::Rect;
 use rayon::prelude::*;
 
-use super::backend::Mask;
+use super::backend::{Mask, PointBox};
 use crate::{EngineError, Result};
 
 /// Longest side (pixels) the encoded image gets; the model takes a 1008 px square anyway.
@@ -43,6 +43,19 @@ pub(crate) fn normalise(canvas: Rect, step: usize, enc: (usize, usize), (x, y): 
     let nx = (x - canvas.x0 as f32) / s / enc.0 as f32;
     let ny = (y - canvas.y0 as f32) / s / enc.1 as f32;
     Some((nx.clamp(0.0, 1.0), ny.clamp(0.0, 1.0)))
+}
+
+/// The document rectangle `rect` on the encoded image of `canvas` shrunk by `step`
+/// (`enc_w × enc_h`), normalised to it; the part outside the canvas is cut off. `None` when
+/// nothing of it lies on the canvas.
+pub(crate) fn normalise_box(canvas: Rect, step: usize, enc: (usize, usize), rect: Rect) -> Option<PointBox> {
+    let r = rect.intersect(&canvas);
+    if r.is_empty() || enc.0 == 0 || enc.1 == 0 {
+        return None;
+    }
+    let s = step.max(1) as f32;
+    let at = |v: i32, origin: i32, len: usize| (((v - origin) as f32 / s) / len as f32).clamp(0.0, 1.0);
+    Some(PointBox { x0: at(r.x0, canvas.x0, enc.0), y0: at(r.y0, canvas.y0, enc.1), x1: at(r.x1, canvas.x0, enc.0), y1: at(r.y1, canvas.y0, enc.1) })
 }
 
 /// At most `max` points of a stroke, evenly spread along it, the first and last always kept.
