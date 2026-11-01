@@ -1,5 +1,8 @@
 # Known failures on this Mac (not caused by the fork)
 
+Fork CI skips the failures listed in [known-failures.txt](known-failures.txt) (one test per line, with why);
+this page lists what fails on this Mac.
+
 - `dialogs::palette::list::upgrade_tests::page_up_and_page_down_move_a_page_and_stop_at_the_ends` (fork) failed once in a 1000-test run on 2026-10-29 and passes alone: load-flaky.
 
 Checked 2026-10-28 on official `main` (b8c3f3aa8) as well: the same failures, none in a fork file.

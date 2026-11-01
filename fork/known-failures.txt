@@ -1,0 +1,9 @@
+# Accepted failures that Fork CI (fork/ci.sh) skips, so a red run is a new failure.
+# One per line: a test as nextest names it (`<module path>::<test name>`), or `step <name>` for a step
+# of `cargo xtask ci`. A `#` line above each says why. Never edit an official test to make it pass.
+# .gitattributes merges this file with `merge=union`: add lines, never reorder the others.
+
+# docs/scorecard.md stays upstream's so official updates never clash on it (fork/known-failures.md);
+# the fork's own settings and crates make the check see it as stale.
+step scorecard
+scorecard::tests::staleness_check_and_determinism
