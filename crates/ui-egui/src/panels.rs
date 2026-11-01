@@ -1734,6 +1734,8 @@ mod clipping_indicator_tests;
 mod mask_properties_tests;
 
 #[cfg(test)]
+mod brush_size_label_tests;
+#[cfg(test)]
 mod compact_visual_regressions;
 
 #[cfg(test)]

@@ -29,3 +29,6 @@ cargo test -p photocraft-ui-egui --lib -- sam3_ui object_finder retouch_ui
 cargo test -p photocraft-ui-egui --lib -- select_mask_ui
 cargo test -p photocraft-ui-egui --lib -- ai_models
 cargo test -p photocraft-ui-egui --lib -- shortcuts_window shortcuts_search shortcuts_rows shortcuts_menus shortcut_capture shortcuts_upgrade kys_import prefs_ui color_picker_preview
+cargo test -p photocraft-engine --lib -- settings_sync
+cargo test -p photocraft-ui-egui --lib -- settings_sync brush_size_label
+cargo test -p photocraft-automation --lib -- automation_rejects_ambient_path

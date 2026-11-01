@@ -21,6 +21,7 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
         "presets" => presets_body(app, ui, f),
         "presetsIO" => presets_io_body(ui, f),
         "mismatch" => mismatch_body(ui, f),
+        "settingsImport" => super::settings_sync::prompt_body(app, ui, f),
         _ => {}
     }
 }
@@ -181,7 +182,15 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
     // The dialog follows the language being edited, so a change shows before OK.
     let lang = crate::i18n::Lang::from_pref(values.pointer("/interface/language").and_then(Value::as_str).unwrap_or("auto"));
     let mut search = f.get("__search").and_then(Value::as_str).unwrap_or("").to_string();
-    crate::widgets::text_field(ui, ui.scope_id().with("prefs-search"), &mut search, tl!("Search settings…"), ui.available_width(), false);
+    // The search field, and Export Settings… / Import Settings… at its right.
+    let sync = ui
+        .horizontal(|ui| {
+            let room = (ui.available_width() - super::settings_sync::icons_width(ui)).max(120.0);
+            crate::widgets::text_field(ui, ui.scope_id().with("prefs-search"), &mut search, tl!("Search settings…"), room, false);
+            super::settings_sync::icons(ui)
+        })
+        .inner;
+    super::settings_sync::message_line(ui, f);
     let mut found = preference_sections(&values, &search);
     let q = search.trim().to_lowercase();
     if q.is_empty() || crate::menu_custom::PAGE_TITLE.to_lowercase().contains(&q) || tl!(crate::menu_custom::PAGE_TITLE).to_lowercase().contains(&q) {
@@ -306,6 +315,7 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
     f.insert("section".into(), json!(section));
     f.insert("__search".into(), json!(search));
     f.insert("values".into(), values);
+    super::settings_sync::run(app, sync);
     // A colour swatch was clicked: open the Color Picker on that value (#2144).
     if let Some((path, name)) = ctx_take_pick(ui) {
         crate::color_picker_ui::request_field(f, &format!("/values/{}", path.replace('.', "/")), &crate::color_picker_ui::title_for(&name));

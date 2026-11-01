@@ -546,6 +546,8 @@ fn ok_label(d: &Dialog) -> &'static str {
         tl!("Replace")
     } else if d.fields.contains_key("__export") {
         tl!("Export")
+    } else if d.fields.get("__prefsui").and_then(Value::as_str) == Some("settingsImport") {
+        tl!("Import")
     } else {
         crate::file_ui::ok_label(&d.fields).unwrap_or(tl!("OK"))
     }

@@ -251,6 +251,9 @@ pub struct Session {
     /// the same check a top-level request sees. `None` runs everything, which is what a local
     /// UI and `photocraft-cli run` do.
     pub authorize: Option<fn(&str, &serde_json::Value) -> Result<()>>,
+    /// What only the shell can check in a settings file (Edit › Preferences › Import Settings…);
+    /// `None` checks what the engine can. See `prefs::settings_sync`.
+    pub settings_checks: Option<prefs::settings_sync::SettingsChecks>,
     /// A further route for File › Print when neither `lp` nor a CUPS server over IPP is
     /// reachable (the XDG Print portal in a Flatpak); see `print_cmds::Spooler`.
     pub print_spooler: Option<print_cmds::Spooler>,

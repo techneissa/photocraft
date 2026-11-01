@@ -82,7 +82,7 @@ impl ShortcutSet {
     }
 
     /// Check every key (a set from a call or a hand-edited file must not hold garbage).
-    fn validate(&self) -> Result<(), String> {
+    pub(crate) fn validate(&self) -> Result<(), String> {
         for (id, k) in &self.shortcuts {
             if !k.is_empty() && normalize_shortcut(k).is_none() {
                 return Err(format!("`{k}` for `{id}` is not a valid shortcut (e.g. Cmd+Shift+N, F7)"));
