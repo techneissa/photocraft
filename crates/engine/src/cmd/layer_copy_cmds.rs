@@ -155,6 +155,15 @@ fn copy_to_document(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let (from, to) = (&s.documents()[src], &s.documents()[dest]);
     let (sdoc, ddoc) = (from.doc.clone(), to.doc.clone());
+    // A job running on the destination (a filter, say) was started from the document as it is now:
+    // the copy would change it under the job, which then discards its whole result. The usual
+    // check only looks at the active document, which is the source here.
+    if let Some(job) = s.job_on(ddoc.id) {
+        return Err(EngineError::Disabled(
+            CMD.into(),
+            format!("“{}” is still running on the destination document; wait for it to finish or cancel it (Esc)", job.label),
+        ));
+    }
     let ids: Vec<LayerId> = match p.get("layers") {
         None => from.selected_layers(),
         Some(v) => v

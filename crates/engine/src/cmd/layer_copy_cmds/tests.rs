@@ -500,3 +500,190 @@ fn retargeting_type_survives_bad_resolutions() {
     crate::canvas_geom::retarget_type_resolution(&mut d, f32::MAX);
     assert!(size(&d).is_finite() && size(&d) > 0.0, "{}", size(&d));
 }
+
+/// Document 0 ("A", 40×30, Background only) and document 1 ("B", same size) holding a red square
+/// layer "red" and a blue square layer "blue" above its Background. Document 1 is active.
+fn a_and_b() -> (Session, LayerId, LayerId) {
+    let mut s = Session::new();
+    s.execute("file.new", json!({"width": 40, "height": 30, "name": "A"})).unwrap();
+    s.execute("file.new", json!({"width": 40, "height": 30, "name": "B"})).unwrap();
+    let paint = |s: &mut Session, name: &str, x: u32, color: &str| {
+        let id = LayerId(s.execute("layer.new.layer", json!({"name": name})).unwrap()["layer"].as_u64().unwrap());
+        s.execute("select.rect", json!({"x": x, "y": 6, "width": 10, "height": 10})).unwrap();
+        s.execute("edit.fill", json!({"color": color})).unwrap();
+        s.execute("select.deselect", json!({})).unwrap();
+        id
+    };
+    let red = paint(&mut s, "red", 4, "#ff0000");
+    let blue = paint(&mut s, "blue", 20, "#0000ff");
+    (s, red, blue)
+}
+
+fn names_of(s: &Session, i: usize) -> Vec<String> {
+    doc(s, i).walk().into_iter().map(|(_, _, l)| l.name.clone()).collect()
+}
+
+fn pixel(s: &Session, i: usize, id: LayerId, x: i32, y: i32) -> Vec<f32> {
+    doc(s, i).layer(id).unwrap().surface().unwrap().read_region(Rect::new(x, y, x + 1, y + 1))
+}
+
+/// techneissa's report: a second layer copied from B into A, after edits in A, replaced a layer of
+/// A, and Undo did not bring it back.
+#[test]
+fn a_second_copy_from_another_document_adds_a_layer_and_each_undo_takes_one_step() {
+    let (mut s, red, blue) = a_and_b();
+    let b_before = doc(&s, 1).clone();
+    // First copy: red, from B to A (B is active, A is the destination).
+    s.execute("layer.select", json!({"layer": red.0})).unwrap();
+    let first = copied(&s.execute("layer.copyToDocument", json!({"document": 0})).unwrap());
+    assert_eq!(s.active_index(), Some(0));
+    // Edits in A: paint on the copy, then add a layer and paint on it.
+    s.execute("select.rect", json!({"x": 0, "y": 0, "width": 3, "height": 3})).unwrap();
+    s.execute("edit.fill", json!({"color": "#00ff00"})).unwrap();
+    s.execute("select.deselect", json!({})).unwrap();
+    s.execute("layer.new.layer", json!({"name": "extra"})).unwrap();
+    s.execute("select.rect", json!({"x": 30, "y": 20, "width": 5, "height": 5})).unwrap();
+    s.execute("edit.fill", json!({"color": "#ffff00"})).unwrap();
+    s.execute("select.deselect", json!({})).unwrap();
+    assert_eq!(names_of(&s, 0), ["Background", "red", "extra"]);
+    let a_before_second = doc(&s, 0).clone();
+    // Second copy: blue, from B (the user clicks B's tab first).
+    s.set_active(1);
+    s.execute("layer.select", json!({"layer": blue.0})).unwrap();
+    let second = copied(&s.execute("layer.copyToDocument", json!({"document": 0})).unwrap());
+    assert_ne!(first, second);
+    let a = doc(&s, 0);
+    assert_eq!(a.walk().len(), a_before_second.walk().len() + 1, "one more layer: {:?}", names_of(&s, 0));
+    for id in a_before_second.walk().iter().map(|(_, _, l)| l.id) {
+        assert_eq!(a.layer(id), a_before_second.layer(id), "layer {id:?} of A is unchanged");
+    }
+    assert_eq!(pixel(&s, 0, second, 25, 7), vec![0.0, 0.0, 1.0, 1.0], "blue pixels");
+    assert_eq!(pixel(&s, 0, first, 5, 7), vec![1.0, 0.0, 0.0, 1.0], "red pixels");
+    assert_eq!(*doc(&s, 1), b_before, "B is untouched");
+    // Undo removes exactly that copy and nothing of B.
+    assert_eq!(s.active_index(), Some(0));
+    assert!(s.undo());
+    assert_eq!(*doc(&s, 0), a_before_second, "one undo removes exactly the second copy");
+    assert_eq!(*doc(&s, 1), b_before, "B is untouched by A's undo");
+}
+
+/// Random sessions on two documents: after every step the copy landed as exactly the new layers
+/// in the destination (nothing else of it or of the source changed), and the other document never
+/// moves under an edit, Undo or Redo.
+#[test]
+fn random_sessions_never_lose_a_layer_or_touch_the_other_document() {
+    for seed in 1..=60u64 {
+        let mut rng = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+        let mut next = move |n: u64| {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            rng % n
+        };
+        let (mut s, _, _) = a_and_b();
+        s.execute("file.new", json!({"width": 40, "height": 30, "name": "C"})).unwrap();
+        s.set_active(1);
+        let mut log: Vec<String> = Vec::new();
+        for _ in 0..40 {
+            let active = s.active_index().unwrap();
+            let other: Vec<_> = (0..s.documents().len()).filter(|i| *i != active).collect();
+            let snaps: Vec<_> = (0..s.documents().len()).map(|i| doc(&s, i).clone()).collect();
+            let ids = |s: &Session, i: usize| doc(s, i).walk().into_iter().map(|(_, _, l)| l.id).collect::<Vec<_>>();
+            let op = next(11);
+            let layers = ids(&s, active);
+            let pick = layers[next(layers.len() as u64) as usize];
+            let desc = match op {
+                0..=2 => {
+                    let dest = other[next(other.len() as u64) as usize];
+                    let before_dest = ids(&s, dest);
+                    s.execute("layer.select", json!({"layer": pick.0})).unwrap();
+                    let r = s.execute("layer.copyToDocument", json!({"document": dest}));
+                    let d = format!("copy {pick:?} {active}->{dest}: {r:?}");
+                    if let Ok(r) = r {
+                        let new: Vec<LayerId> = r["layers"].as_array().unwrap().iter().map(|v| LayerId(v.as_u64().unwrap())).collect();
+                        let now = ids(&s, dest);
+                        assert_eq!(now.len(), before_dest.len() + new.len(), "seed {seed}: {d}\n{log:#?}");
+                        for id in &before_dest {
+                            assert_eq!(doc(&s, dest).layer(*id), snaps[dest].layer(*id), "seed {seed}: layer {id:?} changed by {d}\n{log:#?}");
+                        }
+                        assert_eq!(*doc(&s, active), snaps[active], "seed {seed}: source changed by {d}");
+                        // Undo takes exactly the copy.
+                        assert!(s.undo(), "seed {seed}: {d}");
+                        assert_eq!(*doc(&s, dest), snaps[dest], "seed {seed}: undo of {d}\n{log:#?}");
+                        assert!(s.redo(), "seed {seed}: {d}");
+                        assert_eq!(ids(&s, dest), now, "seed {seed}: redo of {d}");
+                    }
+                    d
+                }
+                3 => {
+                    s.execute("layer.select", json!({"layer": pick.0})).unwrap();
+                    let r = s.execute("layer.new.layer", json!({}));
+                    format!("new layer {r:?}")
+                }
+                4 | 5 => {
+                    s.execute("layer.select", json!({"layer": pick.0})).unwrap();
+                    let x = next(30) as u32;
+                    let r1 = s.execute("select.rect", json!({"x": x, "y": 3, "width": 6, "height": 6}));
+                    let r2 = s.execute("edit.fill", json!({"color": "#10ff20"}));
+                    let _ = s.execute("select.deselect", json!({}));
+                    format!("fill {pick:?} {r1:?} {r2:?}")
+                }
+                6 => {
+                    let r = s.execute("layer.duplicate", json!({"layer": pick.0}));
+                    format!("duplicate {pick:?} {r:?}")
+                }
+                7 => {
+                    let r = s.execute("layer.setProps", json!({"layer": pick.0, "opacity": 0.5, "coalesce": "opacity"}));
+                    format!("opacity {pick:?} {r:?}")
+                }
+                8 => {
+                    let r = s.execute("layer.delete", json!({"layer": pick.0}));
+                    format!("delete {pick:?} {r:?}")
+                }
+                9 => {
+                    let ok = s.undo();
+                    format!("undo {ok}")
+                }
+                _ => {
+                    let to = other[next(other.len() as u64) as usize];
+                    s.set_active(to);
+                    format!("switch to {to}")
+                }
+            };
+            for i in &other {
+                if !matches!(op, 0..=2 | 10) {
+                    assert_eq!(*doc(&s, *i), snaps[*i], "seed {seed}: doc {i} changed by {desc}\n{log:#?}");
+                }
+            }
+            log.push(desc);
+            if log.len() > 12 {
+                log.remove(0);
+            }
+        }
+    }
+}
+
+/// A background job (a filter) on the destination: a copy into it is refused and changes nothing,
+/// so the job's result is not thrown away; once the job has ended the copy goes through.
+#[test]
+fn a_copy_into_a_document_with_a_running_job_is_refused_and_the_job_keeps_its_result() {
+    let mut s = Session::new();
+    s.execute("file.new", json!({"width": 1600, "height": 1200, "name": "A"})).unwrap();
+    s.execute("layer.new.layer", json!({"name": "base"})).unwrap();
+    s.execute("file.new", json!({"width": 40, "height": 30, "name": "B"})).unwrap();
+    s.execute("layer.new.layer", json!({"name": "from-b"})).unwrap();
+    s.set_active(0);
+    let a_before = doc(&s, 0).clone();
+    let crate::jobs::Started::Job(job) = s.start("filter.blur.gaussianBlur", json!({"radius": 60})).unwrap() else { panic!("ran inline") };
+    s.set_active(1);
+    let b_before = doc(&s, 1).clone();
+    let err = s.execute("layer.copyToDocument", json!({"document": 0})).unwrap_err().to_string();
+    assert!(err.contains("still running on the destination"), "{err}");
+    assert_eq!(s.active_index(), Some(1), "the source stays the active document");
+    assert!(*doc(&s, 0) == a_before && *doc(&s, 1) == b_before, "nothing changed");
+    let steps = s.documents()[0].history.past_len();
+    s.wait_job(job).unwrap();
+    assert_eq!(s.documents()[0].history.past_len(), steps + 1, "the job's result landed as a step");
+    s.execute("layer.copyToDocument", json!({"document": 0})).unwrap();
+    assert_eq!(names_of(&s, 0), ["Background", "base", "from-b"]);
+}

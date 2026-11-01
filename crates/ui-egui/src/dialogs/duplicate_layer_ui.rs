@@ -149,6 +149,49 @@ mod tests {
         assert!(names(&app, 1).contains(&"Ink copy".to_string()));
     }
 
+    /// techneissa's report: two copies from one document into another, with edits between them,
+    /// leave both copies (and the edits) in the destination, and each Undo takes one step of it.
+    #[test]
+    fn two_copies_into_another_document_with_edits_between_keep_every_layer() {
+        let mut app = make_app();
+        app.session.execute("file.new", json!({"width":8,"height":8,"name":"Card"})).unwrap();
+        for name in ["One", "Two"] {
+            app.session.execute("layer.new.layer", json!({"name": name})).unwrap();
+            app.session.execute("select.rect", json!({"x":1,"y":1,"width":3,"height":3})).unwrap();
+            app.session.execute("edit.fill", json!({"color": if name == "One" { "#ff0000" } else { "#0000ff" }})).unwrap();
+            app.session.execute("select.deselect", json!({})).unwrap();
+        }
+        let card_before = app.session.documents()[1].doc.clone();
+        let copy_from_card = |app: &mut PhotocraftApp, name: &str| {
+            app.session.set_active(1);
+            app.session.execute("layer.select", json!({"name": name})).unwrap();
+            let dialog = invoke(app);
+            app.ui.dialog_mut(dialog).unwrap().fields.insert("destination".into(), json!(0));
+            crate::dialogs::confirm(app, dialog).unwrap();
+            assert_eq!(app.session.active_index(), Some(0), "the destination is shown after the copy");
+        };
+        copy_from_card(&mut app, "One");
+        // Edits in the destination.
+        app.run("select.rect", json!({"x":0,"y":0,"width":2,"height":2})).unwrap();
+        app.run("edit.fill", json!({"color": "#00ff00"})).unwrap();
+        app.run("select.deselect", json!({})).unwrap();
+        app.run("layer.new.layer", json!({"name": "Notes"})).unwrap();
+        let before_second = app.session.documents()[0].doc.clone();
+        assert_eq!(names(&app, 0), ["Background", "Ink", "One copy", "Notes"]);
+        copy_from_card(&mut app, "Two");
+        let after = names(&app, 0);
+        assert_eq!(after.len(), 5, "Background, Ink, One copy, Notes and Two copy: {after:?}");
+        assert!(after.contains(&"Two copy".to_string()) && after.contains(&"One copy".to_string()) && after.contains(&"Notes".to_string()), "{after:?}");
+        for (_, _, l) in before_second.walk() {
+            assert_eq!(app.session.documents()[0].doc.layer(l.id), Some(l), "{} is unchanged", l.name);
+        }
+        assert_eq!(app.session.documents()[1].doc, card_before, "the source document is untouched");
+        // One Undo takes the second copy only.
+        assert!(app.session.undo());
+        assert_eq!(app.session.documents()[0].doc, before_second);
+        assert_eq!(app.session.documents()[1].doc, card_before);
+    }
+
     #[test]
     fn a_new_destination_makes_a_named_document_holding_just_the_copy() {
         let mut app = make_app();
