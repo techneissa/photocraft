@@ -530,7 +530,17 @@ fn mask_of(w: usize, h: usize, f: impl Fn(usize, usize) -> f32) -> Mask {
 
 #[test]
 fn the_mask_keeps_partial_coverage_and_trims_to_the_object() {
-    let m = mask_of(40, 30, |x, _| if x < 10 { 0.0 } else if x == 10 { 0.5 } else if x < 20 { 1.0 } else { 0.0 });
+    let m = mask_of(40, 30, |x, _| {
+        if x < 10 {
+            0.0
+        } else if x == 10 {
+            0.5
+        } else if x < 20 {
+            1.0
+        } else {
+            0.0
+        }
+    });
     let r = to_region(&m, Rect::new(0, 0, 40, 30), 1).unwrap().unwrap();
     assert_eq!(r.bbox, Rect::new(10, 0, 20, 30));
     assert_eq!(r.at(10, 5), 128.0 / 255.0, "0.5 stays 0.5");

@@ -98,7 +98,8 @@ pub(crate) fn update(app: &mut PhotocraftApp, at: Option<[f64; 2]>, pressed: boo
     let px = [at[0].floor() as i32, at[1].floor() as i32];
     let fresh = app.object_finder.as_ref().is_some_and(|f| f.doc == doc && f.revision == revision && f.target == target && f.all_layers == all_layers);
     if !fresh {
-        app.object_finder = Some(Finder { doc, revision, target, all_layers, at: px, since: now, job: None, misses: Vec::new(), looked: None, shown: None, texture: None });
+        app.object_finder =
+            Some(Finder { doc, revision, target, all_layers, at: px, since: now, job: None, misses: Vec::new(), looked: None, shown: None, texture: None });
     }
     let doc_arc = Arc::clone(&st.doc);
     // The click reports an empty sampled layer; the hover says so too instead of showing nothing.

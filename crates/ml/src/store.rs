@@ -209,6 +209,7 @@ fn user_models_dir(app: &str) -> Option<PathBuf> {
 }
 
 /// `<app data folder>/<app>`: the folder above [`user_models_dir`]'s.
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn app_data_dir(app: &str) -> Option<PathBuf> {
     user_models_dir(app)?.parent().map(Path::to_path_buf)
 }

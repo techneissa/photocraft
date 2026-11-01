@@ -279,7 +279,11 @@ fn real_model_timings_in_the_shell() {
         std::thread::sleep(std::time::Duration::from_millis(5));
         now += 0.05;
     };
-    println!("hover: pointer at rest → highlight {:?} (includes the {:?} debounce; the lookup is one click)", t.elapsed(), std::time::Duration::from_secs_f64(crate::object_finder::DEBOUNCE));
+    println!(
+        "hover: pointer at rest → highlight {:?} (includes the {:?} debounce; the lookup is one click)",
+        t.elapsed(),
+        std::time::Duration::from_secs_f64(crate::object_finder::DEBOUNCE)
+    );
     assert!(shown.is_some());
     let t = std::time::Instant::now();
     click(&mut app, (point[0], point[1]), egui::Modifiers::NONE);
