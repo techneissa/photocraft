@@ -4767,3 +4767,44 @@ cameraRaw	White Balance: As Shot	Vitbalans: som tagen
 	The path was discarded	Banan kasserades
 	The path was kept as the Work Path	Banan behölls som arbetsbana
 	Edit Brush…	Redigera pensel…
+
+# Optional local AI models and SAM 3 (fork: PR #8231, FORK.md)
+	AI Models	AI-modeller
+	Model download worker failed.	Nedladdningen av modellen misslyckades.
+	Models are optional and run entirely on this computer. Downloading fetches the model file from Hugging Face; no images or documents are ever uploaded. Without a model, Select Subject, Remove Background and Remove Subject use the built-in (non-AI) methods.	Modeller är valfria och körs helt på den här datorn. Vid nedladdning hämtas modellfilen från Hugging Face; inga bilder eller dokument laddas någonsin upp. Utan modell använder Markera motiv, Ta bort bakgrund och Ta bort motiv de inbyggda metoderna (utan AI).
+	Select Subject, Remove Background	Markera motiv, Ta bort bakgrund
+	Remove Subject	Ta bort motiv
+	Selection by click or by text	Markering med klick eller text
+	Shared Folder	Delad mapp
+	Custom Folder	Egen mapp
+	Old PhotoCraft Folder (read only)	Gammal PhotoCraft-mapp (skrivskyddad)
+	Installed	Installerad
+	Not installed	Inte installerad
+	{size} MB · {licence}	{size} MB · {licence}
+	Found in: {place}	Hittad i: {place}
+	No public download. Put these files in the folder below:	Ingen offentlig nedladdning. Lägg filerna i mappen nedan:
+	The models folder	Modellmappen
+	Download	Ladda ner
+	{done} / {total} MB ({percent}%)	{done} / {total} MB ({percent}%)
+	Cancelling…	Avbryter…
+	Confirm remove	Bekräfta borttagning
+	subject segmentation (BiRefNet-lite)	motivsegmentering (BiRefNet-lite)
+	inpainting (LaMa)	ifyllnad (LaMa)
+	object selection (SAM 3)	objektmarkering (SAM 3)
+	Select Subject Engine	Motor för Markera motiv
+	Object Selection Engine	Motor för objektmarkering
+	macOS (Apple Vision, Mac only)	macOS (Apple Vision, endast Mac)
+	AI Model (download in Preferences › AI Models)	AI-modell (ladda ner i Inställningar › AI-modeller)
+	SAM 3 (model in Preferences › AI Models)	SAM 3 (modell i Inställningar › AI-modeller)
+	macOS cutout unavailable, used Classic	macOS-frilägging saknas, Klassisk användes
+	macOS cutout failed, used Classic	macOS-frilägging misslyckades, Klassisk användes
+	AI model not installed, used Classic (Preferences › AI Models)	AI-modellen är inte installerad, Klassisk användes (Inställningar › AI-modeller)
+	AI model failed, used Classic	AI-modellen misslyckades, Klassisk användes
+	Not enough memory for the AI model, used Classic	Inte tillräckligt med minne för AI-modellen, Klassisk användes
+	SAM 3 not installed, used Classic (Preferences › AI Models)	SAM 3 är inte installerat, Klassisk användes (Inställningar › AI-modeller)
+	Not enough memory for SAM 3, used Classic	Inte tillräckligt med minne för SAM 3, Klassisk användes
+	SAM 3 failed, used Classic	SAM 3 misslyckades, Klassisk användes
+	SAM 3 is still preparing, used Classic	SAM 3 förbereder fortfarande, Klassisk användes
+	Preparing SAM 3 for this image… (Esc stops it)	Förbereder SAM 3 för den här bilden… (Esc avbryter)
+	SAM 3 is ready	SAM 3 är redo
+	SAM 3 stopped, Classic selects for now	SAM 3 stoppades, Klassisk markerar tills vidare

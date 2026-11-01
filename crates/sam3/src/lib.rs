@@ -2,6 +2,8 @@
 //!
 //! - **Point prompts** ([`Sam3::segment_clicks`]): positive and negative clicks select one
 //!   object, via SAM 3's interactive (SAM 2 style) prompt encoder and mask decoder.
+//! - **Box prompts** ([`Sam3::segment_boxed`]): a rectangle selects the main object inside it (the box
+//!   is two corner points labelled 2 and 3 for the same prompt encoder), optionally with clicks.
 //! - **Text prompts** ([`Sam3::segment_text`]): a noun phrase ("the red car", "sky") selects
 //!   every instance of that concept, via the CLIP text encoder and the DETR detector.
 //!
@@ -50,7 +52,7 @@ use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 
 pub use service::{ImageHandle, Matte, Sam3Service};
-pub use tracker::Click;
+pub use tracker::{BoxPrompt, Click};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -195,7 +197,20 @@ impl Sam3 {
         }
         let f = enc.tracker.as_ref().ok_or_else(|| Error::Model("tracker features".into()))?;
         // one click: SAM's three alternatives, best by predicted IoU; more: the single mask
-        let p = tracker.predict(f, clicks, clicks.len() == 1)?;
+        let p = tracker.predict(f, clicks, None, clicks.len() == 1)?;
+        Ok(Prediction { logits: p.logits, score: p.iou * sigmoid(p.object_score) })
+    }
+
+    /// Segment the main object inside `boxed` (corners normalized to the image, 0..1), refined by
+    /// optional `clicks`. A box is unambiguous, so the single-mask output is used (as SAM does for boxes).
+    pub fn segment_boxed(&mut self, enc: &mut Encoded, boxed: BoxPrompt, clicks: &[Click]) -> Result<Prediction> {
+        let (neck, tracker) = self.tracker_parts()?;
+        if enc.tracker.is_none() {
+            let levels = neck.forward(&enc.backbone, 3)?;
+            enc.tracker = Some(tracker.features(&levels)?);
+        }
+        let f = enc.tracker.as_ref().ok_or_else(|| Error::Model("tracker features".into()))?;
+        let p = tracker.predict(f, clicks, Some(boxed), false)?;
         Ok(Prediction { logits: p.logits, score: p.iou * sigmoid(p.object_score) })
     }
 

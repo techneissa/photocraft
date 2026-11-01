@@ -10,7 +10,7 @@ use photocraft_doc::{Document, Layer, LayerContent, LayerId, LayerMask};
 use photocraft_geom::Rect;
 use serde_json::{Value, json};
 
-use super::sam3_select::{self, Attempt, Request};
+use super::sam3_select::{self, Attempt, BoxRequest, Request, SubjectSam3};
 use super::smartselect_macos::{self, Step};
 use crate::commands::CommandSpec;
 use crate::prefs::SubjectEngine;
@@ -319,8 +319,15 @@ fn object_selection(s: &mut Session, p: &Value) -> Result<Value> {
     let all_layers = b(p, "sampleAllLayers", false);
     let d = s.active().ok_or(EngineError::NoDocument)?;
     check_sampled_pixels(&d.doc, d.active_layer, all_layers, rect)?;
+    // SAM 3, when its encoding of this picture is ready: the rectangle is its box prompt and the
+    // main object inside it the selection (⇧ add, ⌥ subtract, by `mode`). Otherwise GrabCut below.
+    let m = mode(p, "replace");
+    let note = match sam3_select::select_box(s, &BoxRequest { rect, mode: m, label: "Object Selection", all_layers })? {
+        Attempt::Done(done) => return Ok(done),
+        Attempt::Classic(note) => note,
+    };
     let region = with_sampler(s, all_layers, |smp, doc| grabcut::object_select(smp, doc.bounds(), rect, 160_000))?;
-    apply(s, "Object Selection", region.as_ref(), mode(p, "replace"))
+    with_note(apply(s, "Object Selection", region.as_ref(), m)?, note)
 }
 
 /// Select Subject's last result (#2865), so running it again on unchanged pixels answers at
@@ -436,7 +443,7 @@ fn model_failure_note(e: &photocraft_ml::MlError) -> &'static str {
 /// What [`find_subject_region`] found, which engine found it and what to tell the user about it.
 pub(crate) struct Subject {
     pub region: Option<Region>,
-    /// `"macos"`, `"model"` or `"classic"`.
+    /// `"macos"`, `"model"`, `"sam3"` or `"classic"`.
     pub used: &'static str,
     pub note: Option<&'static str>,
 }
@@ -447,7 +454,7 @@ pub(crate) struct Subject {
 pub(crate) fn engine_param(s: &Session, p: &Value) -> Result<SubjectEngine> {
     let Some(name) = p.get("engine") else { return Ok(s.prefs().tools.select_subject_engine) };
     let name = name.as_str().ok_or_else(|| bad("select.subject", "\"engine\" is a string"))?;
-    SubjectEngine::parse(if name == "classical" { "classic" } else { name }).ok_or_else(|| bad("select.subject", "\"engine\" is auto, macos, model or classic"))
+    SubjectEngine::parse(if name == "classical" { "classic" } else { name }).ok_or_else(|| bad("select.subject", "\"engine\" is auto, macos, model, sam3 or classic"))
 }
 
 /// Finds the subject in `area` of `doc` with the engine chosen. `auto` tries the Mac's cutout, then
@@ -461,6 +468,7 @@ pub(crate) fn find_subject_region(
     all_layers: bool,
     area: Rect,
     engine: SubjectEngine,
+    sam3: Option<&SubjectSam3>,
     ctl: &photocraft_raster::Interrupt,
 ) -> Result<Subject> {
     let cancelled = |_| EngineError::Cancelled;
@@ -470,6 +478,20 @@ pub(crate) fn find_subject_region(
         Step::NoSubject => return Ok(Subject { region: None, used: "macos", note: None }),
         Step::Fallback(note) => note,
     };
+    if engine == SubjectEngine::Sam3
+        && let Some(sam) = sam3
+    {
+        // SAM 3 is an explicit choice: "no subject" is its answer, a failure falls through to Classic with a note.
+        match sam.refusal() {
+            Some(why) => note = Some(why),
+            None => match with_doc_sampler(doc, layer, all_layers, |smp, _| sam.find(smp, area, ctl)) {
+                Ok(region) => return Ok(Subject { region, used: "sam3", note: None }),
+                Err(photocraft_ml::MlError::Cancelled) => return Err(EngineError::Cancelled),
+                Err(photocraft_ml::MlError::BadInput(message)) => return Err(EngineError::Other(message)),
+                Err(e) => note = Some(sam3_select::failure_note(&e)),
+            },
+        }
+    }
     if matches!(engine, SubjectEngine::Auto | SubjectEngine::Model) {
         if subject_model_available() {
             // Refused before the photo is sampled: an out-of-memory in tract aborts the process.
@@ -498,6 +520,7 @@ fn select_subject(s: &mut Session, p: &Value) -> Result<Value> {
     let all_layers = b(p, "sampleAllLayers", false);
     let m = mode(p, "replace");
     let engine = engine_param(s, p)?;
+    let sam3 = (engine == SubjectEngine::Sam3).then(|| s.sam3_subject(all_layers));
     let d = s.active().ok_or(EngineError::NoDocument)?;
     // What `with_doc_sampler` samples: the active layer's pixels, else the composite.
     let target = d.active_layer.filter(|id| !all_layers && d.doc.layer(*id).and_then(Layer::surface).is_some());
@@ -517,7 +540,7 @@ fn select_subject(s: &mut Session, p: &Value) -> Result<Value> {
         true,
         move |ctx| {
             let area = doc.bounds();
-            let found = ctx.stage(0.0, 1.0, "Finding subject", |ctl| find_subject_region(&doc, layer, all_layers, area, engine, ctl))?;
+            let found = ctx.stage(0.0, 1.0, "Finding subject", |ctl| find_subject_region(&doc, layer, all_layers, area, engine, sam3.as_ref(), ctl))?;
             Ok((doc, found.region.map(std::sync::Arc::new), found.note))
         },
         move |s, (doc, region, note)| {
@@ -765,7 +788,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "select.subject",
             "Subject",
             ["Select"],
-            r##"{"sampleAllLayers":bool=false (false = the selected layer, true = all visible layers),"mode":"replace|add|subtract|intersect"="replace","engine":"auto|macos|model|classic"=the preference tools.selectSubjectEngine (auto = the Mac's cutout, else the AI model when installed, else Classic; model without the model installed = Classic with a note)}"##,
+            r##"{"sampleAllLayers":bool=false (false = the selected layer, true = all visible layers),"mode":"replace|add|subtract|intersect"="replace","engine":"auto|macos|model|sam3|classic"=the preference tools.selectSubjectEngine (auto = the Mac's cutout, else the AI model when installed, else Classic; model without the model installed = Classic with a note; sam3 = SAM 3 with the text prompts "person" then "main subject", Classic with a note when it cannot run)}"##,
             has_doc,
             select_subject
         ),

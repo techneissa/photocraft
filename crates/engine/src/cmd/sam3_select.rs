@@ -38,9 +38,13 @@ use crate::prefs::ObjectEngine;
 use crate::{EngineError, Result, Session};
 
 mod backend;
+mod boxed;
 mod mask;
+mod subject;
 
-pub use backend::{EncodedImage, Mask, PointClick, Sam3Backend};
+pub(crate) use boxed::{BoxRequest, select_box};
+pub(crate) use subject::{SubjectSam3, failure_note};
+pub use backend::{EncodedImage, Mask, PointBox, PointClick, Sam3Backend};
 
 /// The note for an explicit `sam3` choice with no model installed.
 pub const NOT_INSTALLED: &str = "SAM 3 not installed, used Classic (Preferences › AI Models)";
@@ -290,14 +294,9 @@ impl Sam3Select {
     }
 }
 
-/// Whether the preference and this computer let SAM 3 run: `Ok` or the note for the status bar
-/// (`None` for the quiet cases: `classic`, or `auto` where it cannot run).
-fn capable(s: &mut Session) -> std::result::Result<(), Option<&'static str>> {
-    let engine = s.prefs().tools.object_selection_engine;
-    if engine == ObjectEngine::Classic {
-        return Err(None);
-    }
-    let explicit = engine == ObjectEngine::Sam3;
+/// Whether the model is installed and this computer has the memory for it (the answer is reused
+/// for [`CAPABLE_FOR`]): `Ok`, or the note that says which is missing.
+fn can_run(s: &mut Session) -> std::result::Result<(), &'static str> {
     let backend = s.sam3.backend();
     let (present, memory) = match s.sam3.capable {
         Some((at, present, memory)) if at.elapsed() < CAPABLE_FOR => (present, memory),
@@ -308,12 +307,22 @@ fn capable(s: &mut Session) -> std::result::Result<(), Option<&'static str>> {
         }
     };
     if !present {
-        return Err(explicit.then_some(NOT_INSTALLED));
+        return Err(NOT_INSTALLED);
     }
     if !memory {
-        return Err(explicit.then_some(NO_MEMORY));
+        return Err(NO_MEMORY);
     }
     Ok(())
+}
+
+/// Whether the preference and this computer let SAM 3 run: `Ok` or the note for the status bar
+/// (`None` for the quiet cases: `classic`, or `auto` where it cannot run).
+fn capable(s: &mut Session) -> std::result::Result<(), Option<&'static str>> {
+    let engine = s.prefs().tools.object_selection_engine;
+    if engine == ObjectEngine::Classic {
+        return Err(None);
+    }
+    can_run(s).map_err(|note| (engine == ObjectEngine::Sam3).then_some(note))
 }
 
 /// The document's pixels for the model, shrunk by `step`, and the encoding of them.
@@ -492,19 +501,27 @@ pub(crate) enum Attempt {
     Classic(Option<&'static str>),
 }
 
-/// Selects with SAM 3 when it can: ready encoding for the active document, usable preference.
-pub(crate) fn click(s: &mut Session, req: &Request) -> Result<Attempt> {
+/// The encoding SAM 3 answers from (image, canvas, step), or the reason Classic answers instead.
+fn ready_encoding(s: &mut Session, all_layers: bool) -> std::result::Result<(EncodedImage, Rect, usize), Attempt> {
     if let Err(note) = capable(s) {
-        return Ok(Attempt::Classic(note));
+        return Err(Attempt::Classic(note));
     }
-    let status = s.sam3_status(req.all_layers);
-    let (image, canvas, step) = match (&s.sam3.entry, status) {
-        (Entry::Ready(r), Sam3Status::Ready) => (r.done.image, r.done.canvas, r.done.step),
-        (_, Sam3Status::Preparing) => return Ok(Attempt::Classic(Some(NOT_READY))),
-        (_, Sam3Status::Failed(note)) => return Ok(Attempt::Classic(Some(note))),
+    let status = s.sam3_status(all_layers);
+    match (&s.sam3.entry, status) {
+        (Entry::Ready(r), Sam3Status::Ready) => Ok((r.done.image, r.done.canvas, r.done.step)),
+        (_, Sam3Status::Preparing) => Err(Attempt::Classic(Some(NOT_READY))),
+        (_, Sam3Status::Failed(note)) => Err(Attempt::Classic(Some(note))),
         // Not prepared (the tool was not picked through the UI, an edit dropped it, the model was
         // unloaded): Classic, quietly. The shell starts the encoding for the next click.
-        _ => return Ok(Attempt::Classic(None)),
+        _ => Err(Attempt::Classic(None)),
+    }
+}
+
+/// Selects with SAM 3 when it can: ready encoding for the active document, usable preference.
+pub(crate) fn click(s: &mut Session, req: &Request) -> Result<Attempt> {
+    let (image, canvas, step) = match ready_encoding(s, req.all_layers) {
+        Ok(ready) => ready,
+        Err(classic) => return Ok(classic),
     };
     let d = s.active().ok_or(EngineError::NoDocument)?;
     let (doc_id, revision, target, selection) = (d.doc.id, d.revision, sampled_target(&d.doc, d.active_layer, req.all_layers), d.doc.selection.clone());
@@ -600,3 +617,5 @@ pub fn specs() -> Vec<crate::commands::CommandSpec> {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_box;

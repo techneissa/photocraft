@@ -237,6 +237,7 @@ fn run(s: &mut Session, p: &Value) -> Result<Value> {
     dimensions(doc.bounds(), MAX_CANVAS)?;
     let (all_layers, keep_mask, new_layer) = (flag(p, "sampleAllLayers")?, flag(p, "keepMask")?, flag(p, "newLayer")?);
     let engine = engine_param(s, p)?;
+    let sam3 = (engine == crate::prefs::SubjectEngine::Sam3).then(|| s.sam3_subject(all_layers));
     let fill = choice(p, "fill", &["auto", "lama", "patch"])?;
     // As in Select Subject: unit tests never run an installed model, matching CI.
     let fill = if cfg!(test) && fill == "auto" { "patch" } else { fill };
@@ -251,7 +252,7 @@ fn run(s: &mut Session, p: &Value) -> Result<Value> {
             let cmyk = photocraft_compose::cmyk_space(doc);
             photocraft_color::convert::with_cmyk_space(cmyk.as_ref(), || {
                 let area = doc.bounds();
-                let found = ctx.stage(0.0, 0.4, "Finding subject", |ctl| find_subject_region(doc, Some(id), all_layers, area, engine, ctl))?;
+                let found = ctx.stage(0.0, 0.4, "Finding subject", |ctl| find_subject_region(doc, Some(id), all_layers, area, engine, sam3.as_ref(), ctl))?;
                 let (subject, subject_engine) = (found.region.ok_or_else(|| EngineError::Other("no subject found".into()))?, found.used);
                 ctx.check()?;
                 ctx.progress(0.4, "Growing subject mask");
@@ -292,7 +293,7 @@ pub fn specs() -> Vec<CommandSpec> {
         label: LABEL,
         menu: &["Edit"],
         shortcut: None,
-        params: r##"{"layer":id?,"sampleAllLayers":bool=false,"expand":px=8 (0..200),"keepMask":bool=false,"fill":"auto|lama|patch"="auto","newLayer":bool=false,"engine":"auto|macos|model|classic"=the preference tools.selectSubjectEngine} → {layer,bounds,subjectFound,filledWith,subjectEngine} (missing/unsupported models fall back; keepMask retains the expanded, selection-limited mask)"##,
+        params: r##"{"layer":id?,"sampleAllLayers":bool=false,"expand":px=8 (0..200),"keepMask":bool=false,"fill":"auto|lama|patch"="auto","newLayer":bool=false,"engine":"auto|macos|model|sam3|classic"=the preference tools.selectSubjectEngine} → {layer,bounds,subjectFound,filledWith,subjectEngine} (missing/unsupported models fall back; keepMask retains the expanded, selection-limited mask)"##,
         enabled,
         run,
         journal: true,

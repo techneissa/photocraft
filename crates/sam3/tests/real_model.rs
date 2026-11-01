@@ -13,7 +13,7 @@
 use std::time::Instant;
 
 use photocraft_ml::Rgb;
-use photocraft_sam3::{Click, Matte, Sam3Service};
+use photocraft_sam3::{BoxPrompt, Click, Matte, Sam3Service};
 
 const W: usize = 320;
 const H: usize = 240;
@@ -97,6 +97,16 @@ fn click_and_text_masks_from_the_real_model() {
     let two = service.clicks(handle, &[click, outside]).expect("two clicks");
     eprintln!("two clicks: {:?} (score {:.2})", t.elapsed(), two.score);
     assert!(two.alpha[130 * W + 160] > 0.5);
+
+    // a box around the disc (with a margin) selects the disc; a corner patch of sky alone does not
+    let around = BoxPrompt { x0: 90.0 / W as f32, y0: 60.0 / H as f32, x1: 230.0 / W as f32, y1: 200.0 / H as f32 };
+    for run in 0..2 {
+        let t = Instant::now();
+        let boxed = service.boxed(handle, around, &[]).expect("box");
+        let (covered, precision) = overlap(&boxed);
+        eprintln!("box (run {run}): {:?}, score {:.2}, covers {:.0}% of the disc, {:.0}% of the mask is the disc", t.elapsed(), boxed.score, covered * 100.0, precision * 100.0);
+        assert!(covered > 0.8 && precision > 0.8, "the box mask is the disc: {covered} / {precision}");
+    }
 
     let t = Instant::now();
     let text = service.text(handle, "red ball", 0.5).expect("text");

@@ -330,7 +330,7 @@ fn find_subject_region_reports_which_finder_found_the_subject() {
     let d = s.active().unwrap();
     let ctl = photocraft_raster::Interrupt::default();
     for (engine, note) in [(SubjectEngine::Classic, None), (SubjectEngine::Auto, None), (SubjectEngine::Model, Some(MODEL_MISSING))] {
-        let found = find_subject_region(&d.doc, d.active_layer, false, d.doc.bounds(), engine, &ctl).unwrap();
+        let found = find_subject_region(&d.doc, d.active_layer, false, d.doc.bounds(), engine, None, &ctl).unwrap();
         assert!(found.region.is_some() && found.used == "classic", "{engine:?}");
         assert_eq!(found.note, note, "{engine:?}");
     }

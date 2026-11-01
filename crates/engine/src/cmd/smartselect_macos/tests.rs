@@ -89,14 +89,14 @@ fn set_engine(s: &mut Session, v: &str) {
 // ---- the preference ----
 
 #[test]
-fn the_engine_preference_defaults_to_auto_and_takes_its_four_values() {
+fn the_engine_preference_defaults_to_auto_and_takes_its_five_values() {
     let mut s = Session::new();
     assert_eq!(s.prefs().tools.select_subject_engine, SubjectEngine::Auto);
-    for (v, e) in [("macos", SubjectEngine::MacOs), ("model", SubjectEngine::Model), ("classic", SubjectEngine::Classic), ("auto", SubjectEngine::Auto)] {
+    for (v, e) in [("macos", SubjectEngine::MacOs), ("model", SubjectEngine::Model), ("sam3", SubjectEngine::Sam3), ("classic", SubjectEngine::Classic), ("auto", SubjectEngine::Auto)] {
         set_engine(&mut s, v);
         assert_eq!(s.prefs().tools.select_subject_engine, e);
     }
-    assert_eq!(crate::prefs::choices("tools.selectSubjectEngine"), Some(&["auto", "macos", "model", "classic"][..]));
+    assert_eq!(crate::prefs::choices("tools.selectSubjectEngine"), Some(&["auto", "macos", "model", "sam3", "classic"][..]));
 }
 
 #[test]
