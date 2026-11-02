@@ -218,17 +218,11 @@ fn a_bad_value_refuses_the_whole_file_and_changes_nothing() {
         ("jpegQuality", Box::new(|f| f["preferences"]["export"]["jpegQuality"] = json!(0))),
         ("wrong type", Box::new(|f| f["preferences"]["export"]["jpegQuality"] = json!("high"))),
         ("unknown choice", Box::new(|f| f["preferences"]["interface"]["uiScale"] = json!("77"))),
-        ("unknown setting", Box::new(|f| f["preferences"]["interface"]["notASetting"] = json!(true))),
-        ("unknown top bar item", Box::new(|f| f["preferences"]["interface"]["topBar"]["flag"] = json!(true))),
-        ("unknown section", Box::new(|f| f["preferences"]["nope"] = json!({}))),
         ("section type", Box::new(|f| f["preferences"]["general"] = json!(3))),
-        ("unknown part", Box::new(|f| f["extra"] = json!({}))),
         ("colour setting", Box::new(|f| f["colorSettings"]["intent"] = json!("sideways"))),
-        ("unknown colour setting", Box::new(|f| f["colorSettings"]["nope"] = json!(1))),
         ("profile path", Box::new(|f| f["colorSettings"]["workingRgb"] = json!("/etc/passwd.icc"))),
         ("menu colour", Box::new(|f| f["menus"]["colors"]["edit.copy"] = json!("plaid"))),
         ("menus type", Box::new(|f| f["menus"] = json!([1]))),
-        ("toolbar key", Box::new(|f| f["toolbar"]["extra"] = json!([]))),
         ("shortcuts file", Box::new(|f| f["shortcuts"]["bindings"]["kind"] = json!("other"))),
         ("shortcut set key", Box::new(|f| f["shortcuts"]["sets"]["Mine"]["shortcuts"]["edit.copy"] = json!("Banana+Q"))),
         ("shortcut set name", Box::new(|f| f["shortcuts"]["sets"][""] = json!({}))),
@@ -275,10 +269,78 @@ fn a_newer_file_gives_what_it_understands_and_names_the_rest() {
     let plan = plan_of(&p, &c, &f.to_string()).unwrap();
     assert_eq!(plan.prefs.export.jpeg_quality, 12, "what it understands is taken");
     assert_eq!(plan.prefs.interface.ui_scale, p.interface.ui_scale, "a choice it doesn't know is skipped");
-    let notes = plan.notes.join("\n");
-    for named in ["newer PhotoCraft", "uiScale", "notASetting", "futureSection", "futurePart"] {
-        assert!(notes.contains(named), "{named} not named in: {notes}");
+    assert!(plan.notes.join("\n").contains("newer PhotoCraft"), "{:?}", plan.notes);
+    assert!(plan.notes.join("\n").contains("uiScale"), "{:?}", plan.notes);
+    for named in ["interface.notASetting", "futureSection", "futurePart"] {
+        assert!(plan.unknown.iter().any(|u| u == named), "{named} not named in: {:?}", plan.unknown);
     }
+}
+
+/// A file of this version with unknown settings of every kind next to a known one.
+fn file_with_unknowns() -> Value {
+    let mut f = file();
+    f["preferences"]["export"]["jpegQuality"] = json!(12);
+    f["preferences"]["interface"]["notASetting"] = json!(true);
+    f["preferences"]["interface"]["topBar"]["flag"] = json!(true);
+    f["preferences"]["nope"] = json!({});
+    f["colorSettings"]["nope"] = json!(1);
+    f["toolbar"]["extra"] = json!([]);
+    f["menus"]["extra"] = json!({});
+    f["workspaces"]["extra"] = json!(1);
+    f["extra"] = json!({});
+    f
+}
+
+#[test]
+fn a_setting_this_build_does_not_have_is_skipped_and_named_in_a_file_of_this_version() {
+    let (p, c) = (Preferences::default(), ColorSettings::default());
+    let plan = plan_of(&p, &c, &file_with_unknowns().to_string()).unwrap();
+    assert_eq!(plan.prefs.export.jpeg_quality, 12, "the known setting is applied");
+    let named = ["interface.notASetting", "interface.topBar.flag", "nope", "colorSettings.nope", "toolbar.extra", "menus.extra", "workspaces.extra", "extra"];
+    assert_eq!(plan.unknown.len(), named.len(), "{:?}", plan.unknown);
+    assert_eq!(plan.unknown_total, named.len());
+    for n in named {
+        assert!(plan.unknown.iter().any(|u| u == n), "{n} not named in {:?}", plan.unknown);
+    }
+    assert!(plan.notes.is_empty(), "unknown settings are not also notes: {:?}", plan.notes);
+}
+
+#[test]
+fn only_the_known_settings_change_when_the_file_has_unknown_ones() {
+    let mut s = Session::new();
+    let mut clean = file();
+    clean["preferences"]["export"]["jpegQuality"] = json!(12);
+    let mut fresh = Session::new();
+    fresh.execute("edit.preferences.importSettings", json!({"text": clean.to_string()})).unwrap();
+    let r = s.execute("edit.preferences.importSettings", json!({"text": file_with_unknowns().to_string()})).unwrap();
+    assert_eq!(r["applied"], true);
+    assert_eq!(r["unknownCount"], 8);
+    assert!(r["unknown"].as_array().unwrap().iter().any(|u| u == "interface.notASetting"), "{r}");
+    assert_eq!(s.prefs().export.jpeg_quality, 12);
+    assert_eq!(s.settings_text(), fresh.settings_text(), "the unknown settings changed nothing else");
+}
+
+#[test]
+fn a_dry_run_names_the_unknown_settings_and_changes_nothing() {
+    let mut s = Session::new();
+    let before = (s.settings_text(), s.prefs.rev());
+    let r = s.execute("edit.preferences.importSettings", json!({"text": file_with_unknowns().to_string(), "dryRun": true})).unwrap();
+    assert_eq!(r["applied"], false);
+    assert_eq!(r["unknownCount"], 8);
+    assert!(r["unknown"].as_array().unwrap().iter().any(|u| u == "futurePart" || u == "extra"), "{r}");
+    assert_eq!((s.settings_text(), s.prefs.rev()), before);
+}
+
+#[test]
+fn a_bad_value_for_a_known_setting_still_refuses_a_file_that_has_unknown_settings() {
+    let mut f = file_with_unknowns();
+    f["preferences"]["export"]["jpegQuality"] = json!(0);
+    let mut s = Session::new();
+    s.edit_prefs(|x| x.export.jpeg_quality = 77);
+    let before = (s.settings_text(), s.prefs.rev());
+    let e = s.execute("edit.preferences.importSettings", json!({"text": f.to_string()})).unwrap_err().to_string();
+    assert!(e.contains("jpegQuality") && e.contains("Nothing was changed"), "{e}");
+    assert_eq!((s.settings_text(), s.prefs.rev()), before);
 }
 
 #[test]
@@ -442,6 +504,8 @@ fn the_notes_stay_bounded() {
     }
     let plan = plan_of(&Preferences::default(), &ColorSettings::default(), &f.to_string()).unwrap();
     assert!(plan.notes.len() <= MAX_NOTES);
+    assert_eq!(plan.unknown.len(), MAX_UNKNOWN);
+    assert_eq!(plan.unknown_total, 1000, "the count stays true past the cap");
 }
 
 fn deny_ambient(id: &str, params: &Value) -> Result<()> {

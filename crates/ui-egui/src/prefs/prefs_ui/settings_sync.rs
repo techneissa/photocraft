@@ -170,8 +170,10 @@ pub(crate) fn import_bytes(app: &mut PhotocraftApp, file_name: &str, bytes: &[u8
     f.insert("text".into(), json!(text));
     f.insert("parts".into(), json!(plan.parts));
     f.insert("notes".into(), json!(plan.notes));
+    f.insert("unknown".into(), json!(plan.unknown));
+    f.insert("unknownCount".into(), json!(plan.unknown_total));
     let id = app.ui.open_dialog(DialogKind::Command, f);
-    Ok(json!({"dialog": id, "parts": plan.parts, "skipped": plan.notes}))
+    Ok(json!({"dialog": id, "parts": plan.parts, "skipped": plan.notes, "unknown": plan.unknown, "unknownCount": plan.unknown_total}))
 }
 
 /// What a part of the file is called to the user.
@@ -190,6 +192,20 @@ fn part_label(part: &str) -> &'static str {
     }
 }
 
+/// How many unknown settings the prompt names before "and N more".
+const NAMED: usize = 5;
+
+/// The prompt's line for settings this build doesn't have: the first few names, then "and N more".
+pub(super) fn unknown_line(names: &[&str], total: usize) -> String {
+    let shown = names.iter().take(NAMED).copied().collect::<Vec<_>>().join(", ");
+    let more = total.saturating_sub(names.len().min(NAMED));
+    if more == 0 {
+        crate::i18n::fmt(tl!("Not in this PhotoCraft, skipped: {names}"), &[("names", &shown)])
+    } else {
+        crate::i18n::fmt(tl!("Not in this PhotoCraft, skipped: {names} and {n} more"), &[("names", &shown), ("n", &more.to_string())])
+    }
+}
+
 /// The prompt's body: what the file replaces, and what it skips.
 pub(super) fn prompt_body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &Map<String, Value>) {
     let t = Tokens::get(ui.ctx());
@@ -199,6 +215,12 @@ pub(super) fn prompt_body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &Map<String
     let parts: Vec<&str> = f.get("parts").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).collect();
     for part in parts {
         ui.label(RichText::new(format!("•  {}", part_label(part))).color(t.text_dim));
+    }
+    let unknown: Vec<&str> = f.get("unknown").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).collect();
+    if !unknown.is_empty() {
+        ui.add_space(6.0);
+        let total = f.get("unknownCount").and_then(Value::as_u64).map_or(unknown.len(), |n| usize::try_from(n).unwrap_or(usize::MAX)).max(unknown.len());
+        ui.add(egui::Label::new(RichText::new(unknown_line(&unknown, total)).color(t.warning)).wrap()).on_hover_text(unknown.join("\n"));
     }
     let notes: Vec<&str> = f.get("notes").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).collect();
     if let Some(first) = notes.first() {
@@ -227,7 +249,7 @@ pub(super) fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result
     let file = f.get("file").and_then(Value::as_str).unwrap_or("").to_string();
     let plan = app.session.plan_settings_import(text).inspect_err(|e| report(app, e, true))?;
     let report_json = plan.report(true);
-    let skipped = plan.notes.len();
+    let skipped = plan.notes.len() + plan.unknown_total;
     app.session.apply_settings_plan(plan);
     after_import(app);
     let mut message = crate::i18n::fmt(tl!("Imported settings from {file}"), &[("file", &file)]);

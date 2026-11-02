@@ -171,6 +171,56 @@ fn the_import_icon_reads_a_file_and_shows_the_prompt() {
     h.get_by_label("Import");
 }
 
+/// A settings file of quality `quality` with settings this build doesn't have.
+fn file_with_unknowns(quality: u32, extra: usize) -> String {
+    let mut f: Value = serde_json::from_str(&file_with(quality)).unwrap();
+    f["preferences"]["interface"]["fromTheFuture"] = json!(true);
+    f["futurePart"] = json!({});
+    for n in 0..extra {
+        f["preferences"]["general"][format!("later{n}")] = json!(n);
+    }
+    f.to_string()
+}
+
+#[test]
+fn the_prompt_names_the_skipped_settings_and_ok_imports_the_rest() {
+    let (mut app, _) = super::tests::app_with_store();
+    let reply = settings_sync::import_bytes(&mut app, "Newer.pcsettings", file_with_unknowns(33, 0).as_bytes()).unwrap();
+    assert_eq!(reply["unknownCount"], 2);
+    let (_, f) = prompt(&app).expect("an unknown setting does not refuse the file");
+    let names: Vec<&str> = f["unknown"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
+    assert!(names.contains(&"interface.fromTheFuture") && names.contains(&"futurePart"), "{names:?}");
+    assert_eq!(app.session.prefs().export.jpeg_quality, 85, "nothing changed yet");
+    confirm(&mut app, &f).unwrap();
+    assert_eq!(app.session.prefs().export.jpeg_quality, 33, "the known settings are imported");
+    assert_eq!(app.ui.status, "Imported settings from Newer.pcsettings (2 skipped)");
+}
+
+#[test]
+fn the_prompt_line_is_short_and_cuts_a_long_list() {
+    assert_eq!(settings_sync::unknown_line(&["a.b", "c"], 2), "Not in this PhotoCraft, skipped: a.b, c");
+    let names = ["a", "b", "c", "d", "e"];
+    assert_eq!(settings_sync::unknown_line(&names, 5), "Not in this PhotoCraft, skipped: a, b, c, d, e");
+    assert_eq!(settings_sync::unknown_line(&names, 12), "Not in this PhotoCraft, skipped: a, b, c, d, e and 7 more");
+}
+
+#[test]
+fn the_prompt_shows_the_skipped_settings() {
+    let bytes = file_with_unknowns(33, 8).into_bytes();
+    let (mut app, _) = app_with_dialogs(vec![Some(FileDialogAnswer::Contents("Newer.pcsettings".into(), bytes))]);
+    open_preferences(&mut app, "general");
+    let mut h = Harness::builder().with_size(egui::vec2(1280.0, 860.0)).with_max_steps(64).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        app
+    });
+    h.run_steps(4);
+    h.get_by_label("Import Settings…").click();
+    h.run_steps(8);
+    assert!(prompt(h.state()).is_some(), "the prompt opens for a file with settings this build doesn't have");
+    h.get_by_label_contains("Not in this PhotoCraft, skipped:");
+    h.get_by_label_contains("and 5 more");
+}
+
 #[test]
 fn the_commands_do_not_open_a_preferences_section() {
     let (mut app, _) = super::tests::app_with_store();

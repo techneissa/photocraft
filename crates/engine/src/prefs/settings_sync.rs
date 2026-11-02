@@ -22,9 +22,10 @@
 //! them.
 //!
 //! An import reads the whole file first ([`plan`]) and changes nothing until [`Session::apply_settings_plan`]:
-//! a value this build can't take (a wrong type, an unknown choice, a number out of range, a key
-//! it can't press) or a setting it doesn't know is an error that names it and changes nothing.
-//! A file made by a newer build takes what this build understands and names what it skipped.
+//! a value this build can't take for a setting it knows (a wrong type, an unknown choice, a number
+//! out of range, a key it can't press) is an error that names it and changes nothing.
+//! A setting, section or part this build doesn't have is skipped and named ([`Plan::unknown`]); the
+//! rest is imported, so a file from a newer build gives everything this build understands.
 //! A part the file doesn't have, and a setting a Preferences section doesn't list, stay as they are.
 
 use std::collections::BTreeMap;
@@ -208,22 +209,31 @@ pub struct Plan {
     pub parts: Vec<&'static str>,
     /// What was left out or skipped, one line each.
     pub notes: Vec<String>,
+    /// Settings, sections and parts of the file this build doesn't have, skipped (`section.key`),
+    /// at most [`MAX_UNKNOWN`] of them.
+    pub unknown: Vec<String>,
+    /// How many unknown settings the file had (more than `unknown` holds when it is long).
+    pub unknown_total: usize,
 }
 
 impl Plan {
     /// The reply of the commands.
     pub fn report(&self, applied: bool) -> Value {
-        json!({"applied": applied, "parts": self.parts, "skipped": self.notes})
+        json!({"applied": applied, "parts": self.parts, "skipped": self.notes, "unknown": self.unknown, "unknownCount": self.unknown_total})
     }
 }
 
 /// How many notes are kept (a hand-made file could name thousands of unknown settings).
 const MAX_NOTES: usize = 200;
+/// How many unknown settings are named.
+pub const MAX_UNKNOWN: usize = 200;
 
 struct Cx {
     strict: bool,
     problems: Vec<String>,
     notes: Vec<String>,
+    unknown: Vec<String>,
+    unknown_total: usize,
 }
 
 impl Cx {
@@ -235,6 +245,15 @@ impl Cx {
             self.problems.push(msg);
         } else {
             self.note(format!("Skipped {msg}"));
+        }
+    }
+
+    /// A setting, section or part this build doesn't have: skipped and named, in a file of any
+    /// version.
+    fn unknown(&mut self, name: &str) {
+        self.unknown_total += 1;
+        if self.unknown.len() < MAX_UNKNOWN {
+            self.unknown.push(name.chars().take(60).collect());
         }
     }
 
@@ -280,12 +299,12 @@ pub fn plan_allowing(
     allow: &dyn Fn(&str) -> bool,
 ) -> std::result::Result<Plan, String> {
     let (file, version) = header(text)?;
-    let mut cx = Cx { strict: version <= VERSION, problems: Vec::new(), notes: Vec::new() };
+    let mut cx = Cx { strict: version <= VERSION, problems: Vec::new(), notes: Vec::new(), unknown: Vec::new(), unknown_total: 0 };
     if version > VERSION {
         cx.note(format!("This file was made by a newer PhotoCraft (file version {version}; this one reads up to {VERSION}); what it understands was taken"));
     }
     for key in file.keys().filter(|k| !matches!(k.as_str(), "kind" | "version" | "app") && !PARTS.contains(&k.as_str())) {
-        cx.bad(format!("“{}”: not a part of a settings file", key.chars().take(40).collect::<String>()));
+        cx.unknown(key);
     }
     let mut next = p.clone();
     let mut next_color = color.clone();
@@ -322,7 +341,7 @@ pub fn plan_allowing(
     if parts.is_empty() {
         return Err("This settings file holds no settings".into());
     }
-    Ok(Plan { prefs: next, color: next_color, parts, notes: cx.notes })
+    Ok(Plan { prefs: next, color: next_color, parts, notes: cx.notes, unknown: cx.unknown, unknown_total: cx.unknown_total })
 }
 
 /// Keys of `file` that `now` (the value as this build reads it back) doesn't have.
@@ -334,12 +353,15 @@ fn unknown_inside(file: &Value, now: &Value, path: &str, cx: &mut Cx, depth: usi
         for (k, fv) in f {
             let here = format!("{path}.{k}");
             match n.get(k) {
-                None => cx.bad(format!("{here}: unknown setting")),
+                None => cx.unknown(&here),
                 Some(nv) => unknown_inside(fv, nv, &here, cx, depth + 1),
             }
         }
     }
 }
+
+/// How `Preferences::set` starts its error for a key that doesn't exist.
+const UNKNOWN_PREFERENCE: &str = "unknown preference";
 
 fn read_preferences(next: &mut Preferences, v: &Value, allow: &dyn Fn(&str) -> bool, cx: &mut Cx) {
     let Some(sections) = v.as_object() else {
@@ -348,7 +370,7 @@ fn read_preferences(next: &mut Preferences, v: &Value, allow: &dyn Fn(&str) -> b
     };
     for (section, body) in sections {
         if !section_ids().any(|id| id == section) {
-            cx.bad(format!("preferences.{section}: unknown section"));
+            cx.unknown(section);
             continue;
         }
         if let Some(why) = left_out(section) {
@@ -375,6 +397,7 @@ fn read_preferences(next: &mut Preferences, v: &Value, allow: &dyn Fn(&str) -> b
                         unknown_inside(value, &now, &path, cx, 0);
                     }
                 }
+                Err(e) if e.starts_with(UNKNOWN_PREFERENCE) => cx.unknown(&path),
                 Err(e) => cx.bad(e),
             }
         }
@@ -396,7 +419,7 @@ fn read_color(next: &mut ColorSettings, v: &Value, cx: &mut Cx) {
         } else if cur.contains_key(k) {
             cur.insert(k.clone(), val.clone());
         } else {
-            cx.bad(format!("colorSettings.{k}: unknown setting"));
+            cx.unknown(&format!("colorSettings.{k}"));
         }
     }
     match serde_json::from_value::<ColorSettings>(Value::Object(cur)) {
@@ -411,7 +434,7 @@ fn read_color(next: &mut ColorSettings, v: &Value, cx: &mut Cx) {
 /// Complain about keys of `obj` outside `allowed`.
 fn only_keys(obj: &Map<String, Value>, allowed: &[&str], what: &str, cx: &mut Cx) {
     for k in obj.keys().filter(|k| !allowed.contains(&k.as_str())) {
-        cx.bad(format!("{what}.{}: unknown setting", k.chars().take(40).collect::<String>()));
+        cx.unknown(&format!("{what}.{k}"));
     }
 }
 
@@ -639,7 +662,7 @@ pub fn specs() -> Vec<CommandSpec> {
             label: "Import Settings…",
             menu: &["Edit", "Preferences"],
             shortcut: None,
-            params: r##"{"path":"<.pcsettings file>"|"text":"<the file's text>","dryRun":bool=false} (the whole file is checked first: a bad value or unknown setting is an error and nothing changes; the reply names the parts replaced and what was skipped)"##,
+            params: r##"{"path":"<.pcsettings file>"|"text":"<the file's text>","dryRun":bool=false} (the whole file is checked first: a bad value for a known setting is an error and nothing changes; settings this build doesn't know are skipped; the reply names the parts replaced, `skipped` notes and `unknown` settings)"##,
             enabled: always,
             run: import_settings,
             journal: false,
