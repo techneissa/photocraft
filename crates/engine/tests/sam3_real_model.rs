@@ -110,7 +110,7 @@ fn protect_subject_never_cuts_the_subject_and_leaves_the_strands_to_the_matting(
         let bg = doc.layers[0].surface_mut().unwrap();
         let ch = bg.channels();
         let mut data = Vec::with_capacity((w * h) as usize * ch);
-        for p in rgb.chunks_exact(3) {
+        for p in rgb.as_chunks::<3>().0 {
             data.extend(p.iter().map(|v| f32::from(*v) / 255.0));
             if ch == 4 {
                 data.push(1.0);

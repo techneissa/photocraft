@@ -48,13 +48,13 @@ pub(crate) fn box_downscale_rgba(src: &[u8], from: (u32, u32), to: (u32, u32)) -
     let cols: Vec<(usize, usize)> = (0..dw).map(|x| span(x, sw, dw)).collect();
     for (y, out_row) in out.chunks_exact_mut(dw * 4).enumerate() {
         let (y0, y1) = span(y, sh, dh);
-        for (x, px) in out_row.chunks_exact_mut(4).enumerate() {
+        for (x, px) in out_row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
             let (x0, x1) = cols.get(x).copied()?;
             let mut sum = [0u32; 4];
             for sy in y0..y1 {
                 let row_start = sy.checked_mul(sw)?;
                 let row = src.get(row_start.checked_add(x0)?.checked_mul(4)?..row_start.checked_add(x1)?.checked_mul(4)?)?;
-                for p in row.chunks_exact(4) {
+                for p in row.as_chunks::<4>().0 {
                     for (s, v) in sum.iter_mut().zip(p) {
                         *s += u32::from(*v);
                     }
@@ -141,7 +141,7 @@ pub(crate) fn read_mask(bytes: &[u8], bytes_per_row: usize, width: u32, height: 
     for y in 0..h {
         let row = bytes.get(y * bytes_per_row..y * bytes_per_row + w * item)?;
         match layout {
-            Layout::Float32 => data.extend(row.chunks_exact(4).map(|c| coverage(f32::from_ne_bytes([c[0], c[1], c[2], c[3]])))),
+            Layout::Float32 => data.extend(row.as_chunks::<4>().0.iter().map(|c| coverage(f32::from_ne_bytes(*c)))),
             Layout::Byte => data.extend_from_slice(row),
         }
     }

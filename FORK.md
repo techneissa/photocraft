@@ -48,54 +48,42 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
    - after each change, and once more at the end of the round: only the tests of the code it touched
      (`cargo test -p <crate> --lib <filter>`), `cargo clippy -p <crate> --all-targets -- -D warnings` for the crates it
      touched (the known official lints below excepted), and `cargo fmt --all --check`;
-   - the full suite runs on GitHub, not on this Mac: a push to `custom` starts Fork CI (`fork-ci.yml`), which runs the
-     official CI (`cargo xtask ci`) on `custom`. Check it with `gh run list -R techneissa/photocraft -w CI -b custom`
-     and fix a failure in the next round.
+   - the full suite runs on GitHub, not on this Mac: Fork CI (`fork-ci.yml`, `fork/ci.sh`: the steps of
+     `cargo xtask ci` on Linux) runs on every pull request to `custom` and every push to it, and skips the tests in
+     `fork/known-failures.txt`, so a red run is a new failure. Check it with
+     `gh run list -R techneissa/photocraft -w "Fork CI"` and fix a failure in the next round.
 
    This fork reads `AGENTS.md`'s "before you finish a task" list as the above: no `cargo xtask ci` on this Mac
-   (techneissa, 2026-10-29: the same tests ran several times per feature and loaded the Mac). The official CI runs on
+   (techneissa, 2026-10-29: the same tests ran several times per feature and loaded the Mac). Fork CI runs on
    Linux, so macOS-only tests (`macvision`, the real-Vision tests) run only in a lane's own filtered tests.
-4. `git switch custom && git merge --no-ff feat/<name>`, then `git push mine custom feat/<name>`.
-5. Write `fork/<slug>.md` (headings as in the other files), add its line below and its tests to `fork/tests.sh`; then run `update-photocraft.sh`. FORK.md never holds a feature's details.
+4. Write `fork/<slug>.md` (headings as in the other files; `fork/tests.sh` runs the commands in its `## Tests`
+   block) and add its line at the end of `fork/features.md`. Leave FORK.md, `fork/tests.sh`, the generated
+   `docs/parity-checklist.md` and `docs/scorecard.md`, and the official parity docs (`docs/gaps.md`,
+   `docs/*-parity.md`, `ROADMAP.md`) alone; then two feature branches never clash on shared notes.
+5. `git push mine feat/<name>` and open a pull request to `custom`; Fork CI checks it. Merge it (GitHub's button,
+   or `git switch custom && git merge --no-ff feat/<name> && git push mine custom`). After a single merge, build and
+   test nothing on this Mac: Fork CI checks `custom`.
+6. Once per batch of merges, on `custom` on this Mac (techneissa, 2026-11-02: the Mac rebuilt the same code minutes
+   apart): if a feature added commands, `cargo xtask parity` and commit `docs/parity-checklist.md`; run
+   `fork/tests.sh` (the macOS-only tests Fork CI cannot run); push once; when GitHub's Fork build of that commit is
+   done, run `update-photocraft.sh`, which then downloads the app instead of building it.
+
+**Lanes on this Mac** (techneissa, 2026-11-02): at most 3 feature lanes at a time. Each lane takes a free slot
+1, 2 or 3 and builds with `export CARGO_TARGET_DIR=$WORKSPACE/repos/photocraft/target/lane-<slot>` in place of
+`AGENTS.md`'s `target/agent-<name>`; one lane per slot at a time. The slot's build folder stays after the lane, so
+the next lane's new worktree recompiles only what differs. Measured 2026-11-02 on `photocraft`: clean build in an
+empty folder 537 crates, 6 min (22 min with the Mac's load near 100); a new worktree on a used slot 6 crates,
+100 s; a one-file change 10 s. sccache gave no hits across worktrees and was removed.
 
 ## The features
 
-- [Open as Layers](fork/open-as-layers.md): opens the photos of a LightCraft `.pcstack` file as the layers of one new document. Branch `feat/open-as-layers`.
-- [Transform live blend](fork/transform-live-blend.md): Free Transform, Warp, Puppet Warp and Perspective Warp show the moving layer with its blend mode, opacity and mask. Branch `feat/transform-live-blend`.
-- [Double Exposure](fork/double-exposure.md): Layer ▸ Double Exposure sets the top layer to Screen with a Reveal All mask in one undo step. Branch `feat/double-exposure`.
-- [Blend list height and wheel](fork/blend-list.md): blend mode lists are as tall as the window, and the wheel scrolls them by default (a preference makes it step the mode). Branch `feat/blend-list`.
-- [Dropdown search](fork/dropdown-search.md): typing in an open dropdown list narrows it. Branch `feat/dropdown-search`.
-- [Select Subject on macOS](fork/select-subject-macos.md): Select › Subject uses macOS's own subject cutout (Apple Vision). Branch `feat/select-subject-macos`.
-- [AI Select Subject and Remove Subject](fork/select-subject-ai.md): upstream AI models (BiRefNet-lite and LaMa) joined with the macOS cutout under one engine preference. Branch `feat/select-subject-ai`.
-- [Shared models folder](fork/shared-models.md): the AI models live in one folder shared by the Craft apps. Branch `feat/shared-models`.
-- [Upstream select and mask fixes](fork/upstream-select-mask.md): four upstream fixes taken early, for mask filters, mask copy and paste, the Polygonal Lasso and Select › Modify previews. Branch `feat/upstream-select-mask`.
-- [Copy Layers to Document](fork/duplicate-to-other-doc.md): refuses a destination with a running background job; two upstream PRs taken early; Duplicate Layer… says where the copy went ("Duplicated to …"). Branches `fix/duplicate-to-other-doc`, `feat/dup-note-protect-subject`.
-- [PSD font scan](fork/psd-open-font-scan.md): PSD files with a big font collection open without the long font scan. Branch `fix/psd-open-font-scan`.
-- [Top bar items](fork/topbar-items.md): show or hide the top bar's Logo, Document Title, Workspace, Search and Appearance Mode. Branch `feat/topbar-items`.
-- [Assign Shortcut and command palette](fork/assign-shortcut-palette.md): Assign Shortcut… on right-click, and the command palette on ⌘P as well as ⌘F. Branch `feat/assign-shortcut-palette`.
-- [Context menu editor](fork/context-menu-editor.md): arranges the right-click menus: hide, reorder and add commands, with presets and a backup file. Branch `feat/context-menu-editor`.
-- [Keyboard shortcut upgrade](fork/shortcut-upgrade.md): chords, When conditions, a clash icon and export/import icons in Keyboard Shortcuts. Branch `feat/shortcut-upgrade`.
-- [Crop W×H](fork/pr-9213.md): crop with Delete Cropped Pixels off no longer aborts the app (upstream PR #9213, taken early). Branch `pr-9213`.
-- [Undo and redo stress test](fork/undo-redo-stress.md): hundreds of random edits, undos and redos must restore exact states. Branch `test/undo-redo-stress`.
-- [Discord button hidden](fork/hide-discord-button.md): no Join us on Discord button on the start screen or in About. Branch `feat/hide-discord-button`.
-- [⌘, opens Settings](fork/settings-cmd-comma.md): ⌘, opens Settings, as in every Mac app; Hide Layers has no default key. Branch `feat/settings-cmd-comma`.
-- [⌘, or Esc closes Preferences](fork/settings-close-keys.md): closes Preferences, asking to save when there are unsaved changes. Branch `feat/settings-close-keys`.
-- [Preferences scroll width](fork/prefs-scroll-width.md): Preferences lists fill the window, the Toolbar tab fits 1–4 columns, Keyboard Shortcuts keeps its width while searching. Branch `fix/prefs-scroll-width`, `fix/shortcuts-tabs-layout`, `fix/shortcuts-search-width`.
-- [Context menus page size](fork/context-menus-resize.md): the Context Menus page keeps the size the Preferences window is dragged to. Branch `fix/context-menus-resize`.
-- [Arabic AI Models text](fork/arabic-ai-models.md): Arabic text for the AI Models page. Branch `custom`.
-- [Place Photos](fork/place-photos.md): Place Embedded on ⇧⌘P, several photos at once, a Place Photo button in the Layers panel. Branch `feat/place-photos`.
-- [SAM 3](fork/sam3.md): LightCraft's SAM 3 model code, click and text masks, no UI yet. Branch `feat/sam3`.
-- [Refine Hair](fork/refine-hair.md): Select and Mask's Refine Hair button, closed-form matting in the edge band; a Protect Subject box keeps the subject SAM 3 finds. Branches `feat/refine-hair`, `feat/dup-note-protect-subject`.
-- [SAM 3 click select](fork/sam3-click-select.md): Object Selection and Quick Selection select with SAM 3 (click, ⇧/⌥ refine, hover), with a Classic fallback and an engine preference. Branch `feat/sam3-click-select`.
-- [SAM 3 box and Select Subject](fork/sam3-box-subject.md): Object Selection's dragged rectangle is SAM 3's box prompt, `sam3` joins the Select Subject engine preference, Swedish AI Models text. Branch `feat/sam3-box-subject`.
-- [Shortcuts window](fork/shortcuts-window.md): Keyboard Shortcuts and Menus is resizable with one height for its tabs, records shortcuts like VS Code (chords are two keys in a row), has a reset icon, right-click Remove, modifier-word search, and colour dots on the Menus tab. Branch `feat/shortcuts-window`.
-- [Settings sync](fork/settings-sync.md): Export Settings… / Import Settings… move every setting to another Mac in one `.pcsettings` file; the brush size in the options bar is never cut. Branch `feat/settings-sync`.
+[fork/features.md](fork/features.md): one line per feature.
 
 To find which feature owns an official file: `grep -l '<path>' fork/*.md`.
 
-Every feature also has a row in `docs/parity-checklist.md` when it adds commands; clashes there are fixed by the
-update script (both sides kept).
+`docs/parity-checklist.md` is regenerated on `custom` once per batch (step 6); clashes there with an official
+update are fixed by the update script (both sides kept).
 
-The tests of every feature, after a merge: run `fork/tests.sh`.
+The tests of every feature, once per batch: run `fork/tests.sh`.
 
-More: [GitHub builds](fork/github-builds.md), [Open as Layers interface (for LightCraft)](fork/open-as-layers-interface.md), [Known failures on this Mac](fork/known-failures.md).
+More: [GitHub builds](fork/github-builds.md), [Open as Layers interface (for LightCraft)](fork/open-as-layers-interface.md), [Known failures](fork/known-failures.md).

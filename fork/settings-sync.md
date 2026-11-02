@@ -23,4 +23,5 @@ engine `settings_sync`, automation `automation_rejects_ambient_path`, ui-egui `s
 ```bash
 cargo test -p photocraft-engine --lib -- settings_sync
 cargo test -p photocraft-ui-egui --lib -- settings_sync brush_size_label
+cargo test -p photocraft-automation --lib -- automation_rejects_ambient_path
 ```

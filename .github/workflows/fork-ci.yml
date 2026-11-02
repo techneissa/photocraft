@@ -1,27 +1,65 @@
 name: Fork CI
 
-# techneissa's fork: run the official CI (`cargo xtask ci`, ci.yml: Linux, plus Windows and web when its platform check asks) on every push to `custom`, on GitHub's
-# machines, so the full suite never runs on techneissa's Mac (techneissa, 2026-10-29). ci.yml itself is
-# official and only runs on `main` and pull requests; this dispatches it for `custom` without editing it.
+# techneissa's fork (FORK.md): the official Linux gate on every pull request to `custom` and every push to
+# it, on GitHub's machines, so the full suite never runs on techneissa's Mac (techneissa, 2026-10-29). It
+# calls the same shared gate as ci.yml's `gate` job, with ci.yml's pins, but runs fork/ci.sh: the steps of
+# `cargo xtask ci` minus the accepted failures in fork/known-failures.txt, so a red run is a new failure.
+# The fork is Mac only, so ci.yml's Windows, web and corpus jobs are left out; ci.yml itself is untouched.
 # fork-build.yml pushes its daily upstream merge with FORK_PUSH_TOKEN, so that merge is tested too.
 
 on:
   push:
     branches: [custom]
+  pull_request:
+    branches: [custom]
   workflow_dispatch:
 
 permissions:
-  actions: write
+  contents: read
 
+# A newer push to the same branch or pull request cancels the older run.
 concurrency:
-  group: fork-ci
+  group: fork-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  dispatch:
+  # ci.yml's gate inputs that change upstream (its Ubuntu packages, the craft-fonts commit), read from
+  # ci.yml so the fork never pins its own copy.
+  pins:
+    # never in the official repo, should this file ever travel upstream
+    if: github.repository == 'techneissa/photocraft'
     runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.read.outputs.packages }}
+      craft-fonts-ref: ${{ steps.read.outputs.fonts }}
     steps:
-      - name: Run CI on custom
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run ci.yml --repo "${{ github.repository }}" --ref custom
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/workflows/ci.yml
+          sparse-checkout-cone-mode: false
+      - id: read
+        run: |
+          packages="$(yq '.jobs.gate.with.packages' .github/workflows/ci.yml | tr '\n' ' ')"
+          fonts="$(yq '.jobs.gate.with."craft-fonts-ref"' .github/workflows/ci.yml)"
+          if [ -z "$packages" ] || [ "$packages" = "null " ] || [ -z "$fonts" ] || [ "$fonts" = "null" ]; then
+            echo "::error::ci.yml's gate job no longer has packages or craft-fonts-ref: update fork-ci.yml"
+            exit 1
+          fi
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          echo "fonts=$fonts" >> "$GITHUB_OUTPUT"
+
+  gate:
+    needs: pins
+    uses: storytold/craft-common-actions/.github/workflows/gate.yml@main
+    with:
+      packages: ${{ needs.pins.outputs.packages }}
+      craft-fonts-ref: ${{ needs.pins.outputs.craft-fonts-ref }}
+      # as ci.yml: Cargo.toml's dev profile already keeps line tables only
+      dev-debug: ""
+      env: |
+        PHOTOCRAFT_FULL_SWEEP=0
+        PHOTOCRAFT_NO_PRINT=1
+        LPDEST=photocraft-no-such-printer
+      # fork/ci.sh runs every step even after a failure, so one run lists them all
+      timeout-minutes: 120
+      command: sh fork/ci.sh
