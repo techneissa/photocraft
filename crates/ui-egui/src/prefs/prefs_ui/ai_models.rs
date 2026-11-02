@@ -178,6 +178,12 @@ fn place(source: Source) -> &'static str {
     }
 }
 
+/// The second click of Remove. A model in the shared folder (`ArtCraft/models`) belongs to every ArtCraft app
+/// (`lama/big-lama.pt` is LightCraft's fill too), so the button says it is removed for all of them.
+fn confirm_remove_label(source: Option<Source>) -> &'static str {
+    if source == Some(Source::Shared) { tl!("Remove for Every ArtCraft App?") } else { tl!("Confirm remove") }
+}
+
 /// Megabytes with one decimal, as the size column shows them.
 fn mb(bytes: u64) -> String {
     format!("{:.1}", bytes as f64 / 1_000_000.0)
@@ -210,6 +216,14 @@ fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, found: impl Fn(Model) -> 
             ui.label(RichText::new(crate::i18n::fmt(tl!("{size} MB · {licence}"), &[("size", &size), ("licence", row.model.licence())])).color(t.text_dim));
             if let (Phase::Installed, Some(source)) = (&state.phase, row.source) {
                 ui.label(RichText::new(crate::i18n::fmt(tl!("Found in: {place}"), &[("place", place(source))])).color(t.text_dim));
+            }
+            // The shared folder the model lives in, or goes to when it is downloaded (SAM 3 without its files shows its own below).
+            if (row.model.downloadable() || state.phase == Phase::Installed)
+                && let Some(dir) = photocraft_ml::install_dir(row.model)
+            {
+                let folder = dir.display().to_string();
+                let line = crate::i18n::fmt(tl!("Folder: {folder}"), &[("folder", &folder)]);
+                ui.add(egui::Label::new(RichText::new(line).color(t.text_dim)).selectable(true));
             }
             match state.phase {
                 // No public download (SAM 3): say where the files go instead of a Download button.
@@ -245,7 +259,7 @@ fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, found: impl Fn(Model) -> 
                 Phase::Installed if row.source == Some(Source::Old) || !row.model.downloadable() => {}
                 Phase::Installed => {
                     ui.horizontal(|ui| {
-                        if widgets::secondary_button(ui, if row.confirm_remove { tl!("Confirm remove") } else { tl!("Remove") }, 0.0).clicked() {
+                        if widgets::secondary_button(ui, if row.confirm_remove { confirm_remove_label(row.source) } else { tl!("Remove") }, 0.0).clicked() {
                             row.remove_with(photocraft_ml::remove);
                         }
                         if row.confirm_remove && widgets::secondary_button(ui, tl!("Cancel"), 0.0).clicked() {
@@ -465,6 +479,45 @@ mod tests {
         assert_eq!(harness.get_all_by_label("Found in: Custom Folder").count(), Model::ALL.len() - 1);
         assert_eq!(harness.get_all_by_label("Remove").count(), downloadable().count());
         assert_eq!(harness.query_all_by_label("Download").count(), 0);
+    }
+
+    #[test]
+    fn removing_a_shared_model_says_it_goes_for_every_artcraft_app() {
+        use egui_kittest::kittest::Queryable;
+        assert_eq!(confirm_remove_label(Some(Source::Shared)), "Remove for Every ArtCraft App?");
+        assert_eq!(confirm_remove_label(Some(Source::Custom)), "Confirm remove");
+        // On the page: the first click only asks, and the asking button names every app.
+        let mut runtime = Runtime::default();
+        for row in &mut runtime.rows {
+            row.lock().phase = Phase::Installed;
+            row.confirm_remove = true;
+        }
+        let mut harness = egui_kittest::Harness::new_ui(move |ui| {
+            if ui.ctx().cumulative_pass_nr() == 0 {
+                crate::PhotocraftApp::setup_context(ui.ctx(), Default::default());
+                return;
+            }
+            show_with(ui, &mut runtime, |_| Some(Source::Shared));
+        });
+        harness.run_steps(2);
+        assert_eq!(harness.get_all_by_label("Remove for Every ArtCraft App?").count(), downloadable().count());
+        assert_eq!(harness.query_all_by_label("Confirm remove").count(), 0);
+    }
+
+    #[test]
+    fn every_downloadable_model_shows_its_folder() {
+        use egui_kittest::kittest::Queryable;
+        let harness = installed_page(|_| None);
+        // Where the folder is depends on this computer's home folder; every downloadable model names its own.
+        for model in downloadable() {
+            if let Some(dir) = photocraft_ml::install_dir(model) {
+                harness.get_by_label(&format!("Folder: {}", dir.display()));
+            }
+        }
+        // SAM 3 without its files shows where to put them instead, and with them shows its folder like the others.
+        assert_eq!(harness.query_all_by_label_contains("Folder: ").count(), downloadable().count());
+        let installed = installed_page(|_| Some(Source::Shared));
+        assert_eq!(installed.query_all_by_label_contains("Folder: ").count(), Model::ALL.len());
     }
 
     #[test]

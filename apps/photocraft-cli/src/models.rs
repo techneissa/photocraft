@@ -18,7 +18,24 @@ fn chosen(name: &str) -> Vec<Model> {
     }
 }
 
+/// Moves the models of the old `PhotoCraft/models` folder into the shared folder (`photocraft_ml::migrate_old_models`),
+/// saying on standard error what moved and what could not. Never fails the command. Skipped in this crate's own
+/// tests, which must not touch the real folders.
+fn migrate_old_models() {
+    if cfg!(test) {
+        return;
+    }
+    let report = photocraft_ml::migrate_old_models();
+    for line in report.done {
+        eprintln!("photocraft-cli: {line}");
+    }
+    for line in report.failed {
+        eprintln!("photocraft-cli: warning: {line}");
+    }
+}
+
 pub(crate) fn models(a: &ModelsArgs, out: &mut dyn Write) -> Result {
+    migrate_old_models();
     match &a.action {
         ModelsAction::List => {
             for model in Model::ALL {

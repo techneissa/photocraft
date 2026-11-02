@@ -7,8 +7,9 @@
 
 use crate::inpaint_detail::restore_detail;
 use crate::resize::bilinear;
-use crate::store::Model;
-use crate::{Cancel, MlError, Rgb, backend, check_cancel};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::store::{Model, expected_path, model_path};
+use crate::{Cancel, MlError, Rgb, check_cancel};
 
 /// The network's fixed input side.
 pub const INPAINT_SIZE: usize = 512;
@@ -21,6 +22,21 @@ pub fn inpaint(img: &Rgb, mask: &[f32]) -> Result<Rgb, MlError> {
 
 /// [`inpaint`] that stops with [`MlError::Cancelled`] between stages once `cancel` says so.
 pub fn inpaint_with(img: &Rgb, mask: &[f32], cancel: Cancel<'_>) -> Result<Rgb, MlError> {
+    inpaint_via(img, mask, cancel, &predict)
+}
+
+/// [`inpaint_with`] with an already loaded model, for callers that keep one (and for tests with a made-up
+/// one, `photocraft_lama::synthetic::tiny_model`): the file is not looked for and nothing is loaded or freed.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn inpaint_with_lama(img: &Rgb, mask: &[f32], lama: &photocraft_lama::Lama, cancel: Cancel<'_>) -> Result<Rgb, MlError> {
+    inpaint_via(img, mask, cancel, &|rgb, hole, n, cancel| lama_result(lama.predict(rgb, hole, n, n, cancel), n))
+}
+
+/// The network's answer for an `n × n` window: `rgb` interleaved `0..1`, `hole` 1 where to fill; returns
+/// the network's picture of the whole window, interleaved `0..1`.
+type Predict<'a> = &'a dyn Fn(&[f32], &[f32], usize, Cancel<'_>) -> Result<Vec<f32>, MlError>;
+
+fn inpaint_via(img: &Rgb, mask: &[f32], cancel: Cancel<'_>, predict: Predict<'_>) -> Result<Rgb, MlError> {
     let (w, h) = (img.w, img.h);
     Rgb::check_dims(w, h)?;
     if img.px.len() != w * h * 3 || mask.len() != w * h {
@@ -50,30 +66,11 @@ pub fn inpaint_with(img: &Rgb, mask: &[f32], cancel: Cancel<'_>) -> Result<Rgb, 
     let small = bilinear(&cimg, cw, ch, 3, n, n);
     // Nearest-ish for the mask: bilinear then threshold low, so a thin hole never vanishes.
     let small_mask: Vec<f32> = bilinear(&cmask, cw, ch, 1, n, n).iter().map(|m| if *m > 0.1 { 1.0 } else { 0.0 }).collect();
-    let mut nchw = vec![0.0f32; 3 * n * n];
-    for (i, px) in small.as_chunks::<3>().0.iter().enumerate() {
-        for (c, v) in px.iter().enumerate() {
-            if let Some(o) = nchw.get_mut(c * n * n + i) {
-                *o = *v;
-            }
-        }
-    }
     check_cancel(cancel)?;
-    let out = backend::run_with(Model::Lama, &[(&[1, 3, n, n], nchw), (&[1, 1, n, n], small_mask)], cancel)?;
-    check_cancel(cancel)?;
-    if out.len() != 3 * n * n {
-        return Err(MlError::Backend(format!("unexpected output of {} values", out.len())));
-    }
-    // The export returns 0..255; scale to 0..1 (values are clamped, so a 0..1 export would show as
-    // a black fill rather than corrupt data, which the tests would catch).
-    let scale = if out.iter().cloned().fold(0.0f32, f32::max) > 2.0 { 1.0 / 255.0 } else { 1.0 };
-    let mut filled = vec![0.0f32; n * n * 3];
-    for i in 0..n * n {
-        for c in 0..3 {
-            if let (Some(o), Some(v)) = (filled.get_mut(i * 3 + c), out.get(c * n * n + i)) {
-                *o = (v * scale).clamp(0.0, 1.0);
-            }
-        }
+    // The network's own picture of the whole window, 0..1; only the hole (and its feather) is taken from it below.
+    let filled = predict(&small, &small_mask, n, cancel)?;
+    if filled.len() != 3 * n * n {
+        return Err(MlError::Backend(format!("unexpected output of {} values", filled.len())));
     }
     check_cancel(cancel)?;
     let mut big = bilinear(&filled, n, n, 3, cw, ch);
@@ -101,6 +98,40 @@ pub fn inpaint_with(img: &Rgb, mask: &[f32], cancel: Cancel<'_>) -> Result<Rgb, 
         }
     }
     Ok(res)
+}
+
+/// LaMa's prediction for an `n × n` window: `rgb` interleaved `0..1`, `hole` 1 where to fill. Loads
+/// `big-lama.pt`, runs it (on the GPU when there is one) and lets the model go again, one run at a time
+/// (a cancelled job's worker may still be inside the network, so a retry waits for it instead of
+/// stacking a second run in memory).
+#[cfg(not(target_arch = "wasm32"))]
+fn predict(rgb: &[f32], hole: &[f32], n: usize, cancel: Cancel<'_>) -> Result<Vec<f32>, MlError> {
+    use std::sync::{Mutex, PoisonError};
+    static RUNNING: Mutex<()> = Mutex::new(());
+    let _one = RUNNING.lock().unwrap_or_else(PoisonError::into_inner);
+    check_cancel(cancel)?;
+    let path = model_path(Model::Lama).ok_or_else(|| MlError::ModelMissing { model: Model::Lama, path: expected_path(Model::Lama) })?;
+    lama_result(photocraft_lama::predict_from_file(&path, rgb, hole, n, n, cancel), n)
+}
+
+/// A LaMa result as this crate's: errors mapped, and values that are not numbers refused.
+#[cfg(not(target_arch = "wasm32"))]
+fn lama_result(result: photocraft_lama::Result<Vec<f32>>, n: usize) -> Result<Vec<f32>, MlError> {
+    let out = result.map_err(|e| match e {
+        photocraft_lama::Error::Cancelled => MlError::Cancelled,
+        photocraft_lama::Error::Input(m) => MlError::BadInput(m),
+        other => MlError::Backend(other.to_string()),
+    })?;
+    if out.len() != 3 * n * n || out.iter().any(|v| !v.is_finite()) {
+        return Err(MlError::Backend(format!("unexpected output of {} values", out.len())));
+    }
+    Ok(out.iter().map(|v| v.clamp(0.0, 1.0)).collect())
+}
+
+/// The browser build has no models to run.
+#[cfg(target_arch = "wasm32")]
+fn predict(_: &[f32], _: &[f32], _: usize, _: Cancel<'_>) -> Result<Vec<f32>, MlError> {
+    Err(MlError::Unsupported)
 }
 
 /// Bounding box `(x0, y0, x1, y1)` (exclusive end) of the set pixels.
@@ -200,6 +231,46 @@ mod tests {
         let img = Rgb::new(6, 6, vec![0.5; 108]).unwrap();
         assert_eq!(inpaint_with(&img, &[1.0; 36], &|| true), Err(MlError::Cancelled));
         assert_eq!(inpaint_with(&img, &[0.0; 36], &|| true), Err(MlError::Cancelled));
+    }
+
+    /// A picture with a flat hole, the made-up tiny LaMa: only the hole (and its feather) changes, the rest is exact.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn the_tiny_lama_fills_only_the_hole() {
+        let (w, h) = (96, 80);
+        let px: Vec<f32> = (0..w * h * 3).map(|i| ((i * 7) % 255) as f32 / 255.0).collect();
+        let img = Rgb::new(w, h, px).unwrap();
+        let mut mask = vec![0.0f32; w * h];
+        for y in 30..50 {
+            for x in 40..70 {
+                mask[y * w + x] = 1.0;
+            }
+        }
+        let lama = photocraft_lama::synthetic::tiny_model();
+        let out = inpaint_with_lama(&img, &mask, &lama, &|| false).unwrap();
+        assert_eq!((out.w, out.h, out.px.len()), (w, h, w * h * 3));
+        assert!(out.px.iter().all(|v| v.is_finite() && (0.0..=1.0).contains(v)));
+        let mut changed = 0;
+        for y in 0..h {
+            for x in 0..w {
+                let (a, b) = (&img.px[(y * w + x) * 3..(y * w + x) * 3 + 3], &out.px[(y * w + x) * 3..(y * w + x) * 3 + 3]);
+                let inside_feather = (28..52).contains(&y) && (38..72).contains(&x);
+                if !inside_feather {
+                    assert_eq!(a, b, "pixel ({x},{y}) outside the hole changed");
+                } else if a != b {
+                    changed += 1;
+                }
+            }
+        }
+        assert!(changed > 300, "the hole was not filled ({changed} pixels changed)");
+        assert_eq!(inpaint_with_lama(&img, &mask, &lama, &|| true), Err(MlError::Cancelled));
+    }
+
+    #[test]
+    fn a_network_answer_of_the_wrong_size_is_an_error() {
+        let img = Rgb::new(6, 6, vec![0.5; 108]).unwrap();
+        let r = inpaint_via(&img, &[1.0; 36], &|| false, &|_, _, _, _| Ok(vec![0.0; 3]));
+        assert!(matches!(r, Err(MlError::Backend(_))), "{r:?}");
     }
 
     #[test]

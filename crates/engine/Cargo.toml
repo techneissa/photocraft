@@ -63,6 +63,8 @@ winsafe = { version = "=0.0.29", default-features = false, features = ["kernel"]
 photocraft-ipp = { workspace = true }
 
 [dev-dependencies]
+# A tiny LaMa with made-up weights, to run Remove Subject through the candle network without the real file.
+photocraft-lama = { workspace = true, features = ["synthetic"] }
 photocraft-affinity = { workspace = true, features = ["synth"] }
 # Synthetic camera raw files for the open tests.
 photocraft-raw = { workspace = true, features = ["testgen"] }

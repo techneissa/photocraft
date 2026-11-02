@@ -1,6 +1,6 @@
 [package]
 name = "photocraft-ml"
-description = "Local ONNX model inference (subject segmentation, inpainting) on tract; models are fetched, never committed"
+description = "Local model inference (subject segmentation on tract, inpainting with LaMa on candle); models are fetched, never committed"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,6 +12,8 @@ workspace = true
 # (they are hundreds of MB and are never embedded there), so it stays out of the wasm binary.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tract-onnx = "0.23.9"
+# LaMa (big-lama.pt) on candle, for Remove Subject.
+photocraft-lama = { workspace = true }
 # Model downloads (Settings › AI Models, `photocraft-cli models fetch`); both already in the lockfile.
 reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "rustls"] }
 sha2 = "0.10.9"
@@ -21,4 +23,5 @@ sha2 = "0.10.9"
 winsafe = { version = "=0.0.29", default-features = false, features = ["kernel"] }
 
 [dev-dependencies]
+photocraft-lama = { workspace = true, features = ["synthetic"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }

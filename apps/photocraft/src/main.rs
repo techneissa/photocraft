@@ -352,6 +352,15 @@ fn main() -> eframe::Result {
         return Ok(());
     }
 
+    // The models of the old PhotoCraft/models folder move into the folder the Craft apps share (a rename, a hash of
+    // a 224 MB file: about a second), off the UI thread. A failure is logged and never stops the app.
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = std::thread::Builder::new().name("migrate-models".into()).spawn(|| {
+        let report = photocraft_ml::migrate_old_models();
+        report.done.iter().for_each(|line| log::info!("models: {line}"));
+        report.failed.iter().for_each(|line| log::warn!("models: {line}"));
+    });
+
     // The system font scan can take seconds (minutes on some Macs): run it off the UI thread.
     photocraft_ui_egui::type_tool::warm_fonts();
     // `--help` and `--version` print to standard output and exit 0. A usage error (an unknown

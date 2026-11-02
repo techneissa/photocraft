@@ -121,7 +121,7 @@ fn remove_in(dir: &Path, files: &[ModelFile]) -> Result<(), MlError> {
 /// Exclusive, cross-process hold on one model folder for a download or removal, so a removal
 /// can't unlink another worker's partial file and two fetches can't publish each other's bytes.
 /// Released when the returned file is dropped (or the process exits).
-fn lock_model(dir: &Path) -> Result<File, MlError> {
+pub(crate) fn lock_model(dir: &Path) -> Result<File, MlError> {
     let path = dir.join(".install.lock");
     let file =
         OpenOptions::new().create(true).truncate(false).write(true).open(&path).map_err(|e| MlError::Download(format!("open {}: {e}", path.display())))?;

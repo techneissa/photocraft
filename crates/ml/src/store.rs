@@ -8,8 +8,9 @@
 //!    files directly in `<dir>` (the layout before the shared folder).
 //! 2. The folder shared by the Craft apps, so a model is never downloaded twice:
 //!    `~/Library/Application Support/ArtCraft/models/<model-id>/`.
-//! 3. The old `PhotoCraft/models/` folder, with the files directly in it. Read only: nothing is
-//!    ever written or deleted there.
+//! 3. The old `PhotoCraft/models/` folder, with the files directly in it. Only a model that
+//!    `migrate.rs` could not move yet is found there: the app moves its files to step 2's folder
+//!    when it starts.
 //!
 //! New downloads go into step 1's folder when set, else step 2's.
 
@@ -38,11 +39,13 @@ const BIREFNET_FILES: [ModelFile; 1] = [ModelFile {
     size: 224_005_088,
 }];
 
+/// big-lama as the TorchScript file LightCraft uses (`crates/lama` reads it without Python): the same file in the same
+/// folder, so either app finds the other's download. Hugging Face's own LFS hash (`x-linked-etag`) and size.
 const LAMA_FILES: [ModelFile; 1] = [ModelFile {
-    name: "lama_fp32.onnx",
-    url: "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx",
-    sha256: "1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6",
-    size: 208_044_816,
+    name: "big-lama.pt",
+    url: "https://huggingface.co/fashn-ai/LaMa/resolve/main/big-lama.pt",
+    sha256: "7ba7aa7ac37a4d41fdbbeba3a2af7ead18058552997e3a3cd1a3b2210c9e6b4c",
+    size: 205_803_670,
 }];
 
 /// SAM 3 (Segment Anything with Concepts, Meta): the `facebook/sam3` checkpoint in Hugging Face format. No download is
@@ -60,7 +63,7 @@ const SAM3_FILES: [ModelFile; 3] = [
 pub enum Model {
     /// BiRefNet-lite, 1024 px salient-object segmentation (MIT).
     BirefnetLite,
-    /// big-lama, 512 px inpainting (Apache-2.0).
+    /// big-lama, 512 px inpainting (Apache-2.0), run by `photocraft-lama` on candle.
     Lama,
     /// SAM 3, click and text prompts for object selection (SAM License; no public download).
     Sam3,
@@ -130,7 +133,7 @@ pub enum Source {
     Custom,
     /// The folder shared by the Craft apps (`ArtCraft/models`).
     Shared,
-    /// The old `PhotoCraft/models` folder (read only).
+    /// The old `PhotoCraft/models` folder (read only; `migrate.rs` moves its models to the shared folder).
     Old,
 }
 
@@ -161,9 +164,29 @@ pub(crate) struct Roots {
 }
 
 impl Roots {
+    #[cfg(test)]
+    pub(crate) fn new(custom: Option<PathBuf>, shared: Option<PathBuf>, old: Option<PathBuf>) -> Self {
+        Self { custom, shared, old }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn custom(&self) -> Option<&Path> {
+        self.custom.as_deref()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn shared(&self) -> Option<&Path> {
+        self.shared.as_deref()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn old(&self) -> Option<&Path> {
+        self.old.as_deref()
+    }
+
     /// `PHOTOCRAFT_MODELS_DIR`, the shared `ArtCraft/models` and the old `PhotoCraft/models` of
     /// this user. Empty in the browser.
-    fn current() -> Self {
+    pub(crate) fn current() -> Self {
         if cfg!(target_arch = "wasm32") {
             return Self::default();
         }
@@ -399,6 +422,28 @@ mod tests {
             assert_eq!(model.size_bytes(), model.files().iter().map(|f| f.size).sum::<u64>());
             assert_eq!(model.file_name(), model.files().first().map(|f| f.name).unwrap_or_default());
         }
+    }
+
+    #[test]
+    fn lama_is_big_lama_pt_shared_with_lightcraft_and_has_no_onnx_download() {
+        let files = Model::Lama.files();
+        assert_eq!(files.len(), 1);
+        let file = files[0];
+        // LightCraft's file, in LightCraft's folder, with LightCraft's pin.
+        assert_eq!((file.name, file.size), ("big-lama.pt", 205_803_670));
+        assert_eq!(file.sha256, "7ba7aa7ac37a4d41fdbbeba3a2af7ead18058552997e3a3cd1a3b2210c9e6b4c");
+        assert_eq!(Model::Lama.id(), "lama");
+        for f in Model::ALL.iter().flat_map(|m| m.files()) {
+            assert!(!f.name.ends_with(".onnx") || f.name == "birefnet_lite.onnx", "{} must not be downloaded for LaMa", f.name);
+            assert!(!f.url.contains("LaMa-ONNX"), "{}", f.url);
+        }
+        // Found and downloaded in the shared folder, never the old one.
+        let t = Temp::new().unwrap();
+        let r = roots(&t, false);
+        assert_eq!(r.install_dir(Model::Lama.id()), Some(t.dir("shared").join("lama")));
+        let cands = r.candidates(Model::Lama.id());
+        assert_eq!(cands.first().map(|c| c.1), Some(Source::Shared), "the shared folder is read first");
+        assert_eq!(Model::BirefnetLite.id(), "birefnet-lite", "BiRefNet-lite has its own folder, apart from LightCraft's full BiRefNet");
     }
 
     #[test]

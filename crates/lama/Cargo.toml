@@ -1,0 +1,32 @@
+[package]
+name = "photocraft-lama"
+version.workspace = true
+edition.workspace = true
+# Apache-2.0 only (not the workspace's MIT OR Apache-2.0): a port of the LaMa generator (Apache-2.0).
+license = "Apache-2.0"
+description = "LaMa (big-lama) large-hole inpainting in pure Rust on candle: reads the TorchScript big-lama.pt without Python (L4); the weights are never shipped"
+
+[lints]
+workspace = true
+
+[features]
+# A tiny model with made-up weights (`synthetic::tiny_model`), for other crates' tests; never on in the app.
+synthetic = []
+
+# The model runs natively only (the browser build has no models; see photocraft-ml): on wasm32 the crate is empty.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+thiserror = { workspace = true }
+log = { workspace = true }
+# big-lama.pt is a zip of stored (uncompressed) entries.
+zip = { version = "7.4", default-features = false }
+# 0.9.2 exactly, as LightCraft and photocraft-sam3 pin it: later releases pull `tokenizers` with the Oniguruma C library into candle-core.
+candle-core = { version = "=0.9.2", default-features = false }
+candle-nn = { version = "=0.9.2", default-features = false }
+
+# Metal (the GPU) on the Mac; every other system runs on the CPU.
+[target.'cfg(target_os = "macos")'.dependencies]
+candle-core = { version = "=0.9.2", default-features = false, features = ["metal"] }
+candle-nn = { version = "=0.9.2", default-features = false, features = ["metal"] }
+
+[dev-dependencies]
+zip = { version = "7.4", default-features = false }

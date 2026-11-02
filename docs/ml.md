@@ -1,11 +1,11 @@
 # Local ML models
 
-PhotoCraft's optional ML features run local ONNX models through the `photocraft-ml` crate and `tract-onnx` 0.23.9 (MIT OR Apache-2.0). Models are downloaded into a user cache directory; they are not committed, bundled, or used by the WebAssembly build.
+PhotoCraft's optional ML features run local models through the `photocraft-ml` crate: BiRefNet-lite (ONNX) on `tract-onnx` 0.23.9 (MIT OR Apache-2.0) and LaMa (`big-lama.pt`) on candle 0.9.2 through `photocraft-lama` (`crates/lama`, Apache-2.0). Models are downloaded into the models folder the Craft apps share; they are not committed, bundled, or used by the WebAssembly build.
 
 ## Commands
 
 - `select.subject`, `layer.removeBackground` and `edit.removeSubject` accept `engine: auto|macos|model|sam3|classic` (`classical` is accepted as `classic`); without it the preference `tools.selectSubjectEngine` decides. `auto` uses the Mac's own cutout on a Mac, then BiRefNet-lite when installed, then the classical implementation. `macos` uses the cutout and falls back to classic. `model` uses BiRefNet-lite; without the model installed (or on a computer with less than 12 GB of memory) it uses classic and says so in the status bar. `classic` avoids model inference. `sam3` asks SAM 3 for the text prompt "person", then "main subject" when nothing scores (on the Object Selection encoding when it is ready for these pixels, else the job encodes the picture and frees it afterwards); "no subject" is its answer, and a SAM 3 that cannot run (not installed, less than 32 GB, failure) uses Classic and says so. `auto` is unchanged: SAM 3 is never part of it (it needs 6 to 20 s and 19 GB where the Mac's cutout takes 0.1 s).
-- `edit.removeSubject` accepts `fill: auto|lama|patch`. `auto` uses LaMa when installed and otherwise uses the patch based fill; `patch` avoids model inference; `lama` requires the model.
+- `edit.removeSubject` accepts `fill: auto|lama|patch`. `auto` uses LaMa (`big-lama.pt`) when installed and otherwise uses the patch based fill; `patch` avoids model inference; `lama` requires the model.
 
 ## Install
 
@@ -15,21 +15,21 @@ In the app, **Edit › Preferences › AI Models** lists the models with their s
 models="$HOME/Library/Application Support/ArtCraft/models"
 mkdir -p "$models/birefnet-lite" "$models/lama"
 curl -L --fail -o "$models/birefnet-lite/birefnet_lite.onnx" https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx
-curl -L --fail -o "$models/lama/lama_fp32.onnx" https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx
+curl -L --fail -o "$models/lama/big-lama.pt" https://huggingface.co/fashn-ai/LaMa/resolve/main/big-lama.pt
 ```
 
 A model is looked for in this order, and the first folder that holds all of its files (each with the published size and SHA-256) wins:
 
 1. `PHOTOCRAFT_MODELS_DIR`, when set (then no other folder is used): `<dir>/<model-id>/`, else the files directly in `<dir>`.
 2. The folder shared by the Craft apps, so a model is never downloaded twice: macOS `~/Library/Application Support/ArtCraft/models/<model-id>/`, Linux `$XDG_DATA_HOME/artcraft/models/<model-id>/` (or `~/.local/share/artcraft/models/...`), Windows `%APPDATA%\ArtCraft\models\<model-id>\`.
-3. The old folder, read only, with the files directly in it: macOS `~/Library/Application Support/PhotoCraft/models`, Linux `$XDG_DATA_HOME/photocraft/models`, Windows `%APPDATA%\PhotoCraft\models`.
+3. The old folder, with the files directly in it: macOS `~/Library/Application Support/PhotoCraft/models`, Linux `$XDG_DATA_HOME/photocraft/models`, Windows `%APPDATA%\PhotoCraft\models`. It only matters until the app has moved its files (below).
 
-New downloads go into the first folder of step 1 or 2. Nothing is ever written to or deleted from the old folder. Preferences › AI Models and `photocraft-cli models list` say which folder each model was found in. The model ids are `birefnet-lite`, `lama` and `sam3`. A model may have several files, each with its own pinned size and SHA-256; it counts as installed only when all of them are there.
+New downloads go into the first folder of step 1 or 2. **At every start** (the app, and `photocraft-cli models`; not while `PHOTOCRAFT_MODELS_DIR` is set), the app moves each model file from the old folder into the shared one (`migrate.rs`): a rename on the same disk, after the file passes the published size and SHA-256. A verified copy already in the shared folder is never deleted, overwritten or downloaded again: only the old duplicate goes (a shared copy that fails the check is replaced by the verified old one). A move that fails (permissions, another disk) leaves both files, logs why, and the app starts anyway. The old `lama_fp32.onnx` is not used any more: it is removed once `big-lama.pt` is verified in the shared folder. The old empty `.lock` files and the old folder go when empty. Preferences › AI Models and `photocraft-cli models list` say which folder each model was found in. The model ids are `birefnet-lite`, `lama` and `sam3`. A model may have several files, each with its own pinned size and SHA-256; it counts as installed only when all of them are there.
 
 | File (in the model folder) | Model and input | Published size | SHA-256 | License | Source file |
 |---|---|---:|---|---|---|
 | `birefnet-lite/birefnet_lite.onnx` | BiRefNet-lite, 1024 × 1024 | 224,005,088 bytes | `5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333` | MIT | [onnx-community/BiRefNet_lite-ONNX](https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/blob/main/onnx/model.onnx) |
-| `lama/lama_fp32.onnx` | LaMa, 512 × 512 | 208,044,816 bytes | `1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6` | Apache-2.0 | [Carve/LaMa-ONNX](https://huggingface.co/Carve/LaMa-ONNX/blob/main/lama_fp32.onnx) |
+| `lama/big-lama.pt` | LaMa, 512 × 512 (TorchScript; the file LightCraft uses, in the same folder) | 205,803,670 bytes | `7ba7aa7ac37a4d41fdbbeba3a2af7ead18058552997e3a3cd1a3b2210c9e6b4c` | Apache-2.0 | [fashn-ai/LaMa](https://huggingface.co/fashn-ai/LaMa/blob/main/big-lama.pt) |
 
 ## SAM 3 (object selection by click or by text)
 
@@ -43,8 +43,12 @@ The API is `Sam3Service`: `encode(&Rgb)` runs the image through the model once a
 
 Measured on an Apple-silicon Mac with 48 GB (release build, GPU, other builds running at the same time, so the times are the slow side): the model loads in under a second after the files are verified, an image encodes in about 5 s, a click answers in about 50 ms, a text prompt in 0.7 to 2 s. Peak memory: 1.9 GB with the model loaded, 19 GB while an image is encoded, 20.3 GB with a text prompt too, whatever the image's size (the model takes a 1008 px square). Computers with less than 32 GB of memory are refused (`ram.rs`). `crates/sam3/examples/sam3_probe.rs` and the ignored test `crates/sam3/tests/real_model.rs` repeat the measurement.
 
+## LaMa (Remove Subject) on candle
+
+`photocraft-lama` (`crates/lama`, L4, Apache-2.0 only) is LightCraft's pure-Rust LaMa: it reads the TorchScript archive `big-lama.pt` without Python (the pickle is parsed, never run) and runs the FFC-ResNet generator on candle, on the GPU through Metal on a Mac (the CPU when the GPU fails, or with `PHOTOCRAFT_LAMA_CPU=1`). `photocraft_ml::inpaint` keeps PhotoCraft's own window, detail transfer and feathering around it; the network call is `Lama::predict` on the 512 × 512 window. The model is loaded for each run and freed after it. The ONNX LaMa (`lama_fp32.onnx`) is no longer downloaded or read. [`fork/lama.md`](../fork/lama.md) has the measured speed and memory.
+
 ## Runtime and licences
 
-Inference runs on the CPU. A 1024-pixel inference can take tens of seconds; performance is being measured. Classical selection and patch-based filling remain available without model files.
+BiRefNet-lite runs on the CPU (tract). A 1024-pixel inference can take tens of seconds; performance is being measured. Classical selection and patch-based filling remain available without model files.
 
-The model weights keep their upstream licences: BiRefNet-lite is MIT, LaMa is Apache-2.0 and SAM 3 is under Meta's SAM License. The runtime dependency, `tract-onnx` 0.23.9, is MIT OR Apache-2.0. Model files are not included in PhotoCraft distributions; see [`ATTRIBUTION.md`](../ATTRIBUTION.md).
+The model weights keep their upstream licences: BiRefNet-lite is MIT, LaMa is Apache-2.0 and SAM 3 is under Meta's SAM License. The runtime dependencies, `tract-onnx` 0.23.9 and candle 0.9.2, are MIT OR Apache-2.0. Model files are not included in PhotoCraft distributions; see [`ATTRIBUTION.md`](../ATTRIBUTION.md).
