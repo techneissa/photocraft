@@ -1,4 +1,5 @@
 # techneissa's fork (FORK.md): append-only lists that feature branches add lines to. `union` keeps both
-# sides' new lines instead of a clash; git and GitHub's merge both honour it.
+# sides' new lines instead of a clash in a local `git merge`. GitHub's pull request merge ignores it, so feature
+# branches leave these files to the batch on `custom` (FORK.md step 6).
 fork/features.md merge=union
 fork/known-failures.txt merge=union
