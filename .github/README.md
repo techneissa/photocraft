@@ -102,6 +102,8 @@
 - **Searchable dropdowns:** type to filter an open list, like the blend modes.
 - **Settings sync:** move every setting to another Mac in one file.
 - **Mac keys:** ⌘, opens Settings; ⌘, or Esc closes it.
+- **Home screen:** recent files as a grid of previews; hover a preview for its ×, and choose how many show.
+- **Updates:** Help ▸ Check for Updates and Settings update to this fork's own builds, never the official release.
 
 **Fixes**
 - PSD files with many fonts open without a long wait.
