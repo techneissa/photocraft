@@ -3,7 +3,6 @@
 Fork CI skips the failures listed in [known-failures.txt](known-failures.txt) (one test per line, with why);
 this page lists what fails on this Mac.
 
-- `i18n::live_tests::czech_shortcut_conflicts_keep_warning_state_and_shortcut_codes` (official test) fails since the fork's Keyboard Shortcuts window rework (c0afea600): a fork bug to fix, skipped by Fork CI until then.
 
 - `dialogs::palette::list::upgrade_tests::page_up_and_page_down_move_a_page_and_stop_at_the_ends` (fork) failed once in a 1000-test run on 2026-10-29 and passes alone: load-flaky.
 

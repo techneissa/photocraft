@@ -13,7 +13,8 @@ The workflow `.github/workflows/fork-ci.yml` (Actions ▸ Fork CI) runs the offi
 `cargo xtask ci`, through `fork/ci.sh`) on every pull request to `custom` and every push to it, the daily merge
 included, so the full suite runs on GitHub and not on this Mac (the fork is public, so GitHub's runners are free).
 It skips the accepted failures in `fork/known-failures.txt`, so a red run is a new failure: fix it, or add the test
-there with a `#` line saying why. The official `CI` workflow (`ci.yml`, with Windows and web) is not needed for it.
+there with a `#` line saying why. The official `CI` workflow (`ci.yml`, with Windows and web) is switched off in this fork (2026-11-02): it always
+stopped at the scorecard check here, and the fork is Mac only.
 
 The official project's other workflows (Docs, FreeBSD, Nix, Packaging lint, Perf nightly, Release, SonarCloud,
 Windows arm64) are switched off in this fork: the official project runs them. A workflow the official project
