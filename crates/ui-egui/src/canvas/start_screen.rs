@@ -11,6 +11,10 @@ const HOME_BUTTON_WIDTH: f32 = 190.0;
 const HOME_BUTTON_GAP: f32 = 12.0;
 
 pub(super) fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    // Fork: the grid Home screen replaces this one (fork/home-recent-grid.md).
+    if super::home_grid::home(app, ui) {
+        return;
+    }
     let t = crate::theme::Tokens::get(ui.ctx());
     let area = ui.available_rect_before_wrap();
     paint_dots(ui, area, app.session.prefs().interface.show_canvas_dots);

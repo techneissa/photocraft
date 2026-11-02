@@ -271,6 +271,8 @@ pub struct Interface {
     /// List recent files on the Home screen (the empty workspace). Off hides the list; the
     /// recent files themselves are kept and File > Open Recent still shows them.
     pub show_home_recent_files: bool,
+    /// Fork (`fork/home-recent-grid.md`): most recent files the Home screen's grid shows (1–100).
+    pub home_recent_count: u32,
     /// Document border in standard screen mode.
     pub canvas_border: CanvasBorder,
     pub ui_scale: UiScale,
@@ -320,6 +322,7 @@ impl Default for Interface {
             canvas_custom_color: "#282828".into(),
             show_canvas_dots: true,
             show_home_recent_files: true,
+            home_recent_count: 12,
             canvas_border: CanvasBorder::DropShadow,
             ui_scale: UiScale::Auto,
             language: "auto".into(),
