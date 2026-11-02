@@ -409,34 +409,54 @@ pub fn keep_after_commit(app: &mut PhotocraftApp, layer: LayerId, before: Option
     }
 }
 
-/// Display scale for a 256-bin histogram: bar heights are `v / top` clamped to 1, linear
-/// to the tallest bin like Photoshop. A percentile of the sorted bins degenerates on
-/// sparse histograms (few occupied levels sort 0 into every low index), drawing tiny
-/// counts as tall as the real peaks (#6574).
+/// Display scale for a 256-bin histogram: bar heights are `v / top` clamped to 1, linear to the
+/// tallest bin between the two ends (levels 1..=254) times 1.1. Pure black and pure white often
+/// hold most of an image (a night sky, a white studio backdrop): they run off the top instead of
+/// flattening every other level into nothing, as Camera Raw's histogram does
+/// (`dialogs/rgb_histogram.rs`). An image with nothing between the ends scales to its tallest end,
+/// so a 90/10 black/white histogram still draws 9 : 1 (#6574). A percentile of the sorted bins
+/// degenerates on sparse histograms (few occupied levels sort 0 into every low index), drawing
+/// tiny counts as tall as the real peaks (#6574), so the scale never uses one.
 /// Extracted from [`draw_histogram`] so the scaling is unit-testable.
 pub fn histogram_scale_top(h: &[u32; 256]) -> f32 {
-    h.iter().copied().max().unwrap_or(1).max(1) as f32 * 1.1
+    let interior = h.get(1..255).and_then(|b| b.iter().copied().max()).unwrap_or(0);
+    let peak = if interior > 0 { interior } else { h.iter().copied().max().unwrap_or(1) };
+    peak.max(1) as f32 * 1.1
+}
+
+/// Heights (0..=1 of the box) of `columns` side by side columns drawing the 256 bins, as
+/// Photoshop's Levels histogram does: one column per bin, never a line joining bin centres, so a
+/// lone tall bin stays as wide as the others. With 256 columns or more every bin owns at least
+/// one column; with fewer (a narrow box) a column takes the tallest bin it covers, so a spike
+/// never disappears.
+pub fn histogram_columns(h: &[u32; 256], columns: usize) -> Vec<f32> {
+    let top = histogram_scale_top(h);
+    let height = |i: usize| (h.get(i).copied().unwrap_or(0) as f32 / top).min(1.0);
+    (0..columns)
+        .map(|c| {
+            if columns >= 256 {
+                height((c * 256 + 128) / columns)
+            } else {
+                let (lo, hi) = (c * 256 / columns, ((c + 1) * 256).div_ceil(columns).min(256));
+                (lo..hi.max(lo + 1)).map(height).fold(0.0, f32::max)
+            }
+        })
+        .collect()
 }
 
 pub fn draw_histogram(p: &egui::Painter, r: Rect, h: &[u32; 256], color: Color32) {
-    let top = histogram_scale_top(h);
-    let mut pts = vec![egui::pos2(r.left(), r.bottom())];
-    for (i, v) in h.iter().enumerate() {
-        let x = r.left() + (i as f32 + 0.5) / 256.0 * r.width();
-        let y = r.bottom() - (*v as f32 / top).min(1.0) * r.height();
-        pts.push(egui::pos2(x, y));
-    }
-    pts.push(egui::pos2(r.right(), r.bottom()));
-    // One mesh of vertical strips: no anti-aliasing feather, so no seams between bins.
+    // Columns are whole physical pixels: they tile with no seam and no overlap, so a translucent
+    // colour is never drawn twice, and the mesh has no anti-aliasing feather.
+    let ppp = p.ctx().pixels_per_point().max(0.1);
+    let columns = (r.width() * ppp).round().max(0.0) as usize;
     let mut mesh = egui::Mesh::default();
-    for w in pts.windows(2).skip(1).take(256) {
-        let (a, b) = (w[0], w[1]);
-        let i = mesh.vertices.len() as u32;
-        for q in [egui::pos2(a.x, r.bottom()), a, b, egui::pos2(b.x, r.bottom())] {
-            mesh.colored_vertex(q, color);
+    for (c, height) in histogram_columns(h, columns).into_iter().enumerate() {
+        if height <= 0.0 {
+            continue;
         }
-        mesh.add_triangle(i, i + 1, i + 2);
-        mesh.add_triangle(i, i + 2, i + 3);
+        let (x0, x1) = (r.left() + c as f32 / ppp, r.left() + (c + 1) as f32 / ppp);
+        let top = r.bottom() - height * r.height();
+        mesh.add_colored_rect(Rect::from_min_max(egui::pos2(x0, top), egui::pos2(x1, r.bottom())), color);
     }
     p.add(mesh);
 }
@@ -568,17 +588,85 @@ mod tests {
 
     /// #6574: a sparse histogram (few occupied levels) must not scale to a bin
     /// index that is 0: the old `sorted.get(250)` degenerated to `top = 1.1`,
-    /// drawing a few hundred samples as tall as hundreds of thousands.
+    /// drawing a few hundred samples as tall as hundreds of thousands. Between the ends
+    /// the scale is linear: a 300 bin next to a 150 bin draws at 2 : 1, not as noise.
     #[test]
     fn histogram_scale_does_not_degenerate_on_sparse_histograms() {
         let mut h = [0u32; 256];
         h[0] = 500_000;
+        h[100] = 150;
         h[128] = 300;
         h[255] = 500_000;
         let top = histogram_scale_top(&h);
-        assert!(top > h[128] as f32, "scale {top} must exceed the tiny middle bin");
-        let tiny = (h[128] as f32 / top).min(1.0);
-        assert!(tiny < 0.05, "tiny bin draws near-flat, got {tiny}");
+        assert!(top > h[128] as f32, "scale {top} must exceed the interior peak");
+        let (small, big) = (h[100] as f32 / top, h[128] as f32 / top);
+        assert!((small / big - 0.5).abs() < 1e-3, "interior bars stay proportional: {small} vs {big}");
+    }
+
+    /// A photo that is two thirds pure black (Earthrise): the black spike must not flatten the
+    /// other 254 levels. The scale follows the tallest level between the ends; the two ends run
+    /// off the top.
+    #[test]
+    fn histogram_scale_ignores_the_two_end_spikes() {
+        let mut h = [0u32; 256];
+        h[0] = 1_000_000;
+        h[255] = 50_000;
+        for (i, v) in h.iter_mut().enumerate().take(200).skip(60) {
+            *v = 10_000 + (i as u32 % 7) * 500;
+        }
+        let top = histogram_scale_top(&h);
+        let interior_peak = h[1..255].iter().copied().max().unwrap() as f32;
+        assert!((top - interior_peak * 1.1).abs() < 1.0, "scale {top} follows the interior peak {interior_peak}");
+        assert_eq!((h[0] as f32 / top).min(1.0), 1.0, "the black spike runs off the top");
+        assert!(interior_peak / top > 0.9, "the interior peak fills the box");
+    }
+
+    /// With nothing between the ends, the scale is the tallest end (a flat black image fills the box).
+    #[test]
+    fn histogram_scale_uses_the_end_when_nothing_is_between() {
+        let mut h = [0u32; 256];
+        h[0] = 7;
+        assert!((7.0 / histogram_scale_top(&h) - 1.0 / 1.1).abs() < 1e-3);
+        assert!(histogram_scale_top(&[0; 256]) > 0.0, "an empty histogram scales safely");
+    }
+
+    /// The drawn columns: a lone bin keeps the width of any other bin and its height, at every
+    /// box width from a narrow panel to a big display, and the empty bins stay empty.
+    #[test]
+    fn a_lone_tall_bin_is_drawn_as_its_own_column() {
+        let mut h = [0u32; 256];
+        h[0] = 900_000; // pure black
+        h[1..255].iter_mut().for_each(|v| *v = 9_000); // a flat shape 1 % of the spike
+        h[255] = 1;
+        for columns in [100, 200, 256, 286, 400, 572, 1000] {
+            let cols = histogram_columns(&h, columns);
+            assert_eq!(cols.len(), columns);
+            assert_eq!(cols[0], 1.0, "{columns} columns: the black bin reaches the top at the left edge");
+            let shape = cols[columns / 2];
+            assert!(shape > 0.85, "{columns} columns: the shape is visible, not flattened ({shape})");
+            let wide = cols.iter().take_while(|v| **v >= 1.0).count();
+            assert!(wide <= columns.div_ceil(256), "{columns} columns: the spike is one bin wide, not smeared ({wide} columns)");
+        }
+    }
+
+    /// Every occupied bin reaches at least one column, whatever the width (a spike never vanishes
+    /// in a narrow box), and the tallest bin's column is the tallest.
+    #[test]
+    fn every_occupied_bin_has_a_column() {
+        let mut h = [0u32; 256];
+        for i in [3usize, 77, 128, 130, 201, 254] {
+            h[i] = 1000 + i as u32;
+        }
+        for columns in 1..=700usize {
+            let cols = histogram_columns(&h, columns);
+            let seen = cols.iter().filter(|v| **v > 0.0).count();
+            if columns >= 256 {
+                assert!(seen >= 6, "{columns} columns show {seen} bars for 6 occupied bins");
+            }
+            let tallest = cols.iter().copied().fold(0.0, f32::max);
+            let expected = 1254.0 / histogram_scale_top(&h);
+            assert!((tallest - expected).abs() < 1e-5, "{columns} columns: the tallest bar is {tallest}, not {expected}");
+        }
     }
 
     /// A white document with black filled over columns `0..split` (a layer above the background).
