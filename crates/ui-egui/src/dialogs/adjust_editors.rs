@@ -24,6 +24,7 @@ use crate::tone::{self, HistSource, Histograms};
 use crate::widgets::{self, hue_color};
 
 mod basic;
+mod curve_points;
 mod curves;
 mod gradient_map;
 mod hue_saturation;
@@ -36,6 +37,9 @@ pub(crate) use basic::row_value;
 use basic::track_stops;
 use basic::{black_white, brightness_contrast, channel_mixer, color_balance, photo_filter, sliders, threshold};
 pub use basic::{reset_adjustment_editor, reset_color_balance};
+#[cfg(test)]
+pub(crate) use curve_points::strip as curve_strip;
+pub(crate) use curve_points::{curves_drag, show_clipping, sync_show_clipping};
 use curves::curves;
 #[cfg(test)]
 use curves::{CURVE_HANDLE_SIZE, curve_graph};
@@ -47,6 +51,7 @@ use hue_saturation::hue_saturation;
 #[cfg(test)]
 use hue_saturation::{lightness_track, move_hue_range_handle, saturation_track};
 use levels::levels;
+pub(crate) use levels::levels_drag;
 pub use levels::{auto_levels, gamma_from_pos, gamma_pos};
 pub use session::{layer_editor, layer_mem, properties_coalesce, properties_reset, session_start};
 

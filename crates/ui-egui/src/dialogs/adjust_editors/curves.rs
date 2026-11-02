@@ -350,6 +350,13 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
         e.commit |= interaction.commit;
     }
 
+    if cx.dialog && !pencil {
+        // Black point / white point sliders under the graph (curve_points.rs).
+        let (moved, edit) = super::curve_points::point_sliders(ui, cx, graph, &mut pts);
+        changed |= moved;
+        e.add(edit);
+    }
+
     // Draw: histogram, quarter grid, baseline, gradient bars, other channels, the curve, points.
     let p = ui.painter_at(full.expand(2.0));
     p.rect_filled(graph, 0.0, t.field);
@@ -442,6 +449,9 @@ pub(super) fn curves(ui: &mut egui::Ui, v: &mut Value, cx: &EditorCx) -> Edit {
         crate::i18n::fmt(tl!("Click to add a point · drag off or {key}-click or Delete to remove"), &[("key", &crate::shortcuts::pretty("Cmd"))])
     };
     ui.label(RichText::new(hint).color(t2.text_faint).size(11.0));
+    if cx.dialog && !pencil {
+        super::curve_points::show_clipping_row(ui, cx);
+    }
     ui.data_mut(|d| d.insert_temp(state_id, st));
     if drawn {
         write_map(v, key, &map);

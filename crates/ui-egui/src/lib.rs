@@ -29,6 +29,7 @@ mod blend_wheel;
 mod brush_mode_menu;
 pub mod canvas;
 pub mod control;
+pub mod curves_clipping;
 pub mod dialogs;
 pub mod dock;
 mod double_exposure;
@@ -42,6 +43,7 @@ pub mod icons;
 pub mod jobs_ui;
 pub mod keybinds;
 pub(crate) mod last_brush;
+pub mod levels_clipping;
 pub mod links;
 pub mod menu_catalog;
 pub mod menu_custom;
@@ -529,6 +531,8 @@ pub struct PhotocraftApp {
     /// The Properties panel's live adjustment-layer drag: its damage region and coverage
     /// (`adjust_preview::live_key`).
     pub(crate) live_adjust_preview: Option<adjust_preview::LiveAdjust>,
+    /// The Levels / Curves dialog's Alt-drag clipping display over the canvas.
+    pub(crate) levels_clipping: Option<levels_clipping::Cache>,
     /// Synthetic input events queued by automation (`ui.click`, `ui.key`, …), injected next frame.
     pub(crate) synthetic: Vec<egui::Event>,
     /// The one synthetic batch currently being delivered.
