@@ -169,14 +169,17 @@ impl Roots {
         Self { custom, shared, old }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn custom(&self) -> Option<&Path> {
         self.custom.as_deref()
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn shared(&self) -> Option<&Path> {
         self.shared.as_deref()
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn old(&self) -> Option<&Path> {
         self.old.as_deref()
     }

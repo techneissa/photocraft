@@ -7,6 +7,7 @@
 
 use crate::inpaint_detail::restore_detail;
 use crate::resize::bilinear;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::store::{Model, expected_path, model_path};
 use crate::{Cancel, MlError, Rgb, check_cancel};
 
