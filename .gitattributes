@@ -1,0 +1,4 @@
+# techneissa's fork (FORK.md): append-only lists that feature branches add lines to. `union` keeps both
+# sides' new lines instead of a clash; git and GitHub's merge both honour it.
+fork/features.md merge=union
+fork/known-failures.txt merge=union

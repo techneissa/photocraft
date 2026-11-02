@@ -27,6 +27,7 @@ cargo test -p photocraft-ui-egui --lib -- open_as_layers double_exposure blend_w
 cargo test -p photocraft-compose --lib live
 cargo test -p photocraft-gpu --test it live_transform
 cargo test -p photocraft-ui-egui --lib -- liquify_ui rasterize_prompt distort_ui camera_raw mask_clipboard polygon_lasso lasso_ui filter_dialog
+cargo test -p photocraft-ui-egui --lib -- color_picker_preview
 ```
 
 ## When upstream merges
