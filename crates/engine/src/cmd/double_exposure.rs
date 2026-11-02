@@ -3,9 +3,10 @@
 //! a Reveal All layer mask when it has none, and the mask becomes the edit target, so painting
 //! black hides parts of it and white brings them back.
 //!
-//! The layer is the selected one when exactly one pixel layer other than the lowest is selected,
-//! else the topmost pixel layer. The brush, the colours and the tool are the shell's (see the
-//! UI's `double_exposure`): this command only changes the document, in one history step.
+//! The layer is the selected one when exactly one pixel or smart object layer other than the
+//! lowest is selected, else the topmost such layer (a placed photo is a smart
+//! object). The brush, the colours and the tool are the shell's (see the UI's `double_exposure`):
+//! this command only changes the document, in one history step.
 
 use photocraft_color::BlendMode;
 use photocraft_doc::{LayerContent, LayerId, LayerMask};
@@ -63,9 +64,11 @@ fn parse(p: &Value) -> Result<Exposure> {
     }
 }
 
-const NEEDS_TWO: &str = "Double Exposure needs two visible pixel layers, the upper one unlocked";
+const NEEDS_TWO: &str = "Double Exposure needs two visible pixel or smart object layers, the upper one unlocked";
 
-/// The visible pixel layers, bottom to top, each with whether it is unlocked. Only the active
+/// The visible pixel and smart object layers (the photos; Place Photo makes smart objects by
+/// default), bottom to top, each with whether it is unlocked. Text, shape, fill, adjustment and
+/// group layers are not photographs, so they are no exposure and stay out. Only the active
 /// artboard's layers count while one is active, else all of the document's. A layer in a hidden
 /// group is hidden too.
 fn pixel_layers(st: &DocState) -> Vec<(LayerId, bool)> {
@@ -78,7 +81,7 @@ fn pixel_layers(st: &DocState) -> Vec<(LayerId, bool)> {
     doc.walk()
         .into_iter()
         .filter(|(path, _, l)| {
-            matches!(l.content, LayerContent::Raster(_))
+            matches!(l.content, LayerContent::Raster(_) | LayerContent::Smart(_))
                 && (artboard.is_none() || path.first().copied() == artboard)
                 && (1..=path.len()).all(|n| path.get(..n).and_then(|p| doc.layer_at(p)).is_some_and(|a| a.visible))
         })
@@ -139,7 +142,7 @@ pub(crate) fn specs() -> Vec<CommandSpec> {
         label: "Double Exposure",
         menu: &["Layer"],
         shortcut: None,
-        params: r##"{"mode":"screen"|"lighten"="screen"?} → {"layer": id, "mode", "maskAdded": bool} (one step: sets the layer's blend mode, adds a Reveal All mask unless it has one and targets the mask; the layer is the selected visible, unlocked pixel layer above another, else the topmost such layer)"##,
+        params: r##"{"mode":"screen"|"lighten"="screen"?} → {"layer": id, "mode", "maskAdded": bool} (one step: sets the layer's blend mode, adds a Reveal All mask unless it has one and targets the mask; the layer is the selected visible, unlocked pixel or smart object layer above another, else the topmost such layer)"##,
         enabled: |s| target(s).map(|_| ()),
         run: double_exposure,
         journal: true,

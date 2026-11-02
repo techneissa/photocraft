@@ -1,5 +1,5 @@
 use photocraft_color::{BlendMode, SampleType};
-use photocraft_doc::{Document, Layer, LayerId};
+use photocraft_doc::{Document, Layer, LayerContent, LayerId};
 
 use super::*;
 use crate::channel_cmds::ChannelTarget;
@@ -44,12 +44,12 @@ fn double_exposure_needs_two_pixel_layers() {
 
     s.execute("file.new", json!({"width": 24, "height": 16, "background": "transparent"})).unwrap();
     let why = s.disabled_reason(CMD).expect("one layer");
-    assert!(why.contains("two visible pixel layers"), "{why}");
+    assert!(why.contains("two visible pixel or smart object layers"), "{why}");
     let before = s.active().unwrap().doc.clone();
     assert!(s.execute(CMD, json!({})).is_err());
     assert!(std::sync::Arc::ptr_eq(&before, &s.active().unwrap().doc), "a refused command changes nothing");
 
-    // An adjustment layer and a group are not pixel layers.
+    // An adjustment layer and a group are not photo layers.
     s.execute("layer.newAdjustmentLayer.invert", json!({})).unwrap();
     s.execute("layer.new.group", json!({})).unwrap();
     assert!(s.disabled_reason(CMD).is_some(), "one pixel layer under an adjustment layer and a group");
@@ -339,4 +339,105 @@ fn the_panel_button_setting_defaults_on_and_is_checked_like_its_neighbours() {
     // Settings saved before the option existed read as on.
     let old: crate::prefs::Interface = serde_json::from_value(json!({"showTooltips": false})).unwrap();
     assert!(old.show_double_exposure_button);
+}
+
+/// Converts `id` to a smart object (what Place Photo makes) and returns the converted layer.
+fn smart(s: &mut Session, id: LayerId) -> LayerId {
+    select(s, id);
+    // An empty layer can't be converted: give it some pixels.
+    s.execute("select.rect", json!({"x": 2, "y": 2, "width": 10, "height": 8})).unwrap();
+    s.execute("edit.fill", json!({"contents": "color", "color": "#ff8000"})).unwrap();
+    s.execute("select.deselect", json!({})).unwrap();
+    s.execute("layer.smartObjects.convertToSmartObject", json!({})).unwrap();
+    let now = s.active().unwrap().active_layer.unwrap();
+    assert!(matches!(layer(s, now).content, LayerContent::Smart(_)), "converted");
+    now
+}
+
+#[test]
+fn two_placed_smart_objects_get_screen_and_a_mask_in_one_undo_step() {
+    for depth in DEPTHS {
+        let (mut s, [a, b, _]) = session(depth);
+        s.execute("layer.delete", json!({"layer": id_of_top(&s).0})).unwrap();
+        let a = smart(&mut s, a);
+        let b = smart(&mut s, b);
+        assert!(s.disabled_reason(CMD).is_none(), "depth {depth}");
+        let out = s.execute(CMD, json!({})).unwrap();
+        assert_eq!(out, json!({"layer": b.0, "mode": "screen", "maskAdded": true}), "depth {depth}");
+        let l = layer(&s, b);
+        assert_eq!(l.blend, BlendMode::Screen);
+        assert!(matches!(l.content, LayerContent::Smart(_)), "still a smart object");
+        let mask = l.mask.as_ref().expect("mask");
+        assert_eq!(mask.surface.sample_channel(3, 3, 0), 1.0, "Reveal All");
+        assert!(mask_targeted(&s));
+        assert_eq!(layer(&s, a).blend, BlendMode::Normal, "the lower one is left alone");
+
+        assert!(s.undo(), "one undo step");
+        assert_eq!(layer(&s, b).blend, BlendMode::Normal);
+        assert!(layer(&s, b).mask.is_none());
+        assert!(matches!(layer(&s, b).content, LayerContent::Smart(_)));
+        assert!(s.redo());
+        assert_eq!(layer(&s, b).blend, BlendMode::Screen);
+        assert!(layer(&s, b).mask.is_some());
+    }
+}
+
+fn id_of_top(s: &Session) -> LayerId {
+    doc(s).layers.last().unwrap().id
+}
+
+#[test]
+fn a_mixed_pixel_and_smart_pair_works_either_way_round() {
+    // Pixel below, smart object above.
+    let (mut s, [_, b, c]) = session(8);
+    s.execute("layer.delete", json!({"layer": c.0})).unwrap();
+    let b = smart(&mut s, b);
+    assert_eq!(s.execute(CMD, json!({})).unwrap()["layer"], b.0);
+    assert_eq!(layer(&s, b).blend, BlendMode::Screen);
+
+    // Smart object below, pixel above.
+    let (mut s, [a, b, c]) = session(8);
+    s.execute("layer.delete", json!({"layer": b.0})).unwrap();
+    smart(&mut s, a);
+    assert_eq!(s.execute(CMD, json!({})).unwrap()["layer"], c.0);
+    assert_eq!(layer(&s, c).blend, BlendMode::Screen);
+
+    // A lone smart object over a lone pixel layer is a pair; a lone smart object is not.
+    let mut s = Session::new();
+    s.execute("file.new", json!({"width": 24, "height": 16, "background": "transparent"})).unwrap();
+    let a = s.active().unwrap().active_layer.unwrap();
+    smart(&mut s, a);
+    assert!(s.disabled_reason(CMD).expect("one layer").contains("two visible pixel or smart object layers"));
+}
+
+#[test]
+fn hidden_and_locked_smart_objects_are_left_out() {
+    let (mut s, [a, b, c]) = session(8);
+    let (_a, b, c) = (smart(&mut s, a), smart(&mut s, b), smart(&mut s, c));
+    hide(&mut s, c);
+    assert_eq!(s.execute(CMD, json!({})).unwrap()["layer"], b.0, "hidden smart object skipped");
+    assert_eq!(layer(&s, c).blend, BlendMode::Normal);
+
+    let (mut s, [a, b, c]) = session(8);
+    let (_a, b, c) = (smart(&mut s, a), smart(&mut s, b), smart(&mut s, c));
+    lock(&mut s, c);
+    assert_eq!(s.execute(CMD, json!({})).unwrap()["layer"], b.0, "locked smart object skipped");
+    assert_eq!(layer(&s, c).blend, BlendMode::Normal);
+
+    // Hidden or locked upper layers leave nothing to expose.
+    let (mut s, [a, b, _]) = session(8);
+    s.execute("layer.delete", json!({"layer": id_of_top(&s).0})).unwrap();
+    smart(&mut s, a);
+    let b = smart(&mut s, b);
+    lock(&mut s, b);
+    assert!(s.execute(CMD, json!({})).is_err());
+}
+
+#[test]
+fn a_fill_layer_does_not_count() {
+    let (mut s, [_, b, c]) = session(8);
+    s.execute("layer.delete", json!({"layer": c.0})).unwrap();
+    s.execute("layer.delete", json!({"layer": b.0})).unwrap();
+    s.execute("layer.newFillLayer.solidColor", json!({})).unwrap();
+    assert!(s.disabled_reason(CMD).is_some(), "a pixel layer under a fill layer");
 }
