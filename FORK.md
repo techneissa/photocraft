@@ -57,14 +57,14 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
    (techneissa, 2026-10-29: the same tests ran several times per feature and loaded the Mac). Fork CI runs on
    Linux, so macOS-only tests (`macvision`, the real-Vision tests) run only in a lane's own filtered tests.
 4. Write `fork/<slug>.md` (headings as in the other files; `fork/tests.sh` runs the commands in its `## Tests`
-   block). Leave FORK.md, `fork/features.md` (the batch adds the line, step 6), `fork/tests.sh`, the generated
+   block). Leave FORK.md, `fork/features.md` and `.github/README.md` (the batch adds the lines, step 6), `fork/tests.sh`, the generated
    `docs/parity-checklist.md` and `docs/scorecard.md`, and the official parity docs (`docs/gaps.md`,
    `docs/*-parity.md`, `ROADMAP.md`) alone; then two feature branches never clash on shared notes.
 5. `git push mine feat/<name>` and open a pull request to `custom`; Fork CI checks it. Merge it (GitHub's button,
    or `git switch custom && git merge --no-ff feat/<name> && git push mine custom`). After a single merge, build and
    test nothing on this Mac: Fork CI checks `custom`.
 6. Once per batch of merges, on `custom` on this Mac (techneissa, 2026-11-02: the Mac rebuilt the same code minutes
-   apart): add each merged feature's line at the end of `fork/features.md`; if a feature added commands,
+   apart): add each merged feature's line at the end of `fork/features.md`, and a short line for each feature you can see in the app under the right group of "What I added" in `.github/README.md` (the page GitHub shows for this fork); if a feature added commands,
    `cargo xtask parity` and commit `docs/parity-checklist.md`; run
    `fork/tests.sh <slug>...` for the features merged in the batch plus `select-subject-macos` (the macOS-only
    tests Fork CI cannot run; Fork CI already ran the rest on Linux); push once; when GitHub's Fork build of that commit is
