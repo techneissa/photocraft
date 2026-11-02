@@ -10,6 +10,9 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
     if let Some(r) = super::settings_sync::invoke(app, id, params) {
         return Some(r);
     }
+    if let Some(r) = super::settings_folder::invoke(app, id, params) {
+        return Some(r);
+    }
     let empty = params.as_object().is_none_or(|o| o.is_empty());
     if !empty {
         return None;

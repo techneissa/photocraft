@@ -254,6 +254,10 @@ pub struct Session {
     /// What only the shell can check in a settings file (Edit › Preferences › Import Settings…);
     /// `None` checks what the engine can. See `prefs::settings_sync`.
     pub settings_checks: Option<prefs::settings_sync::SettingsChecks>,
+    /// This Mac's name and the ArtCraft shared file for the sync folder; tests set both
+    /// (`prefs::settings_folder`).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub sync_env: prefs::settings_folder::SyncEnv,
     /// A further route for File › Print when neither `lp` nor a CUPS server over IPP is
     /// reachable (the XDG Print portal in a Flatpak); see `print_cmds::Spooler`.
     pub print_spooler: Option<print_cmds::Spooler>,

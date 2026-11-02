@@ -470,6 +470,7 @@ mod chords;
 mod cmds;
 mod customize;
 mod files;
+pub mod settings_folder;
 pub mod settings_sync;
 mod shortcuts;
 mod store;
@@ -1235,6 +1236,8 @@ pub struct Preferences {
     /// until something is arranged, which leaves every menu as it is. JSON owned by the shell
     /// (`ui-egui::menu_custom`), which reads it leniently.
     pub context_menus: Value,
+    /// Settings sync: this Mac's sync folder and state (`settings_folder`).
+    pub sync: settings_folder::SyncPrefs,
 }
 
 impl Preferences {

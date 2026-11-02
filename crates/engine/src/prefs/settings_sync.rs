@@ -79,6 +79,7 @@ pub const NOT_IN_FILE: &[(&str, &str)] = &[
     ("toolBrushes", "the brush of each tool"),
     ("selectedTool", "the tool in use"),
     ("scriptEvents", "script files of this Mac"),
+    ("sync", "the sync folder and state of this Mac"),
 ];
 
 /// Top-level keys of the preferences document that a part other than `preferences` holds.
@@ -303,7 +304,7 @@ pub fn plan_allowing(
     if version > VERSION {
         cx.note(format!("This file was made by a newer PhotoCraft (file version {version}; this one reads up to {VERSION}); what it understands was taken"));
     }
-    for key in file.keys().filter(|k| !matches!(k.as_str(), "kind" | "version" | "app") && !PARTS.contains(&k.as_str())) {
+    for key in file.keys().filter(|k| !matches!(k.as_str(), "kind" | "version" | "app" | "savedBy") && !PARTS.contains(&k.as_str())) {
         cx.unknown(key);
     }
     let mut next = p.clone();

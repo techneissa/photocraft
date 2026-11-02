@@ -474,6 +474,9 @@ fn automation_rejects_ambient_path_commands_and_preferences() {
         ("layer.layerStyle.contours.save", serde_json::json!({"names": ["a"]})),
         ("edit.preferences.exportSettings", serde_json::json!({})),
         ("edit.preferences.importSettings", serde_json::json!({"text": "{}", "dryRun": true})),
+        // They take no path: the folder is the user's own choice (`sync.folder`, which an agent can't set).
+        ("edit.preferences.saveSettingsToFolder", serde_json::json!({})),
+        ("edit.preferences.loadSettingsFromFolder", serde_json::json!({"dryRun": true})),
     ] {
         assert!(authorize_engine_command(id, &params).is_ok(), "{id}: {params}");
     }
@@ -491,6 +494,10 @@ fn automation_rejects_ambient_path_commands_and_preferences() {
         "fileHandling.lutFolder",
         "fileHandling",
         "scratchDisks.disks",
+        "sync",
+        "sync.folder",
+        ".sync.folder",
+        "sync.keep",
         ".",
         "..historyLog.filePath",
     ] {

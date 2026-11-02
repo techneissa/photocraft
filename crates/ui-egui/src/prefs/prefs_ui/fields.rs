@@ -190,6 +190,7 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
             super::settings_sync::icons(ui)
         })
         .inner;
+    let folder = super::settings_folder::row(ui, app, f);
     super::settings_sync::message_line(ui, f);
     let mut found = preference_sections(&values, &search);
     let q = search.trim().to_lowercase();
@@ -316,6 +317,7 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
     f.insert("__search".into(), json!(search));
     f.insert("values".into(), values);
     super::settings_sync::run(app, sync);
+    super::settings_folder::run(app, f, folder);
     // A colour swatch was clicked: open the Color Picker on that value (#2144).
     if let Some((path, name)) = ctx_take_pick(ui) {
         crate::color_picker_ui::request_field(f, &format!("/values/{}", path.replace('.', "/")), &crate::color_picker_ui::title_for(&name));

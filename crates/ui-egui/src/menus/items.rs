@@ -46,6 +46,8 @@ const PLACE_AFTER: &[(&str, &str)] = &[
     ("layer.doubleExposure", "layer.maskAllObjects"),
     ("edit.preferences.exportSettings", "edit.preferences.rawDefaults"),
     ("edit.preferences.importSettings", "edit.preferences.exportSettings"),
+    ("edit.preferences.saveSettingsToFolder", "edit.preferences.importSettings"),
+    ("edit.preferences.loadSettingsFromFolder", "edit.preferences.saveSettingsToFolder"),
 ];
 
 pub fn menu_items(app: &PhotocraftApp) -> Vec<MenuItem> {

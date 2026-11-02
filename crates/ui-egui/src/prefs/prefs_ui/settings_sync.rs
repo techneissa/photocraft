@@ -25,7 +25,7 @@ pub const IMPORT: &str = "edit.preferences.importSettings";
 /// The marker of the prompt that names what an import replaces.
 const PROMPT: &str = "settingsImport";
 /// The Preferences window's one-line message about the last export or import.
-const MESSAGE: &str = "__syncMessage";
+pub(super) const MESSAGE: &str = "__syncMessage";
 const ICON: f32 = 22.0;
 
 /// The checks the shell adds to the engine's.
@@ -56,7 +56,7 @@ fn context_menus_check(v: &Value) -> Result<(Value, Vec<String>), String> {
 }
 
 /// Make the session use the shell's checks (once; a session starts without).
-fn ensure_checks(app: &mut PhotocraftApp) {
+pub(super) fn ensure_checks(app: &mut PhotocraftApp) {
     app.session.settings_checks.get_or_insert_with(checks);
 }
 
@@ -211,6 +211,7 @@ pub(super) fn prompt_body(app: &PhotocraftApp, ui: &mut egui::Ui, f: &Map<String
     let t = Tokens::get(ui.ctx());
     let file = f.get("file").and_then(Value::as_str).unwrap_or("");
     ui.label(RichText::new(crate::i18n::fmt(tl!("Replace these settings with those in {file}?"), &[("file", file)])).color(t.text));
+    super::settings_folder::saved_line(ui, f);
     ui.add_space(4.0);
     let parts: Vec<&str> = f.get("parts").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).collect();
     for part in parts {
@@ -251,6 +252,7 @@ pub(super) fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result
     let report_json = plan.report(true);
     let skipped = plan.notes.len() + plan.unknown_total;
     app.session.apply_settings_plan(plan);
+    super::settings_folder::note_loaded(app, f);
     after_import(app);
     let mut message = crate::i18n::fmt(tl!("Imported settings from {file}"), &[("file", &file)]);
     if skipped > 0 {
