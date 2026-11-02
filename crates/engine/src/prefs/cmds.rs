@@ -195,6 +195,7 @@ pub fn specs() -> Vec<CommandSpec> {
         spec!("edit.toolbar", "Toolbar…", ["Edit"], None, r##"{"hidden":["<tool>",…]?,"order":["<tool>",…]?,"reset":bool=false}"##, toolbar, true),
     ];
     v.extend(super::settings_sync::specs());
+    #[cfg(not(target_arch = "wasm32"))]
     v.extend(super::settings_folder::specs());
     v
 }
