@@ -754,6 +754,52 @@ mod tests {
         assert_eq!(used, "patch");
     }
 
+    /// Remove Subject's fill through the candle LaMa (a tiny one with made-up weights: the real file is 206 MB and
+    /// tests never read the user's models folder): the hole is filled and every other pixel stays as it was.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn remove_subject_fill_runs_through_the_candle_lama() {
+        use photocraft_color::PixelFormat;
+        use photocraft_paint::retouch::Region;
+        let (w, h) = (64usize, 64usize);
+        let mut data = Vec::new();
+        for i in 0..w * h {
+            data.extend([(i % 17) as f32 / 17.0, (i % 5) as f32 / 5.0, (i % 11) as f32 / 11.0, 1.0]);
+        }
+        let source = Region { rect: Rect::new(0, 0, w as i32, h as i32), ch: 4, data: data.clone() };
+        let mut hole = vec![false; w * h];
+        for y in 20..44 {
+            for x in 22..40 {
+                hole[y * w + x] = true;
+            }
+        }
+        let lama = photocraft_lama::synthetic::tiny_model();
+        let ctx = crate::jobs::JobCtx::new();
+        let (out, used) = super::fill_window(
+            &source,
+            PixelFormat::RGBA8,
+            &hole,
+            "lama",
+            &ctx,
+            Some(|img: &photocraft_ml::Rgb, mask: &[f32], cancel: &dyn Fn() -> bool| photocraft_ml::inpaint_with_lama(img, mask, &lama, cancel)),
+        )
+        .unwrap();
+        assert_eq!(used, "lama");
+        assert_eq!(out.len(), data.len());
+        let changed = (0..w * h).filter(|i| hole[*i] && out[i * 4..i * 4 + 3] != data[i * 4..i * 4 + 3]).count();
+        assert!(changed > 200, "only {changed} of the hole's pixels changed");
+        // Away from the hole (and its 2 px feather) the picture is exactly the input.
+        let far = |x: usize, y: usize| !(17..46).contains(&y) || !(19..43).contains(&x);
+        for y in 0..h {
+            for x in 0..w {
+                if far(x, y) {
+                    let i = (y * w + x) * 4;
+                    assert_eq!(&out[i..i + 3], &data[i..i + 3], "({x},{y})");
+                }
+            }
+        }
+    }
+
     #[test]
     fn remove_subject_model_errors_and_bad_outputs_are_not_silently_filled() {
         use photocraft_color::PixelFormat;

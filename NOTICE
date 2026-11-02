@@ -48,6 +48,13 @@ port was modified by the LightCraft contributors (2026): translated from Python/
 candle and restructured; each ported file says so. Because of this, crates/sam3 is licensed under the
 Apache License 2.0 only (LICENSE-APACHE), not under the MIT option.
 
+crates/lama (photocraft-lama) is LightCraft's crates/lama (https://github.com/techneissa/lightcraft,
+commit 05908fa4f), a port to Rust on candle of the generator of LaMa (https://github.com/advimman/lama,
+Suvorov et al., licensed under the Apache License 2.0). Because of this, crates/lama is licensed under the
+Apache License 2.0 only (LICENSE-APACHE), not under the MIT option. The big-lama weights are not part of
+PhotoCraft and are never distributed with it; they are downloaded into the models folder only when a
+user asks.
+
 The SAM 3 weights are not part of PhotoCraft and are never distributed with it. A user puts the
 facebook/sam3 checkpoint in the models folder only when they choose to, under Meta's SAM License
 (https://github.com/facebookresearch/sam3/blob/main/LICENSE), a separate, non-OSI licence.

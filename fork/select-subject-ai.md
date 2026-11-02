@@ -2,7 +2,7 @@
 
 ## What it does
 
-AI Select Subject and Remove Subject: upstream PR #8231 taken early (a real merge of its head `09aad5020`: BiRefNet-lite and LaMa through the pure-Rust `tract`, models downloaded only from Preferences ▸ AI Models or `photocraft-cli models fetch`, fixed URLs, pinned SHA-256), joined with the macOS cutout into ONE preference `tools.selectSubjectEngine` = auto (macOS cutout → AI model if installed → Classic) / macos / model / classic; the same choice drives Remove Background and Remove Subject; `select.subject` is a background job; `sampleAllLayers` now defaults to false (the selected layer). Fork fixes: bilinear matte upscale, the model plan freed after every run, cancel or error (peak ~9 GB, idle ~2.2 GB), a total-RAM check (under 12 GB → Classic with a note).
+AI Select Subject and Remove Subject: upstream PR #8231 taken early (a real merge of its head `09aad5020`: BiRefNet-lite through the pure-Rust `tract`, LaMa since `feat/shared-models-lama` from `big-lama.pt` on candle ([lama.md](lama.md); upstream's ONNX LaMa is no longer downloaded), models downloaded only from Preferences ▸ AI Models or `photocraft-cli models fetch`, fixed URLs, pinned SHA-256), joined with the macOS cutout into ONE preference `tools.selectSubjectEngine` = auto (macOS cutout → AI model if installed → Classic) / macos / model / classic; the same choice drives Remove Background and Remove Subject; `select.subject` is a background job; `sampleAllLayers` now defaults to false (the selected layer). Fork fixes: bilinear matte upscale, the model plan freed after every run, cancel or error (peak ~9 GB, idle ~2.2 GB), a total-RAM check (under 12 GB → Classic with a note).
 
 ## Branch
 
@@ -10,7 +10,7 @@ AI Select Subject and Remove Subject: upstream PR #8231 taken early (a real merg
 
 ## Own files
 
-from the PR: `crates/ml/` (fork adds `ram.rs`), `crates/engine/src/cmd/remove_subject_cmds.rs`, `apps/photocraft-cli/src/models.rs`, `crates/ui-egui/src/prefs/prefs_ui/ai_models.rs`, `docs/ml.md`, `docs/remove-subject.md`; fork: `crates/engine/examples/select_subject_quickmask.rs`
+from the PR: `crates/ml/` (fork adds `ram.rs`), `crates/engine/src/cmd/remove_subject_cmds.rs`, `apps/photocraft-cli/src/models.rs`, `crates/ui-egui/src/prefs/prefs_ui/ai_models.rs`, `docs/ml.md`, `docs/remove-subject.md`; fork: `crates/engine/examples/select_subject_quickmask.rs`; `crates/ml/src/inpaint.rs` now calls `photocraft-lama` (see [lama.md](lama.md))
 
 ## Hooks in official files
 
@@ -27,4 +27,4 @@ cargo test -p photocraft-ml
 
 ## When upstream merges
 
-**When upstream merges #8231:** by merge commit, git sees it as merged; if squashed, expect conflicts in `smartselect_cmds.rs`, `cutout_cmds.rs`, `remove_subject_cmds.rs`, `ml/backend.rs`: keep upstream where it matches, re-apply the engine choice and the plan freeing. The merge commit `00f8aa768` does not name `jobs_ui.rs` (a `select.subject` result arm), the rewritten `smartselect_macos.rs` (`step`), `prefs_ui/fields.rs` (~90 lines: section list re-indent, AI Models line), nor `Cargo.lock`'s `itertools` 0.10.5 → 0.13/0.14/0.15 and `winsafe` `crates/ml/src/store.rs`, `install.rs` and `backend.rs` are rewritten by `feat/shared-models` (a model is a folder of `ModelFile`s, `model_location`, `install_dir`, `Source`): if #8231 lands as is, keep the fork's version of those three files, `lib.rs`'s `pub use store::{…}` line, `ai_models.rs` (`found`, `place`) and `models.rs` (`list`).
+**When upstream merges #8231:** by merge commit, git sees it as merged; if squashed, expect conflicts in `smartselect_cmds.rs`, `cutout_cmds.rs`, `remove_subject_cmds.rs`, `ml/backend.rs`: keep upstream where it matches, re-apply the engine choice and the plan freeing. The merge commit `00f8aa768` does not name `jobs_ui.rs` (a `select.subject` result arm), the rewritten `smartselect_macos.rs` (`step`), `prefs_ui/fields.rs` (~90 lines: section list re-indent, AI Models line), nor `Cargo.lock`'s `itertools` 0.10.5 → 0.13/0.14/0.15 and `winsafe` `crates/ml/src/store.rs`, `install.rs` and `backend.rs` are rewritten by `feat/shared-models` (a model is a folder of `ModelFile`s, `model_location`, `install_dir`, `Source`): if #8231 lands as is, keep the fork's version of those three files and of `inpaint.rs` (it no longer uses the ONNX LaMa), `lib.rs`'s `pub use store::{…}` line, `ai_models.rs` (`found`, `place`) and `models.rs` (`list`).

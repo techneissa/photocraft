@@ -1,18 +1,20 @@
 //! # photocraft-ml
 //!
 //! Local neural-network inference for the editor, on [tract](https://github.com/sonos/tract)
-//! (pure Rust ONNX): no native runtime, no `unsafe`. Inference never touches the network; the only
+//! (pure Rust ONNX) for BiRefNet-lite and on [candle](https://github.com/huggingface/candle)
+//! (`photocraft-lama`) for LaMa: no native runtime, no `unsafe`. Inference never touches the network; the only
 //! network access is the model download in `install.rs`, which runs when the user asks for it
 //! (Preferences › AI Models, `photocraft-cli models fetch`).
 //!
 //! * [`segment_subject`]: salient-object matte (BiRefNet-lite, MIT) with a guided-filter edge
 //!   refinement so hair and fur keep partial coverage at full resolution.
-//! * [`inpaint`]: large-hole inpainting (LaMa, Apache-2.0) on a context window around the hole,
-//!   composited back so only the hole changes.
+//! * [`inpaint`]: large-hole inpainting (LaMa, Apache-2.0; `big-lama.pt` through `photocraft-lama`) on a
+//!   context window around the hole, composited back so only the hole changes.
 //!
 //! Models are **not** in the repository or the binary. They are looked up by [`model_path`] in
 //! `PHOTOCRAFT_MODELS_DIR` if set, else the folder shared by the Craft apps
-//! (`ArtCraft/models/<model-id>/`), else the old `PhotoCraft/models` (see `store.rs`); an absent model is
+//! (`ArtCraft/models/<model-id>/`), else the old `PhotoCraft/models` (see `store.rs`; [`migrate_old_models`]
+//! moves what is there into the shared folder when the app starts); an absent model is
 //! [`MlError::ModelMissing`], and callers fall back to the classical algorithms. Licences and
 //! sources are listed in `ATTRIBUTION.md` and `docs/ml.md`.
 //!
@@ -28,15 +30,21 @@ mod inpaint_detail;
 mod install;
 #[cfg(not(target_arch = "wasm32"))]
 mod marker;
+#[cfg(not(target_arch = "wasm32"))]
+mod migrate;
 mod ram;
 mod resize;
 mod segment;
 mod store;
 
 pub use guided::guided_filter;
+#[cfg(not(target_arch = "wasm32"))]
+pub use inpaint::inpaint_with_lama;
 pub use inpaint::{INPAINT_SIZE, inpaint, inpaint_with};
 #[cfg(not(target_arch = "wasm32"))]
 pub use install::{download, remove};
+#[cfg(not(target_arch = "wasm32"))]
+pub use migrate::{Migration, migrate_old_models};
 pub use ram::{check_memory, min_total_memory, physical_memory};
 pub use segment::{SEGMENT_SIZE, segment_subject, segment_subject_with};
 pub use store::{

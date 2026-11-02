@@ -211,6 +211,14 @@ fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, found: impl Fn(Model) -> 
             if let (Phase::Installed, Some(source)) = (&state.phase, row.source) {
                 ui.label(RichText::new(crate::i18n::fmt(tl!("Found in: {place}"), &[("place", place(source))])).color(t.text_dim));
             }
+            // The shared folder the model lives in, or goes to when it is downloaded (SAM 3 without its files shows its own below).
+            if (row.model.downloadable() || state.phase == Phase::Installed)
+                && let Some(dir) = photocraft_ml::install_dir(row.model)
+            {
+                let folder = dir.display().to_string();
+                let line = crate::i18n::fmt(tl!("Folder: {folder}"), &[("folder", &folder)]);
+                ui.add(egui::Label::new(RichText::new(line).color(t.text_dim)).selectable(true));
+            }
             match state.phase {
                 // No public download (SAM 3): say where the files go instead of a Download button.
                 Phase::Idle if !row.model.downloadable() => {
@@ -465,6 +473,22 @@ mod tests {
         assert_eq!(harness.get_all_by_label("Found in: Custom Folder").count(), Model::ALL.len() - 1);
         assert_eq!(harness.get_all_by_label("Remove").count(), downloadable().count());
         assert_eq!(harness.query_all_by_label("Download").count(), 0);
+    }
+
+    #[test]
+    fn every_downloadable_model_shows_its_folder() {
+        use egui_kittest::kittest::Queryable;
+        let harness = installed_page(|_| None);
+        // Where the folder is depends on this computer's home folder; every downloadable model names its own.
+        for model in downloadable() {
+            if let Some(dir) = photocraft_ml::install_dir(model) {
+                harness.get_by_label(&format!("Folder: {}", dir.display()));
+            }
+        }
+        // SAM 3 without its files shows where to put them instead, and with them shows its folder like the others.
+        assert_eq!(harness.query_all_by_label_contains("Folder: ").count(), downloadable().count());
+        let installed = installed_page(|_| Some(Source::Shared));
+        assert_eq!(installed.query_all_by_label_contains("Folder: ").count(), Model::ALL.len());
     }
 
     #[test]

@@ -5549,6 +5549,7 @@ dependencies = [
  "photocraft-format",
  "photocraft-geom",
  "photocraft-io",
+ "photocraft-ml",
  "photocraft-raster",
  "photocraft-tablet",
  "photocraft-ui-egui",
@@ -5729,6 +5730,7 @@ dependencies = [
  "photocraft-geom",
  "photocraft-io",
  "photocraft-ipp",
+ "photocraft-lama",
  "photocraft-macvision",
  "photocraft-ml",
  "photocraft-ops",
@@ -5851,6 +5853,17 @@ name = "photocraft-ipp"
 version = "0.19.0"
 
 [[package]]
+name = "photocraft-lama"
+version = "0.19.0"
+dependencies = [
+ "candle-core",
+ "candle-nn",
+ "log",
+ "thiserror 2.0.21",
+ "zip 7.4.0",
+]
+
+[[package]]
 name = "photocraft-macvision"
 version = "0.19.0"
 dependencies = [
@@ -5869,6 +5882,7 @@ name = "photocraft-ml"
 version = "0.19.0"
 dependencies = [
  "image",
+ "photocraft-lama",
  "reqwest",
  "sha2",
  "tract-onnx",
