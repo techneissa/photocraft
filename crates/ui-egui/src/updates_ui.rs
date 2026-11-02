@@ -37,6 +37,10 @@ fn release_of(found: &photocraft_engine::updates_cmds::Release) -> craft_update:
 }
 
 pub(crate) fn check(app: &mut PhotocraftApp, _ctx: &egui::Context, params: Value) -> Result<Value, String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    if app.fork_update_rt.official_off {
+        return crate::fork_update::check(app, _ctx, params);
+    }
     let before = app.session.updates.status.clone();
     let result = app.run("help.checkForUpdates", params);
     // A check that fails to start still shows its failure and Check Again; the command error
@@ -56,6 +60,10 @@ pub(crate) fn check(app: &mut PhotocraftApp, _ctx: &egui::Context, params: Value
 }
 
 pub(crate) fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    #[cfg(not(target_arch = "wasm32"))]
+    if app.fork_update_rt.official_off {
+        return crate::fork_update::tick(app, ctx);
+    }
     // `updates.status` also polls (automation may consume the result before this frame).
     app.session.updates.poll();
     if let Status::Available { release } = &app.session.updates.status
@@ -85,6 +93,9 @@ pub(crate) fn show(_app: &mut PhotocraftApp, _ctx: &egui::Context) {}
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    if app.fork_update_rt.official_off {
+        return crate::fork_update::show(app, ctx);
+    }
     let mut download: Option<String> = None;
     {
         let was_open = app.updates_rt.updater.prompt_open();
