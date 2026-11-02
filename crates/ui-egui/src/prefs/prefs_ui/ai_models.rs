@@ -178,6 +178,12 @@ fn place(source: Source) -> &'static str {
     }
 }
 
+/// The second click of Remove. A model in the shared folder (`ArtCraft/models`) belongs to every ArtCraft app
+/// (`lama/big-lama.pt` is LightCraft's fill too), so the button says it is removed for all of them.
+fn confirm_remove_label(source: Option<Source>) -> &'static str {
+    if source == Some(Source::Shared) { tl!("Remove for Every ArtCraft App?") } else { tl!("Confirm remove") }
+}
+
 /// Megabytes with one decimal, as the size column shows them.
 fn mb(bytes: u64) -> String {
     format!("{:.1}", bytes as f64 / 1_000_000.0)
@@ -253,7 +259,7 @@ fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, found: impl Fn(Model) -> 
                 Phase::Installed if row.source == Some(Source::Old) || !row.model.downloadable() => {}
                 Phase::Installed => {
                     ui.horizontal(|ui| {
-                        if widgets::secondary_button(ui, if row.confirm_remove { tl!("Confirm remove") } else { tl!("Remove") }, 0.0).clicked() {
+                        if widgets::secondary_button(ui, if row.confirm_remove { confirm_remove_label(row.source) } else { tl!("Remove") }, 0.0).clicked() {
                             row.remove_with(photocraft_ml::remove);
                         }
                         if row.confirm_remove && widgets::secondary_button(ui, tl!("Cancel"), 0.0).clicked() {
@@ -473,6 +479,29 @@ mod tests {
         assert_eq!(harness.get_all_by_label("Found in: Custom Folder").count(), Model::ALL.len() - 1);
         assert_eq!(harness.get_all_by_label("Remove").count(), downloadable().count());
         assert_eq!(harness.query_all_by_label("Download").count(), 0);
+    }
+
+    #[test]
+    fn removing_a_shared_model_says_it_goes_for_every_artcraft_app() {
+        use egui_kittest::kittest::Queryable;
+        assert_eq!(confirm_remove_label(Some(Source::Shared)), "Remove for Every ArtCraft App?");
+        assert_eq!(confirm_remove_label(Some(Source::Custom)), "Confirm remove");
+        // On the page: the first click only asks, and the asking button names every app.
+        let mut runtime = Runtime::default();
+        for row in &mut runtime.rows {
+            row.lock().phase = Phase::Installed;
+            row.confirm_remove = true;
+        }
+        let mut harness = egui_kittest::Harness::new_ui(move |ui| {
+            if ui.ctx().cumulative_pass_nr() == 0 {
+                crate::PhotocraftApp::setup_context(ui.ctx(), Default::default());
+                return;
+            }
+            show_with(ui, &mut runtime, |_| Some(Source::Shared));
+        });
+        harness.run_steps(2);
+        assert_eq!(harness.get_all_by_label("Remove for Every ArtCraft App?").count(), downloadable().count());
+        assert_eq!(harness.query_all_by_label("Confirm remove").count(), 0);
     }
 
     #[test]
