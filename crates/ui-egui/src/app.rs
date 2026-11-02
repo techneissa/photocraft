@@ -186,6 +186,8 @@ impl PhotocraftApp {
             slow_frames: Default::default(),
             prefs_rt: Default::default(),
             updates_rt: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            fork_update_rt: Default::default(),
             discard: None,
             file_dialog: None,
             tiff_options: None,

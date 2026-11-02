@@ -283,6 +283,10 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                         ui.label(RichText::new(tl!("These settings aren't available in PhotoCraft yet.")).color(t.text_faint));
                     } else if let Some(obj) = values.get_mut(&section).and_then(Value::as_object_mut) {
                         section_fields(ui, &section, obj, &order, lang, system, filter);
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if section == "general" && crate::fork_update::row_matches(filter) {
+                            crate::fork_update::settings_row(ui, app);
+                        }
                         if section == "fileHandling" {
                             ui.label(
                                 RichText::new(tl!("0 turns this threshold off; SVG groups nested deeper than 100 levels are always rasterized."))

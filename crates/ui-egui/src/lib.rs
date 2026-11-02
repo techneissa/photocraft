@@ -61,6 +61,8 @@ pub mod state;
 pub mod texel_guard;
 pub mod theme;
 pub use titlebar::{Caption, CaptionFamily, CaptionIcon, CaptionIcons, CaptionStyle, RenderIconFn};
+#[cfg(not(target_arch = "wasm32"))]
+pub mod fork_update;
 pub(crate) mod tool_memory;
 pub mod updates_ui;
 pub mod widgets;
@@ -682,6 +684,9 @@ pub struct PhotocraftApp {
     /// Preferences, autosave and snapping runtime state (see `prefs_ui`, `snap_ui`).
     pub(crate) prefs_rt: prefs_ui::Runtime,
     pub(crate) updates_rt: updates_ui::Runtime,
+    /// techneissa's own update check (fork; the official one is off).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fork_update_rt: fork_update::Runtime,
     /// Close, Revert or Exit parked behind the unsaved-changes prompt (see `discard_ui`).
     pub(crate) discard: Option<discard_ui::Prompt>,
     /// The Open or Save dialog in progress, and the action waiting on it (see `file_dialog`).
