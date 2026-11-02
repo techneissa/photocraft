@@ -427,7 +427,9 @@ fn cancelling_stops_the_encoding_and_only_a_forced_prepare_starts_it_again() {
     std::thread::sleep(Duration::from_millis(60));
     assert_eq!(s.sam3_prepare(false, Prepare::Auto).unwrap(), Sam3Status::Cancelled, "the UI's polling does not undo Esc");
     assert_eq!(fake.state().encodes, 0, "the stopped encoding made nothing");
-    assert_eq!(s.sam3_prepare(false, Prepare::Force).unwrap(), Sam3Status::Preparing);
+    // The gate is open, so the forced encoding may already be done when prepare returns.
+    let forced = s.sam3_prepare(false, Prepare::Force).unwrap();
+    assert!(matches!(forced, Sam3Status::Preparing | Sam3Status::Ready), "{forced:?}");
     assert_eq!(s.sam3_wait(false, Duration::from_secs(10)), Sam3Status::Ready);
     // the command does the same
     assert_eq!(s.execute("select.objectPrepare", json!({"cancel": true})).unwrap()["cancelled"], false);
@@ -463,7 +465,9 @@ fn an_idle_unload_is_noticed_and_not_undone_by_polling() {
     assert!(s.sam3_hover_source(false).is_none());
     let r = click(&mut s, 200.0, 100.0, json!({}));
     assert!(r.get("engine").is_none() && r.get("note").is_none(), "Classic, quietly: {r}");
-    assert_eq!(s.sam3_prepare(false, Prepare::Force).unwrap(), Sam3Status::Preparing);
+    // The fake encodes at once, so a forced prepare may already be done when it returns.
+    let forced = s.sam3_prepare(false, Prepare::Force).unwrap();
+    assert!(matches!(forced, Sam3Status::Preparing | Sam3Status::Ready), "{forced:?}");
     assert_eq!(s.sam3_wait(false, Duration::from_secs(10)), Sam3Status::Ready);
 }
 
