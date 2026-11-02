@@ -93,3 +93,32 @@ fn navigator_draws_the_gpu_canvas_texture_and_follows_edits() {
     assert!(h.state().navigator_textures.contains_key(&id), "the CPU thumbnail again");
     assert!(near(preview_px(&mut h, 0.25, 0.5), [255, 0, 0]) && near(preview_px(&mut h, 0.75, 0.5), [0, 0, 255]), "same picture, unflipped");
 }
+
+#[test]
+fn navigator_stays_on_the_gpu_texture_while_a_free_transform_box_moves() {
+    let _gpu = photocraft_testkit::gpu_lock();
+    let Some(mut h) = harness() else { return };
+    h.run_steps(8);
+    if !h.state().perf.gpu {
+        eprintln!("skipping: the canvas fell back to the CPU here");
+        return;
+    }
+    let id = h.state().session.active().expect("doc").doc.id;
+    h.state_mut().run("layer.new.layer", json!({})).unwrap();
+    h.state_mut().run("select.rect", json!({"x": 100, "y": 100, "width": 100, "height": 100})).unwrap();
+    h.state_mut().run("edit.fill", json!({"color": "#0000ff"})).unwrap();
+    h.state_mut().run("select.deselect", json!({})).unwrap();
+    h.run_steps(4);
+    let ctx = h.ctx.clone();
+    crate::transform_tool::begin(h.state_mut(), &ctx).unwrap();
+    // Each step moves the box, so each frame has a new mesh to show.
+    for _ in 0..4 {
+        let t = h.state_mut().ui.transform.as_mut().expect("box open");
+        t.quad = t.quad.map(|q| [q[0] + 25.0, q[1] + 25.0]);
+        h.run_steps(2);
+        assert!(h.state().navigator_gpu.contains_key(&id), "the Navigator keeps the GPU canvas view");
+        assert!(!h.state().navigator_textures.contains_key(&id), "no CPU composite of the moving mesh");
+    }
+    assert!(near(preview_px(&mut h, 0.625, 0.75), [0, 0, 255]), "the Navigator shows the box where it is");
+    assert!(near(preview_px(&mut h, 0.375, 0.5), [255, 0, 0]), "and the red it left behind");
+}
