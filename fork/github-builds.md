@@ -13,7 +13,11 @@ The workflow `.github/workflows/fork-ci.yml` (Actions ▸ Fork CI) runs the offi
 `cargo xtask ci`, through `fork/ci.sh`) on every pull request to `custom` and every push to it, the daily merge
 included, so the full suite runs on GitHub and not on this Mac (the fork is public, so GitHub's runners are free).
 It skips the accepted failures in `fork/known-failures.txt`, so a red run is a new failure: fix it, or add the test
-there with a `#` line saying why. The official `CI` workflow (`ci.yml`, with Windows and web) is switched off in this fork (2026-11-02): it always
+there with a `#` line saying why. A pull request tests only the packages it can affect (`fork/affected.py`: the
+changed packages and every package that depends on them; a Markdown-only change runs no Rust checks; a change to
+`Cargo.toml`, `Cargo.lock`, CI files or a file outside the packages tests everything); a push to `custom` always tests
+the whole workspace. The tests run on three machines at once (`--part 1/3` to `3/3`); the first also runs fmt,
+clippy, layers, panic_hunt, doctests and the web check. The official `CI` workflow (`ci.yml`, with Windows and web) is switched off in this fork (2026-11-02): it always
 stopped at the scorecard check here, and the fork is Mac only.
 
 The official project's other workflows (Docs, FreeBSD, Nix, Packaging lint, Perf nightly, Release, SonarCloud,

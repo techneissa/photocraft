@@ -48,8 +48,15 @@ jobs:
           echo "packages=$packages" >> "$GITHUB_OUTPUT"
           echo "fonts=$fonts" >> "$GITHUB_OUTPUT"
 
+  # The tests split over three machines that run at once (free for a public repo); job 1 also runs fmt,
+  # clippy, layers, panic_hunt, doctests and wasm. A pull request tests only the packages it can affect
+  # (fork/affected.py); a push to `custom` tests everything.
   gate:
     needs: pins
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3]
     uses: storytold/craft-common-actions/.github/workflows/gate.yml@main
     with:
       packages: ${{ needs.pins.outputs.packages }}
@@ -61,5 +68,5 @@ jobs:
         PHOTOCRAFT_NO_PRINT=1
         LPDEST=photocraft-no-such-printer
       # fork/ci.sh runs every step even after a failure, so one run lists them all
-      timeout-minutes: 120
-      command: sh fork/ci.sh
+      timeout-minutes: 90
+      command: sh fork/ci.sh --part ${{ matrix.part }}/3
