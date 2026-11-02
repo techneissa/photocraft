@@ -505,7 +505,9 @@ pub(super) fn ensure_gpu(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
     let preview_key = raw_key ^ display_key;
     // The Navigator may draw this texture while it holds the plain document or a drag preview
     // that updates the full texture (not an adjustment preview composited only where the view is).
-    if raw_key == 0 || navigator_waits_for_drag(app, idx) {
+    // A transform box's moving layer is drawn into the full texture too, so the Navigator needs
+    // no CPU composite of the mesh while it moves.
+    if raw_key == 0 || navigator_waits_for_drag(app, idx) || crate::transform_live::is_live_key(raw_key) {
         app.navigator_plain.insert(id);
     } else {
         app.navigator_plain.remove(&id);

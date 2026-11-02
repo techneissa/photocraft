@@ -56,6 +56,19 @@ pub(crate) struct LiveSession {
     applied: Option<(u64, Arc<Document>)>,
     /// Preferences › Interpolation is Nearest: the mesh samples the nearest texel.
     nearest: bool,
+    /// The document, the moving pixels and the unmoved ones scaled down for the Navigator.
+    reduced: Option<Reduced>,
+}
+
+/// A live session scaled down by `k` (see [`navigator_buffer`]).
+struct Reduced {
+    k: u32,
+    /// The prepared document this was made from.
+    from: Arc<Document>,
+    /// The same document scaled down.
+    doc: Document,
+    source: Arc<Surface>,
+    rest: Option<Arc<Surface>>,
 }
 
 impl LiveSession {
@@ -86,6 +99,7 @@ impl LiveSession {
             origin,
             applied: None,
             nearest: false,
+            reduced: None,
         };
         s.base = Arc::new(live::prepare(doc, &s.live(Arc::new(LiveMesh::default()))));
         Some(s)
@@ -365,6 +379,58 @@ pub(crate) fn cpu_doc(app: &mut PhotocraftApp, doc: Arc<Document>, key: u64) -> 
     d
 }
 
+/// Whether `key` is one of the live transform's preview keys.
+pub(crate) fn is_live_key(key: u64) -> bool {
+    (BASE..BASE << 1).contains(&key)
+}
+
+/// The Navigator's picture (longest side `side`) of `doc`, shown under preview `key`, when that is
+/// a live transform's document: the mesh drawn on a copy of the document scaled down by the same
+/// factor [`photocraft_compose::thumbnail_buffer`] uses, so the moving layer costs a thumbnail
+/// composite, not an f32 raster of the whole mesh area (about 380 MB at 24 MP). The scaled copy
+/// is made once per prepared document, the scaled pixels once per session; a frame scales only
+/// the mesh. `None` when the document is small enough that the full composite is cheap, isn't a
+/// faithful reduction (layer effects, vector masks) or isn't this session's: the caller then
+/// composites [`cpu_doc`] as before.
+pub(crate) fn navigator_buffer(app: &mut PhotocraftApp, doc: &Arc<Document>, key: u64, side: u32) -> Option<photocraft_compose::Buffer> {
+    let s = session_mut(app).filter(|s| s.doc == doc.id && s.key() == key)?;
+    let k = reduction(doc, side)?;
+    let (_, live) = s.current()?;
+    if !s.reduced.as_ref().is_some_and(|r| r.k == k && Arc::ptr_eq(&r.from, &s.base)) {
+        if !photocraft_compose::proxy::proxy_faithful(&s.base) {
+            return None;
+        }
+        let down = |x: &Arc<Surface>| Arc::new(photocraft_compose::proxy::downsample(x, k));
+        s.reduced = Some(Reduced {
+            k,
+            from: s.base.clone(),
+            doc: photocraft_compose::proxy::proxy_document(&s.base, k),
+            source: down(&s.source),
+            rest: s.rest.as_ref().map(down),
+        });
+    }
+    let r = s.reduced.as_ref()?;
+    // The scaled surfaces' pixel `i` is the original's pixel `i * k`, so a point is `(x - .5) / k + .5`.
+    let scale = |p: [f32; 2]| p.map(|v| (v - 0.5) / k as f32 + 0.5);
+    let mesh = LiveMesh {
+        pos: live.mesh.pos.iter().copied().map(scale).collect(),
+        uv: live.mesh.uv.iter().copied().map(scale).collect(),
+        indices: live.mesh.indices.clone(),
+    };
+    let reduced = LiveTransform { layer: live.layer, source: r.source.clone(), rest: r.rest.clone(), mesh: Arc::new(mesh), nearest: live.nearest };
+    let moved = live::apply(&r.doc, &reduced);
+    let (w, h) = photocraft_compose::thumbnail_size(doc, side);
+    Some(photocraft_compose::render_reduced(&moved, w, h))
+}
+
+/// The factor [`navigator_buffer`] scales `doc` down by, as `thumbnail_buffer` picks it; `None`
+/// below the size where it uses a scaled copy.
+fn reduction(doc: &Document, side: u32) -> Option<u32> {
+    let b = doc.bounds();
+    let k = b.width().max(b.height()).max(1) / side.max(1).saturating_mul(2);
+    (k >= 2 && doc.size.area() > photocraft_compose::PROXY_THUMBNAIL_PIXELS).then_some(k)
+}
+
 /// What changed on the canvas between preview keys `seen` and `now` of document `doc` (at
 /// `revision`): where the moving layer was in each (its original place for the document itself).
 /// `None` when either key isn't one of this session's recent ones.
@@ -516,5 +582,88 @@ mod tests {
         assert!(m.triangles().next().is_none());
         t.rect = [0.0, 0.0, f64::NAN, 1.0];
         assert!(mesh(t).indices.is_empty());
+    }
+
+    /// A `w`×`h` document with an orange layer over white, filling it but for `inset` pixels on each
+    /// side, and Free Transform open on that layer.
+    fn big_app(w: u32, h: u32, inset: u32) -> PhotocraftApp {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": w, "height": h, "background": "white"})).unwrap();
+        app.run("layer.new.layer", json!({})).unwrap();
+        app.run("select.rect", json!({"x": inset, "y": inset, "width": w - 2 * inset, "height": h - 2 * inset})).unwrap();
+        app.run("edit.fill", json!({"contents": "color", "color": "#ff8000"})).unwrap();
+        app.run("select.deselect", json!({})).unwrap();
+        crate::transform_tool::begin(&mut app, &egui::Context::default()).unwrap();
+        app
+    }
+
+    /// Moves the box right and down by `d` document pixels and returns what the canvas shows.
+    fn nudge(app: &mut PhotocraftApp, d: f64) -> (Arc<Document>, u64) {
+        let t = app.ui.transform.as_mut().unwrap();
+        t.quad = t.quad.map(|q| [q[0] + d, q[1] + d]);
+        crate::canvas::display_doc(app, 0)
+    }
+
+    /// On a document the Navigator reduces, the moving layer is drawn on the scaled copy and
+    /// matches the full-size composite's thumbnail; a small document keeps the full path.
+    #[test]
+    fn the_navigator_draws_the_moving_layer_on_a_scaled_copy() {
+        const SIDE: u32 = crate::canvas::NAVIGATOR_SIDE;
+        let mut small = app_with_layer("Normal");
+        crate::transform_tool::begin(&mut small, &egui::Context::default()).unwrap();
+        let (shown, key) = nudge(&mut small, 5.0);
+        assert!(is_live_key(key));
+        assert!(navigator_buffer(&mut small, &shown, key, SIDE).is_none(), "a small document is composited whole");
+
+        let mut app = big_app(4400, 4000, 1100);
+        let (shown, key) = nudge(&mut app, 400.0);
+        let fast = navigator_buffer(&mut app, &shown, key, SIDE).expect("reduced path");
+        let full = photocraft_compose::thumbnail_buffer(&cpu_doc(&mut app, shown.clone(), key), SIDE);
+        assert_eq!((fast.rect.width(), fast.rect.height()), (full.rect.width(), full.rect.height()));
+        let n = fast.px.len() as f32;
+        let mean = fast.px.iter().zip(&full.px).map(|(a, b)| (0..4).map(|k| (a[k] - b[k]).abs()).sum::<f32>() / 4.0).sum::<f32>() / n;
+        assert!(mean < 0.01, "mean difference {mean}");
+        let w = fast.rect.width() as usize;
+        let at = |b: &photocraft_compose::Buffer, fx: f32, fy: f32| b.px[(fy * b.rect.height() as f32) as usize * w + (fx * w as f32) as usize];
+        // The orange sits at 1/4..3/4 and moved by 400/4400 right and 400/4000 down.
+        assert!(at(&fast, 0.7, 0.7)[2] < 0.1 && at(&fast, 0.7, 0.7)[0] > 0.9, "orange where it landed: {:?}", at(&fast, 0.7, 0.7));
+        assert!(at(&fast, 0.27, 0.27)[2] > 0.9, "white where it left: {:?}", at(&fast, 0.27, 0.27));
+        // The scaled copy is made once: a second mesh reuses it.
+        let (shown, key) = nudge(&mut app, 100.0);
+        assert!(navigator_buffer(&mut app, &shown, key, SIDE).is_some());
+    }
+
+    /// Before/after timing of one Navigator frame of a Free Transform drag on a 24 MP document:
+    /// `cargo test -p photocraft-ui-egui --release --lib navigator_frame_timing -- --ignored --nocapture`
+    #[test]
+    #[ignore = "timing harness"]
+    fn navigator_frame_timing() {
+        const SIDE: u32 = crate::canvas::NAVIGATOR_SIDE;
+        let mut app = big_app(6000, 4000, 0);
+        let ms = |t: std::time::Instant| t.elapsed().as_secs_f64() * 1000.0;
+        // Before: a CPU composite of the whole mesh area, then the thumbnail of that document.
+        let mut before = Vec::new();
+        for _ in 0..5 {
+            let (shown, key) = nudge(&mut app, 20.0);
+            let t = std::time::Instant::now();
+            let moved = cpu_doc(&mut app, shown, key);
+            let _ = photocraft_compose::thumbnail_buffer(&moved, SIDE);
+            before.push(ms(t));
+        }
+        // After: the first frame scales the document and layer once, the next ones the mesh only.
+        let mut after = Vec::new();
+        for _ in 0..6 {
+            let (shown, key) = nudge(&mut app, 20.0);
+            let t = std::time::Instant::now();
+            let _ = navigator_buffer(&mut app, &shown, key, SIDE).expect("reduced path");
+            after.push(ms(t));
+        }
+        // A frame the Navigator already has: the cache check.
+        let t = std::time::Instant::now();
+        let (_, key) = crate::canvas::display_doc(&mut app, 0);
+        let cached_frame = ms(t);
+        eprintln!(
+            "navigator frame, 24 MP Free Transform drag (ms)\n  before, per frame: {before:.0?}\n  after, first frame then per frame: {after:.0?}\n  display_doc for an unchanged key {key}: {cached_frame:.2}"
+        );
     }
 }
