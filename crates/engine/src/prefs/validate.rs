@@ -118,6 +118,8 @@ pub fn range(path: &str) -> Option<(f64, f64)> {
         "tools.nudgeBundlePauseMs" => (100.0, 10_000.0),
         "fileHandling.rasterizeSvgGroupsDeeperThan" => (0.0, photocraft_doc::MAX_GROUP_DEPTH as f64),
         "interface.notificationDurationSeconds" => (1.0, 120.0),
+        // Fork: the Home screen's grid (fork/home-recent-grid.md).
+        "interface.homeRecentCount" => (1.0, 100.0),
         "export.jpegQuality" | "export.webpQuality" => (1.0, 100.0),
         "performance.memoryUsageMb" => (256.0, 1_048_576.0),
         "performance.gpuMemoryMb" => (0.0, 1_048_576.0),

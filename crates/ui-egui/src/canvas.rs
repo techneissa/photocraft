@@ -44,6 +44,8 @@ pub mod select_mask_view;
 mod selection;
 pub mod snap_ui;
 mod start_screen;
+// Fork: the Home screen with a grid of recent-file previews (fork/home-recent-grid.md).
+mod home_grid;
 mod strokes;
 mod tabs;
 mod textures;
