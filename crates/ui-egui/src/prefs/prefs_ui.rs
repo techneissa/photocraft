@@ -84,6 +84,7 @@ mod dialogs;
 mod fields;
 mod graphics;
 mod save;
+mod settings_folder;
 mod settings_sync;
 mod shortcut_target;
 mod shortcuts;
@@ -120,6 +121,7 @@ pub(crate) use save::save_preferences;
 #[cfg(test)]
 use save::{SAVE_RETRY_MAX_S, SAVE_RETRY_S, merge_changes, persist};
 pub use save::{autosave_now, tick};
+pub use settings_folder::{offer_newer_file as offer_newer_sync_file, save_on_exit as save_sync_on_exit};
 /// The one entry point for Assign Shortcut…: the dialog on a command with capture on.
 pub use shortcut_target::open_shortcuts_for;
 #[cfg(test)]
@@ -136,6 +138,8 @@ mod close_keys_tests;
 #[cfg(test)]
 mod recovery_tests;
 
+#[cfg(test)]
+mod settings_folder_tests;
 #[cfg(test)]
 mod settings_sync_tests;
 #[cfg(test)]

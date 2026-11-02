@@ -458,7 +458,8 @@ fn preference_uses_ambient_filesystem(path: &str) -> bool {
     let mut segments = path.split('.').filter(|segment| !segment.is_empty());
     let Some(section) = segments.next() else { return true };
     // File Handling's LUT folder (#6558) is listed from disk; the rest of that section is not.
-    matches!(section, "colorSettings" | "scriptEvents" | "historyLog" | "plugIns" | "scratchDisks")
+    // `sync.folder` (fork/settings-sync.md) names the folder Save to Folder writes to and Load from Folder reads.
+    matches!(section, "colorSettings" | "scriptEvents" | "historyLog" | "plugIns" | "scratchDisks" | "sync")
         || (section == "fileHandling" && segments.next().is_none_or(|key| key == "lutFolder"))
 }
 
