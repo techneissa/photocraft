@@ -89,6 +89,7 @@ mod shortcut_target;
 mod shortcuts;
 mod shortcuts_backup;
 mod shortcuts_chord;
+mod shortcuts_items;
 mod shortcuts_menus;
 mod shortcuts_record;
 mod shortcuts_rows;
@@ -141,6 +142,8 @@ mod settings_sync_tests;
 mod shortcut_capture_tests;
 #[cfg(test)]
 mod shortcut_set_tests;
+#[cfg(test)]
+mod shortcuts_items_tests;
 #[cfg(test)]
 mod shortcuts_upgrade_tests;
 #[cfg(test)]

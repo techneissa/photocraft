@@ -74,10 +74,14 @@ fn take_step(ctx: &egui::Context) -> Option<Step> {
     }
 }
 
+/// Keyboard Shortcuts' recording flags. Waiting for keys is a mode, not an edit: a shortcut applied
+/// while recording and the Enter that ends the recording are one step back for ⌘Z, not two.
+const RECORDING: [&str; 3] = ["capture", "captureAlt", "captureMods"];
+
 /// A parameter dialog's settings: its fields without the private `__` keys (preview toggle,
-/// command, label…).
+/// command, label…) and the recording flags.
 fn settings(fields: &Map<String, Value>) -> Map<String, Value> {
-    fields.iter().filter(|(k, _)| !k.starts_with("__")).map(|(k, v)| (k.clone(), v.clone())).collect()
+    fields.iter().filter(|(k, _)| !k.starts_with("__") && !RECORDING.contains(&k.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect()
 }
 
 /// The parameter dialogs' histories, by dialog id.
@@ -111,20 +115,16 @@ pub fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
         let history = app.dialog_edits.entry(id).or_insert_with(|| EditHistory::new(&now));
         if let Some(step) = take_step(ctx)
             && history.step(&mut now, step)
+            && let Some(d) = app.ui.dialog_mut(id)
         {
-            // A step back to before a recorded shortcut doesn't wait for keys again (and, like
-            // the dialog itself, keeps no capture modifiers then). That isn't an edit of its own:
-            // the step's settled settings say so too, or the next frame would record it and
-            // lose Redo.
-            if let Some(c) = now.get_mut("capture") {
+            d.fields.retain(|k, _| k.starts_with("__") || RECORDING.contains(&k.as_str()));
+            d.fields.extend(now);
+            // A step back to before a recorded shortcut doesn't wait for keys again (and, like the
+            // dialog itself, keeps no capture modifiers then).
+            if let Some(c) = d.fields.get_mut("capture") {
                 *c = Value::Bool(false);
-                now.remove("captureMods");
-                history.settled = now.clone();
             }
-            if let Some(d) = app.ui.dialog_mut(id) {
-                d.fields.retain(|k, _| k.starts_with("__"));
-                d.fields.extend(now);
-            }
+            d.fields.remove("captureMods");
         }
     } else if let Some(d) = app.distort.gallery.as_mut() {
         if let Some(step) = take_step(ctx) {

@@ -142,10 +142,12 @@ fn enter_accepts_one_key_as_the_main_key() {
     h.get_by_label(&crate::shortcuts::pretty("Cmd+N")).click();
     h.run_steps(2);
     key(&mut h, Key::J, Modifiers::COMMAND | Modifiers::SHIFT);
-    assert!(field(&h, id, "overrides").get("file.new").is_none(), "not before Enter");
+    assert_eq!(field(&h, id, "overrides")["file.new"], json!("Cmd+Shift+J"), "the first combination is applied at once");
+    assert_eq!(field(&h, id, "capture"), json!(true), "and the recording stays open for a second one");
     key(&mut h, Key::Enter, Modifiers::NONE);
     assert_eq!(field(&h, id, "overrides")["file.new"], json!("Cmd+Shift+J"));
     assert_eq!(field(&h, id, "capture"), json!(false));
+    assert!(field(&h, id, "__recBefore").is_null(), "nothing is left to take back");
     assert!(h.state().ui.dialogs.iter().any(|d| d.id == id), "Enter accepted the recording, it did not click OK");
 }
 
@@ -175,6 +177,46 @@ fn escape_cancels_and_changes_nothing() {
     assert!(field(&h, id, "overrides").get("file.new").is_none());
     assert_eq!(field(&h, id, "chords"), json!({}));
     assert!(h.state().ui.dialogs.iter().any(|d| d.id == id), "Esc ended the recording, the window stays");
+}
+
+#[test]
+fn escape_puts_back_the_key_the_row_had() {
+    let (mut h, id) = on("edit.keyboardShortcuts", "file.new");
+    set_field(&mut h, id, "overrides", json!({"file.new": "Cmd+Shift+Y"}));
+    set_field(&mut h, id, "capture", json!(true));
+    h.run_steps(2);
+    key(&mut h, Key::K, Modifiers::COMMAND);
+    assert_eq!(field(&h, id, "overrides")["file.new"], json!("Cmd+K"));
+    key(&mut h, Key::Escape, Modifiers::NONE);
+    assert_eq!(field(&h, id, "overrides")["file.new"], json!("Cmd+Shift+Y"), "Esc takes the new key back");
+    assert_eq!(field(&h, id, "capture"), json!(false));
+}
+
+#[test]
+fn a_second_combination_takes_the_first_back_because_the_command_gets_a_chord() {
+    let (mut h, id) = on("edit.keyboardShortcuts", "file.new");
+    h.get_by_label(&crate::shortcuts::pretty("Cmd+N")).click();
+    h.run_steps(2);
+    key(&mut h, Key::K, Modifiers::COMMAND);
+    assert_eq!(field(&h, id, "overrides")["file.new"], json!("Cmd+K"));
+    key(&mut h, Key::J, Modifiers::COMMAND);
+    assert!(field(&h, id, "overrides").get("file.new").is_none(), "the main key is back as it was");
+    key(&mut h, Key::L, Modifiers::COMMAND);
+    assert_eq!(field(&h, id, "overrides")["file.new"], json!("Cmd+L"), "a third combination starts over as a key");
+    key(&mut h, Key::Escape, Modifiers::NONE);
+    assert!(field(&h, id, "overrides").get("file.new").is_none());
+}
+
+#[test]
+fn clicking_away_keeps_the_applied_key() {
+    let (mut h, id) = on("edit.keyboardShortcuts", "file.new");
+    h.get_by_label(&crate::shortcuts::pretty("Cmd+N")).click();
+    h.run_steps(2);
+    key(&mut h, Key::K, Modifiers::COMMAND);
+    set_field(&mut h, id, "capture", json!(false));
+    h.run_steps(2);
+    assert_eq!(field(&h, id, "overrides")["file.new"], json!("Cmd+K"));
+    assert!(field(&h, id, "__recBefore").is_null(), "the recording is over");
 }
 
 #[test]
@@ -211,7 +253,7 @@ fn a_key_in_use_warns_before_enter_and_enter_still_takes_it() {
     assert_eq!(field(&h, id, "messageWarning"), json!(true));
     let message = field(&h, id, "message");
     assert!(message.as_str().unwrap().contains("already in use"), "{message}");
-    assert!(field(&h, id, "overrides").get("file.new").is_none(), "nothing changed yet");
+    assert_eq!(field(&h, id, "overrides")["file.new"], json!("Cmd+S"), "applied with the warning");
     key(&mut h, Key::Enter, Modifiers::NONE);
     assert_eq!(field(&h, id, "overrides")["file.new"], json!("Cmd+S"));
     assert!(field(&h, id, "conflict").is_object(), "Accept and Go to Conflict is offered");

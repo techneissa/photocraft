@@ -63,12 +63,14 @@ fn dropdown_with<T: PartialEq + Clone>(
     let mut reveal = wheel && ui.data_mut(|d| d.remove_temp::<bool>(reveal_id)).unwrap_or(false);
     // The list opens on the press: press, drag onto an option and release to choose it (#2735).
     let (press, close) = crate::press_menu::PressCombo::before(ui, id);
-    let texts: Vec<String> = options.iter().map(|(_, l)| shown(l)).collect();
+    // The labels as shown: made only for an open list, not for the dozens a screen draws closed.
+    let texts_of = || -> Vec<String> { options.iter().map(|(_, l)| shown(l)).collect() };
     let list = list_height(ui);
     // Typing in the open list narrows it, ↩ picks and closes it (`dropdown_search`, #1481).
-    let find = dropdown_search::before(ui, id, &texts);
+    let find = dropdown_search::before_with(ui, id, texts_of, &[]);
     let response =
         craft_ui::ComboBox::from_id_salt(id).selected_text(label).width(width).height(list).icon(chevron_icon).close_behavior(close).search(ui, &find, |ui| {
+            let texts = texts_of();
             fit_widest_option(ui, texts.iter().map(|l| l.as_str()));
             if let Some((v, _)) = find.picked(ui).and_then(|i| options.get(i)) {
                 *current = v.clone();
@@ -281,7 +283,7 @@ pub fn dropdown_with_tooltips<T: PartialEq + Clone>(ui: &mut Ui, id: &str, name:
     let mut changed = false;
     let (press, close) = crate::press_menu::PressCombo::before(ui, id);
     let list = list_height(ui);
-    let find = dropdown_search::before(ui, id, &options.iter().map(|(_, l, _)| tl!(l)).collect::<Vec<_>>());
+    let find = dropdown_search::before_with(ui, id, || options.iter().map(|(_, l, _)| tl!(l).to_string()).collect(), &[]);
     let response =
         craft_ui::ComboBox::from_id_salt(id).selected_text(label).width(width).height(list).icon(chevron_icon).close_behavior(close).search(ui, &find, |ui| {
             fit_widest_option(ui, options.iter().map(|(_, l, _)| tl!(l)));
