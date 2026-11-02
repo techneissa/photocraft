@@ -222,7 +222,8 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     let mut rec_steps = super::shortcuts_record::load_steps(f);
     let mut message = f.get("message").and_then(Value::as_str).unwrap_or("").to_string();
     let mut message_warning = f.get("messageWarning").and_then(Value::as_bool).unwrap_or(false);
-    let items = shortcut_items(app);
+    // Built once, again only when what it reads changes (not on every frame the window is open).
+    let items = super::shortcuts_items::cached(app);
     // The Set row, then the search (the Menus tab searches too).
     if tab == 0 {
         set_row(app, ui, f, (&mut overrides, &mut alt_overrides, &mut chords, &mut whens), &items, &mut message, &mut message_warning);
@@ -296,7 +297,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
         let mut last_top = String::new();
         let (grid_id, columns) = if tab == 0 { ("shortcut-grid", 4) } else { ("menu-grid", 3) };
         egui::Grid::new(grid_id).num_columns(columns).spacing([12.0, 3.0]).striped(true).show(ui, |ui| {
-            for (id, label, path, def) in &items {
+            for (id, label, path, def) in items.iter() {
                 if tab == 1 && crate::tool_shortcuts::tool(id).is_some() {
                     continue;
                 }
@@ -559,6 +560,10 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     f.insert("selected".into(), json!(selected));
     f.insert("capture".into(), json!(capture));
     f.insert("__recSteps".into(), json!(if capture { rec_steps } else { Vec::new() }));
+    if !capture {
+        // The recording is over: what it applied stays, and there is nothing left to take back.
+        f.remove("__recBefore");
+    }
     if capture {
         f.insert("captureMods".into(), capture_mods_json(capture_mods));
     } else {

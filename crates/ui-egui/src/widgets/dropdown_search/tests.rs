@@ -131,6 +131,11 @@ fn shown(h: &Harness<'static, usize>, label: &str) -> bool {
     h.query_by_label(label).is_some()
 }
 
+/// The width of the open list: the widest popup layer (the only one open in these tests).
+fn list_width(h: &Harness<'static, usize>) -> f32 {
+    h.ctx.memory(|m| m.layer_ids().filter(|l| l.order == egui::Order::Foreground).filter_map(|l| m.area_rect(l.id)).map(|r| r.width()).fold(0.0, f32::max))
+}
+
 #[test]
 fn typing_narrows_the_open_list_and_enter_picks() {
     let mut h = dropdown_harness();
@@ -318,4 +323,30 @@ fn space_while_typing_neither_switches_tools_nor_pans() {
     assert_eq!(crate::hold_keys::held_tool(h.state(), &h.ctx), Some(crate::hold_keys::Temporary::Hand));
     h.event(space(false));
     h.run_steps(2);
+}
+
+/// The search field must not feed its own width back into the list: the list grew a little on every
+/// frame while a query was typed (and repainted every frame), until the app crawled.
+#[test]
+fn the_list_keeps_its_width_across_frames_while_a_query_is_typed() {
+    let mut h = dropdown_harness();
+    open(&mut h);
+    h.run_steps(3);
+    let width = list_width(&h);
+    for text in ["d", "a", "r", "k"] {
+        type_text(&mut h, text);
+        for frame in 0..30 {
+            h.run_steps(1);
+            let now = list_width(&h);
+            assert!((now - width).abs() < 0.5, "after \"{text}\", frame {frame}: the list is {now} wide, it was {width} before typing");
+        }
+    }
+    // Backspacing back to nothing and typing again changes nothing either.
+    for _ in 0..4 {
+        h.key_press(egui::Key::Backspace);
+        h.run_steps(5);
+    }
+    type_text(&mut h, "li");
+    h.run_steps(30);
+    assert!((list_width(&h) - width).abs() < 0.5, "{} against {width}", list_width(&h));
 }

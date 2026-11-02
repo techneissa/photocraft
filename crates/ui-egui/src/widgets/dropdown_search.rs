@@ -204,14 +204,17 @@ impl Filter {
             type_ahead::keys(ui, id, None, &[]);
             return;
         }
-        let width = ui.data(|d| d.get_temp::<f32>(id.with("width"))).unwrap_or(FIELD_WIDTH).max(FIELD_MIN);
+        // The field and its magnifier fill the width the full list had, never more: a header wider than the
+        // list widens it, and a width read back from the widened list would widen it again every frame.
+        let list = ui.data(|d| d.get_temp::<f32>(id.with("width")));
+        let width = list.map_or(FIELD_MIN, |list| list - ICON - ui.spacing().item_spacing.x).max(FIELD_MIN);
         let mut query = self.found.borrow().query.clone();
         let t = Tokens::get(ui.ctx());
         ui.horizontal(|ui| {
-            let (icon, _) = ui.allocate_exact_size(egui::vec2(16.0, TEXT_FIELD_H), egui::Sense::hover());
+            let (icon, _) = ui.allocate_exact_size(egui::vec2(ICON, TEXT_FIELD_H), egui::Sense::hover());
             crate::icons::paint(ui, icon, "search", 14.0, t.text_faint);
             ui.memory_mut(|m| m.request_focus(field_id));
-            let field = text_field(ui, field_id, &mut query, "", width - 20.0, false);
+            let field = text_field(ui, field_id, &mut query, "", width, false);
             field.accessible_name(tl!("Search"));
         });
         ui.add_space(2.0);
@@ -244,10 +247,14 @@ impl Filter {
     pub fn row(&self, ui: &Ui, item: &egui::Response) {
         let at = self.row.get();
         self.row.set(at.saturating_add(1));
-        if let Some(id) = self.salt("width") {
+        let found = self.found.borrow();
+        // The width of the full list, until something is typed: while filtering, the list is as wide as
+        // the header made it, and that is not a width to copy back.
+        if found.query.is_empty()
+            && let Some(id) = self.salt("width")
+        {
             ui.data_mut(|d| d.insert_temp(id, item.rect.width()));
         }
-        let found = self.found.borrow();
         if found.query.is_empty() || found.active != at {
             return;
         }
@@ -268,9 +275,11 @@ impl Filter {
     }
 }
 
-/// The width of the field before a row has told how wide the list is, and the narrowest it gets.
-const FIELD_WIDTH: f32 = 140.0;
-const FIELD_MIN: f32 = 90.0;
+/// The narrowest the field gets, and its width before a row has told how wide the list is. Narrow
+/// on purpose: a field wider than the list widens the list.
+const FIELD_MIN: f32 = 48.0;
+/// The width of the magnifier before the field.
+const ICON: f32 = 16.0;
 
 /// A combo box with a search: [`Self::search`] is `show_ui` with the typed text in a field above the
 /// rows.
@@ -286,22 +295,22 @@ impl Searchable for craft_ui::ComboBox<'_> {
 
 /// Searches the open list of dropdown `salt`: takes the typing and the keys that belong to the search.
 /// Call it before the combo box is shown, because a focused combo box button takes ↩ to toggle its
-/// list before the list gets to see the key. `labels` are the options as displayed.
-pub fn before(ui: &mut Ui, salt: &str, labels: &[impl AsRef<str>]) -> Filter {
-    before_enabled(ui, salt, labels, &[])
-}
-
-/// [`before`], where `enabled[i] == false` keeps option `i` out of the matches (an option past the end
-/// of `enabled` is enabled).
-pub fn before_enabled(ui: &mut Ui, salt: &str, labels: &[impl AsRef<str>], enabled: &[bool]) -> Filter {
+/// list before the list gets to see the key. `labels` makes the options as displayed, only when the
+/// list is open: a closed list costs nothing, and a screen has dozens of them every frame.
+/// `enabled[i] == false` keeps option `i` out of the matches (an option past the end of `enabled` is
+/// enabled).
+pub fn before_with(ui: &mut Ui, salt: &str, labels: impl FnOnce() -> Vec<String>, enabled: &[bool]) -> Filter {
     let id = ui.make_persistent_id(salt).with("search");
     let button = ui.make_persistent_id(egui::IdSalt::new(salt));
     // A list that is not open starts with nothing typed when it opens.
     if !craft_ui::ComboBox::is_open(ui.ctx(), button) {
-        ui.data_mut(|d| d.remove::<Search>(id));
+        ui.data_mut(|d| {
+            d.remove::<Search>(id);
+            d.remove::<f32>(id.with("width"));
+        });
         return Filter::default();
     }
-    let labels: Vec<String> = labels.iter().map(|l| l.as_ref().to_owned()).collect();
+    let labels = labels();
     let texts: Vec<&str> = labels.iter().map(String::as_str).collect();
     let mut search: Search = ui.data(|d| d.get_temp(id)).unwrap_or_default();
     let before = search.clone();
