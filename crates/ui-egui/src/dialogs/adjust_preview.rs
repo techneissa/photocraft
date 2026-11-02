@@ -207,6 +207,18 @@ fn cheap(app: &PhotocraftApp, doc: &Document) -> bool {
     }
 }
 
+/// Whether Image › Adjustments `kind` with `params` on document `idx` would edit a channel (the
+/// Channels panel's target or the Quick Mask) or a layer mask instead of the layer's pixels.
+pub(crate) fn targets_channel(app: &PhotocraftApp, idx: usize, kind: &str, params: &Value) -> bool {
+    if let Some(target) = params.get("target") {
+        return target.as_str() != Some("pixels");
+    }
+    let Some(st) = app.session.documents().get(idx) else { return false };
+    st.channel_view.target != photocraft_engine::channel_cmds::ChannelTarget::Composite
+        || st.doc.quick_mask.is_some()
+        || !app.with_mask_target(&format!("image.adjustments.{kind}"), Value::Null).is_null()
+}
+
 /// Bring the cached preview up to date for document `idx` (the active one) and return it.
 fn update(app: &mut PhotocraftApp, idx: usize) -> Option<&AdjustPreview> {
     if app.session.active_index() != Some(idx) {
@@ -225,13 +237,7 @@ fn update(app: &mut PhotocraftApp, idx: usize) -> Option<&AdjustPreview> {
     let (doc_id, revision, target) = (st.doc.id, st.revision, st.active_layer?);
     // Commands that target a channel (Channels panel / Quick Mask) or a layer mask keep the proxy
     // preview.
-    let channel_target = if let Some(target) = params.get("target") {
-        target.as_str() != Some("pixels")
-    } else {
-        st.channel_view.target != photocraft_engine::channel_cmds::ChannelTarget::Composite
-            || st.doc.quick_mask.is_some()
-            || !app.with_mask_target(&format!("image.adjustments.{kind}"), Value::Null).is_null()
-    };
+    let channel_target = targets_channel(app, idx, &kind, &params);
     let session = hash(&[&doc_id.0.to_le_bytes(), &revision.to_le_bytes(), &target.0.to_le_bytes(), &[u8::from(channel_target)]]);
     let h = hash(&[kind.as_bytes(), params.to_string().as_bytes(), &[u8::from(preview)]]);
     if let Some(p) = &app.adjust_preview
