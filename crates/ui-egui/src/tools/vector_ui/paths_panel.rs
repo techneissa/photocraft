@@ -292,7 +292,7 @@ pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         let can_paint = app.session.active().and_then(|s| s.active_layer.and_then(|id| s.doc.layer(id))).is_some_and(|l| l.surface().is_some());
                         for (label, cmd, params) in path_context_actions(&entry, &doc, st_layer) {
                             let enabled = !matches!(cmd, "path.fill" | "path.stroke") || can_paint;
-                            if ui.add_enabled(enabled, egui::Button::new(tl!(label))).clicked() {
+                            if ui.add_enabled(enabled, crate::menu_custom::shortcut::show(app, cmd, egui::Button::new(tl!(label)))).clicked() {
                                 if cmd == "path.stroke" {
                                     // Stroke Path… asks for the tool first, as in Photoshop (#2978).
                                     stroke_dialog = Some(params.get("name").and_then(Value::as_str).unwrap_or("work").to_string());
