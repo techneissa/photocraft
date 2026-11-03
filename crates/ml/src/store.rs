@@ -39,6 +39,16 @@ const BIREFNET_FILES: [ModelFile; 1] = [ModelFile {
     size: 224_005_088,
 }];
 
+/// The full BiRefNet (Swin-L, 1024 px; `ZhengPeng7/BiRefNet`, MIT) as the `model.safetensors` LightCraft uses: the same file
+/// in the same folder (`ArtCraft/models/birefnet/`), so either app finds the other's download. Size and SHA-256 are
+/// LightCraft's catalog entry (`crates/birefnet/src/fetch.rs`), at the revision it downloads from.
+const BIREFNET_FULL_FILES: [ModelFile; 1] = [ModelFile {
+    name: "model.safetensors",
+    url: "https://huggingface.co/ZhengPeng7/BiRefNet/resolve/e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4/model.safetensors",
+    sha256: "9ab37426bf4de0567af6b5d21b16151357149139362e6e8992021b8ce356a154",
+    size: 444_473_596,
+}];
+
 /// big-lama as the TorchScript file LightCraft uses (`crates/lama` reads it without Python): the same file in the same
 /// folder, so either app finds the other's download. Hugging Face's own LFS hash (`x-linked-etag`) and size.
 const LAMA_FILES: [ModelFile; 1] = [ModelFile {
@@ -61,6 +71,8 @@ const SAM3_FILES: [ModelFile; 3] = [
 /// A model the editor can run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Model {
+    /// The full BiRefNet, 1024 px salient-object segmentation on candle (MIT), the file LightCraft shares.
+    Birefnet,
     /// BiRefNet-lite, 1024 px salient-object segmentation (MIT).
     BirefnetLite,
     /// big-lama, 512 px inpainting (Apache-2.0), run by `photocraft-lama` on candle.
@@ -71,11 +83,12 @@ pub enum Model {
 
 impl Model {
     /// All supported models, in display/download order.
-    pub const ALL: [Self; 3] = [Self::BirefnetLite, Self::Lama, Self::Sam3];
+    pub const ALL: [Self; 4] = [Self::Birefnet, Self::BirefnetLite, Self::Lama, Self::Sam3];
 
     /// Folder name inside a models folder, shared by every Craft app.
     pub fn id(self) -> &'static str {
         match self {
+            Self::Birefnet => "birefnet",
             Self::BirefnetLite => "birefnet-lite",
             Self::Lama => "lama",
             Self::Sam3 => "sam3",
@@ -85,6 +98,7 @@ impl Model {
     /// Every file of the model, the one the loader reads first.
     pub fn files(self) -> &'static [ModelFile] {
         match self {
+            Self::Birefnet => &BIREFNET_FULL_FILES,
             Self::BirefnetLite => &BIREFNET_FILES,
             Self::Lama => &LAMA_FILES,
             Self::Sam3 => &SAM3_FILES,
@@ -100,7 +114,7 @@ impl Model {
     /// Licence of the model weights.
     pub fn licence(self) -> &'static str {
         match self {
-            Self::BirefnetLite => "MIT",
+            Self::Birefnet | Self::BirefnetLite => "MIT",
             Self::Lama => "Apache-2.0",
             Self::Sam3 => "SAM License",
         }
@@ -114,6 +128,7 @@ impl Model {
     /// Human name for messages.
     pub fn label(self) -> &'static str {
         match self {
+            Self::Birefnet => "subject segmentation (full BiRefNet)",
             Self::BirefnetLite => "subject segmentation (BiRefNet-lite)",
             Self::Lama => "inpainting (LaMa)",
             Self::Sam3 => "object selection (SAM 3)",
@@ -444,6 +459,50 @@ mod tests {
         let cands = r.candidates(Model::Lama.id());
         assert_eq!(cands.first().map(|c| c.1), Some(Source::Shared), "the shared folder is read first");
         assert_eq!(Model::BirefnetLite.id(), "birefnet-lite", "BiRefNet-lite has its own folder, apart from LightCraft's full BiRefNet");
+    }
+
+    #[test]
+    fn the_full_birefnet_is_lightcrafts_file_in_lightcrafts_folder() {
+        let files = Model::Birefnet.files();
+        assert_eq!(files.len(), 1);
+        // LightCraft's catalog entry (`crates/birefnet/src/fetch.rs`): name, size and SHA-256.
+        assert_eq!((files[0].name, files[0].size), ("model.safetensors", 444_473_596));
+        assert_eq!(files[0].sha256, "9ab37426bf4de0567af6b5d21b16151357149139362e6e8992021b8ce356a154");
+        assert!(files[0].url.starts_with("https://huggingface.co/ZhengPeng7/BiRefNet/resolve/") && files[0].url.ends_with("/model.safetensors"));
+        assert!(Model::Birefnet.downloadable());
+        // Read and downloaded in the shared folder's `birefnet/`, apart from BiRefNet-lite's `birefnet-lite/`.
+        assert_eq!((Model::Birefnet.id(), Model::BirefnetLite.id()), ("birefnet", "birefnet-lite"));
+        let t = Temp::new().unwrap();
+        let r = roots(&t, false);
+        assert_eq!(r.install_dir(Model::Birefnet.id()), Some(t.dir("shared").join("birefnet")));
+        assert_eq!(r.candidates(Model::Birefnet.id()).first().map(|c| c.1), Some(Source::Shared));
+    }
+
+    /// The shared file is found, a file of the wrong size or the wrong bytes is not, and with it missing the lookup
+    /// still finds BiRefNet-lite (which is what the engine then runs).
+    #[test]
+    fn the_full_birefnet_is_found_in_the_shared_folder_or_not_at_all() -> Result<(), Box<dyn std::error::Error>> {
+        let t = Temp::new()?;
+        let r = roots(&t, false);
+        let (full, lite) = (Model::Birefnet.id(), Model::BirefnetLite.id());
+        let file = Model::Birefnet.files().first().ok_or("no file")?;
+        // Missing: nothing, and BiRefNet-lite (put there as a stand-in with small files) is still found.
+        assert_eq!(r.locate(full, Model::Birefnet.files()), None);
+        put_two(&t.dir("shared").join(lite))?;
+        assert_eq!(r.locate(lite, &TWO), Some(Located { dir: t.dir("shared").join(lite), source: Source::Shared }));
+        assert_eq!(r.locate(full, Model::Birefnet.files()), None, "BiRefNet-lite's folder is not the full model's");
+        // The wrong size (a truncated download).
+        let dir = t.dir("shared").join(full);
+        std::fs::create_dir_all(&dir)?;
+        std::fs::File::create_new(dir.join(file.name))?.set_len(file.size - 1)?;
+        assert_eq!(r.locate(full, Model::Birefnet.files()), None, "wrong size");
+        // The right size, the wrong bytes (sparse zeros): the hash refuses it.
+        std::fs::File::options().write(true).open(dir.join(file.name))?.set_len(file.size)?;
+        assert_eq!(r.locate(full, Model::Birefnet.files()), None, "wrong hash");
+        // A model of the same shape that is right is found there (small files stand in for the 444 MB).
+        put_two(&dir)?;
+        assert_eq!(r.locate(full, &TWO), Some(Located { dir, source: Source::Shared }));
+        Ok(())
     }
 
     #[test]

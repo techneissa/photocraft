@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 
 use super::sam3_select::{self, Attempt, BoxRequest, Request, SubjectSam3};
 use super::smartselect_macos::{self, Step};
+use super::subject_full;
 use crate::commands::CommandSpec;
 use crate::prefs::SubjectEngine;
 use crate::select_mask_edits;
@@ -346,14 +347,14 @@ pub struct SubjectCache {
     region: Option<std::sync::Arc<Region>>,
     /// The engine choice it was computed with ([`SubjectEngine`]): a changed choice is a miss.
     engine: SubjectEngine,
-    /// Installing, removing or disabling the AI model invalidates an automatic fallback.
-    model_available: bool,
+    /// Installing, removing or disabling an AI model (BiRefNet-lite, the full BiRefNet) invalidates an automatic fallback.
+    model_available: (bool, bool),
     /// The note that came with it (a fallback from the macOS cutout), shown again on a repeat.
     note: Option<&'static str>,
 }
 
 impl SubjectCache {
-    fn valid(&self, doc: &Document, target: Option<LayerId>, engine: SubjectEngine, model_available: bool) -> bool {
+    fn valid(&self, doc: &Document, target: Option<LayerId>, engine: SubjectEngine, model_available: (bool, bool)) -> bool {
         self.target == target
             && self.engine == engine
             && self.model_available == model_available
@@ -375,6 +376,11 @@ const MODEL_MAX_PX: usize = 16_000_000;
 /// The expanded neural mask must also fit a bounded allocation, even for sparse PSB canvases.
 const MODEL_MASK_MAX_PX: usize = 64_000_000;
 
+/// Which AI models are installed: BiRefNet-lite, the full BiRefNet.
+fn subject_models_available() -> (bool, bool) {
+    (subject_model_available(), subject_full::installed())
+}
+
 fn subject_model_available() -> bool {
     // Unit tests run without the model, even where a developer has it installed, so results match
     // CI (which has none) and the suite stays fast.
@@ -395,8 +401,18 @@ pub(super) fn stretch_taps(len: usize, small_len: usize, step: usize) -> Vec<(us
         .collect()
 }
 
-/// The subject's coverage from the neural matte (BiRefNet), or why the model could not run.
+/// The subject's coverage from the neural matte (BiRefNet-lite), or why the model could not run.
 fn model_subject(smp: &dyn Sampler, canvas: Rect, ctl: &photocraft_raster::Interrupt) -> std::result::Result<Option<Region>, photocraft_ml::MlError> {
+    model_subject_with(smp, canvas, ctl, photocraft_ml::segment_subject_with)
+}
+
+/// [`model_subject`] with the network that draws the matte (BiRefNet-lite, or the full BiRefNet).
+fn model_subject_with(
+    smp: &dyn Sampler,
+    canvas: Rect,
+    ctl: &photocraft_raster::Interrupt,
+    segment: fn(&photocraft_ml::Rgb, photocraft_ml::Cancel<'_>) -> std::result::Result<Vec<f32>, photocraft_ml::MlError>,
+) -> std::result::Result<Option<Region>, photocraft_ml::MlError> {
     ctl.check().map_err(|_| photocraft_ml::MlError::Cancelled)?;
     let (w, h) = (canvas.width() as usize, canvas.height() as usize);
     let count = w.checked_mul(h).filter(|n| *n <= MODEL_MASK_MAX_PX).ok_or_else(|| {
@@ -408,7 +424,7 @@ fn model_subject(smp: &dyn Sampler, canvas: Rect, ctl: &photocraft_raster::Inter
     let small = smp.rgb_scaled(canvas, step);
     ctl.check().map_err(|_| photocraft_ml::MlError::Cancelled)?;
     let rgb = photocraft_ml::Rgb::new(small.w, small.h, small.px.iter().flatten().copied().collect())?;
-    let matte = photocraft_ml::segment_subject_with(&rgb, &|| ctl.cancelled())?;
+    let matte = segment(&rgb, &|| ctl.cancelled())?;
     ctl.check().map_err(|_| photocraft_ml::MlError::Cancelled)?;
     let mut mask = crate::allocation::filled(count, 0u8, "neural subject mask").map_err(|e| photocraft_ml::MlError::BadInput(e.to_string()))?;
     // The matte is a picture of the canvas shrunk by `step`: stretch it back with bilinear taps at
@@ -443,7 +459,7 @@ fn model_failure_note(e: &photocraft_ml::MlError) -> &'static str {
 /// What [`find_subject_region`] found, which engine found it and what to tell the user about it.
 pub(crate) struct Subject {
     pub region: Option<Region>,
-    /// `"macos"`, `"model"`, `"sam3"` or `"classic"`.
+    /// `"macos"`, `"model"` (BiRefNet-lite), `"model-full"` (the full BiRefNet), `"sam3"` or `"classic"`.
     pub used: &'static str,
     pub note: Option<&'static str>,
 }
@@ -474,10 +490,23 @@ pub(crate) fn find_subject_region(
 ) -> Result<Subject> {
     let cancelled = |_| EngineError::Cancelled;
     ctl.check().map_err(cancelled)?;
+    // The full BiRefNet goes first for `auto` and `model` when installed (`subject_full.rs`); `other` is what to tell the
+    // user when a later engine finds the subject after it failed, `classic` the note if Classic does.
+    let (mut classic_note, mut other_note) = (None, None);
+    let full = subject_full::installed();
+    if subject_full::tried_first(engine, full) {
+        // Refused before the photo is sampled: running out of memory on the GPU can take the process down.
+        let tried = photocraft_ml::check_memory(photocraft_ml::Model::Birefnet)
+            .and_then(|()| with_doc_sampler(doc, layer, all_layers, |smp, _| model_subject_with(smp, area, ctl, subject_full::segment())));
+        match subject_full::step(engine, tried)? {
+            subject_full::Step::Done(region) => return Ok(Subject { region, used: "model-full", note: None }),
+            subject_full::Step::Next { classic, other } => (classic_note, other_note) = (classic, other),
+        }
+    }
     let mut note = match with_doc_sampler(doc, layer, all_layers, |smp, _| smartselect_macos::current_step(engine, smp, area)) {
-        Step::Found(region) => return Ok(Subject { region: Some(region), used: "macos", note: None }),
+        Step::Found(region) => return Ok(Subject { region: Some(region), used: "macos", note: other_note }),
         Step::NoSubject => return Ok(Subject { region: None, used: "macos", note: None }),
-        Step::Fallback(note) => note,
+        Step::Fallback(note) => note.or(classic_note),
     };
     if engine == SubjectEngine::Sam3
         && let Some(sam) = sam3
@@ -499,7 +528,7 @@ pub(crate) fn find_subject_region(
             let tried = photocraft_ml::check_memory(photocraft_ml::Model::BirefnetLite)
                 .and_then(|()| with_doc_sampler(doc, layer, all_layers, |smp, _| model_subject(smp, area, ctl)));
             match tried {
-                Ok(Some(region)) => return Ok(Subject { region: Some(region), used: "model", note: None }),
+                Ok(Some(region)) => return Ok(Subject { region: Some(region), used: "model", note: other_note }),
                 Ok(None) if engine == SubjectEngine::Model => return Ok(Subject { region: None, used: "model", note: None }),
                 Ok(None) => {}
                 Err(photocraft_ml::MlError::Cancelled) => return Err(EngineError::Cancelled),
@@ -508,7 +537,7 @@ pub(crate) fn find_subject_region(
                 Err(photocraft_ml::MlError::BadInput(message)) => return Err(EngineError::Other(message)),
                 Err(e) => note = Some(model_failure_note(&e)),
             }
-        } else if engine == SubjectEngine::Model {
+        } else if engine == SubjectEngine::Model && note.is_none() {
             note = Some(MODEL_MISSING);
         }
     }
@@ -525,7 +554,7 @@ fn select_subject(s: &mut Session, p: &Value) -> Result<Value> {
     let d = s.active().ok_or(EngineError::NoDocument)?;
     // What `with_doc_sampler` samples: the active layer's pixels, else the composite.
     let target = d.active_layer.filter(|id| !all_layers && d.doc.layer(*id).and_then(Layer::surface).is_some());
-    let available = subject_model_available();
+    let available = subject_models_available();
     let c = &s.subject_cache;
     if c.valid(&d.doc, target, engine, available) {
         let (region, note) = (c.region.clone(), c.note);

@@ -48,7 +48,7 @@ pub fn segment_subject_with(img: &Rgb, cancel: Cancel<'_>) -> Result<Vec<f32>, M
 /// Pulls the matte's uncertain band onto the photo's own edges (guided filter on luminance), so
 /// hair and fur get the partial coverage the 1024 px network output only hints at. Confident
 /// pixels are left exactly as the network said.
-fn refine_edges(img: &Rgb, matte: &mut [f32]) {
+pub(crate) fn refine_edges(img: &Rgb, matte: &mut [f32]) {
     let (w, h) = (img.w, img.h);
     // The network sees 1024 px; below that there is nothing to recover.
     if w.max(h) <= SEGMENT_SIZE / 2 {

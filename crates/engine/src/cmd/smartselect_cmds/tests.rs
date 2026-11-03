@@ -283,13 +283,14 @@ fn subject_cache_invalidates_when_model_availability_changes() {
     let doc = &s.active().unwrap().doc;
     let target = s.active().unwrap().active_layer;
     let mut cache = SubjectCache { doc: std::sync::Arc::downgrade(doc), doc_id: Some(doc.id), target, engine: SubjectEngine::Auto, ..SubjectCache::default() };
-    assert!(cache.valid(doc, target, SubjectEngine::Auto, false));
-    assert!(!cache.valid(doc, target, SubjectEngine::Auto, true), "installing a model reused a classical result");
-    cache.model_available = true;
+    assert!(cache.valid(doc, target, SubjectEngine::Auto, (false, false)));
+    assert!(!cache.valid(doc, target, SubjectEngine::Auto, (true, false)), "installing a model reused a classical result");
+    cache.model_available = (true, false);
     cache.region = Some(std::sync::Arc::new(Region { bbox: Rect::new(0, 0, 1, 1), mask: vec![255] }));
-    assert!(cache.valid(doc, target, SubjectEngine::Auto, true));
-    assert!(!cache.valid(doc, target, SubjectEngine::Auto, false), "removing a model reused a neural result");
-    assert!(!cache.valid(doc, target, SubjectEngine::Model, true), "another engine reused the result");
+    assert!(cache.valid(doc, target, SubjectEngine::Auto, (true, false)));
+    assert!(!cache.valid(doc, target, SubjectEngine::Auto, (false, false)), "removing a model reused a neural result");
+    assert!(!cache.valid(doc, target, SubjectEngine::Auto, (true, true)), "installing the full model reused BiRefNet-lite's result");
+    assert!(!cache.valid(doc, target, SubjectEngine::Model, (true, false)), "another engine reused the result");
 }
 
 /// The `model` choice without the model installed (no model ever runs in unit tests) gives
@@ -861,4 +862,85 @@ fn refine_edge_rejects_bad_edits_and_keeps_the_selection() {
         assert!(s.execute("select.refineEdge", json!({"edits": bad})).is_err(), "{bad}");
         assert_eq!(sel_bytes(&s, 80, 40), before, "{bad}");
     }
+}
+
+// The full BiRefNet in front of the chain (`subject_full.rs`): the order and the fallbacks, with stand-ins for the models.
+
+/// A stand-in for the full model: the matte is everything.
+fn everything(img: &photocraft_ml::Rgb, _: photocraft_ml::Cancel<'_>) -> std::result::Result<Vec<f32>, photocraft_ml::MlError> {
+    Ok(vec![1.0; img.w * img.h])
+}
+
+fn load_fails(_: &photocraft_ml::Rgb, _: photocraft_ml::Cancel<'_>) -> std::result::Result<Vec<f32>, photocraft_ml::MlError> {
+    Err(photocraft_ml::MlError::Backend("could not load".into()))
+}
+
+fn nothing(img: &photocraft_ml::Rgb, _: photocraft_ml::Cancel<'_>) -> std::result::Result<Vec<f32>, photocraft_ml::MlError> {
+    Ok(vec![0.0; img.w * img.h])
+}
+
+/// A Mac cutout that finds the whole picture.
+fn cutout_finds_all(_: &[u8], w: u32, h: u32) -> std::result::Result<photocraft_macvision::Mask, photocraft_macvision::Error> {
+    Ok(photocraft_macvision::Mask { width: w, height: h, data: vec![255; (w * h) as usize] })
+}
+
+/// What `find_subject_region` says for `engine` on a small photo, with the stand-in full model and the Mac cutout a test installs.
+fn find(engine: SubjectEngine, full: Option<subject_full::Segment>, cutout: Option<smartselect_macos::CutoutFn>) -> Subject {
+    let (s, _) = disc(8);
+    let d = s.active().unwrap();
+    subject_full::TEST_FULL.with(|f| f.set(full));
+    smartselect_macos::TEST_CUTOUT.with(|c| c.set(cutout));
+    let ctl = photocraft_raster::Interrupt::default();
+    let found = find_subject_region(&d.doc, d.active_layer, false, d.doc.bounds(), engine, None, &ctl);
+    subject_full::TEST_FULL.with(|f| f.set(None));
+    smartselect_macos::TEST_CUTOUT.with(|c| c.set(None));
+    found.ok().unwrap()
+}
+
+#[test]
+fn the_ai_choices_use_the_full_model_when_it_is_installed() {
+    for engine in [SubjectEngine::Auto, SubjectEngine::Model] {
+        let found = find(engine, Some(everything), None);
+        assert!(found.region.is_some() && found.used == "model-full" && found.note.is_none(), "{engine:?}: {}", found.used);
+    }
+    // `auto` puts it before the Mac's cutout.
+    let found = find(SubjectEngine::Auto, Some(everything), Some(cutout_finds_all));
+    assert_eq!(found.used, "model-full");
+    // The other choices never run it.
+    for engine in [SubjectEngine::Classic, SubjectEngine::MacOs] {
+        let found = find(engine, Some(everything), None);
+        assert_eq!(found.used, "classic", "{engine:?}");
+    }
+    let found = find(SubjectEngine::MacOs, Some(everything), Some(cutout_finds_all));
+    assert_eq!(found.used, "macos");
+}
+
+#[test]
+fn a_full_model_that_fails_falls_back_in_order_and_says_so() {
+    // `model`: no BiRefNet-lite here, so Classic, with the existing "AI model failed" note.
+    let found = find(SubjectEngine::Model, Some(load_fails), None);
+    assert!(found.region.is_some() && found.used == "classic");
+    assert_eq!(found.note, Some(MODEL_FAILED));
+    // `auto`: the Mac's cutout takes over, and the note names the full model.
+    let found = find(SubjectEngine::Auto, Some(load_fails), Some(cutout_finds_all));
+    assert_eq!(found.used, "macos");
+    assert_eq!(found.note, Some(subject_full::FULL_FAILED));
+    // `auto` with nothing else: Classic.
+    let found = find(SubjectEngine::Auto, Some(load_fails), None);
+    assert_eq!((found.used, found.note), ("classic", Some(MODEL_FAILED)));
+}
+
+#[test]
+fn a_full_model_that_finds_nothing_is_the_answer_of_model_but_not_of_auto() {
+    let found = find(SubjectEngine::Model, Some(nothing), None);
+    assert!(found.region.is_none() && found.used == "model-full");
+    let found = find(SubjectEngine::Auto, Some(nothing), Some(cutout_finds_all));
+    assert_eq!(found.used, "macos");
+}
+
+#[test]
+fn without_the_full_model_the_chain_is_what_it_was() {
+    assert_eq!(find(SubjectEngine::Auto, None, Some(cutout_finds_all)).used, "macos");
+    let found = find(SubjectEngine::Model, None, None);
+    assert_eq!((found.used, found.note), ("classic", Some(MODEL_MISSING)));
 }

@@ -8,6 +8,8 @@
 //!
 //! * [`segment_subject`]: salient-object matte (BiRefNet-lite, MIT) with a guided-filter edge
 //!   refinement so hair and fur keep partial coverage at full resolution.
+//! * [`segment_subject_full_with`]: the same from the full BiRefNet (Swin-L, `model.safetensors`, the file
+//!   LightCraft shares; `photocraft-birefnet` on candle, Metal on the Mac).
 //! * [`inpaint`]: large-hole inpainting (LaMa, Apache-2.0; `big-lama.pt` through `photocraft-lama`) on a
 //!   context window around the hole, composited back so only the hole changes.
 //!
@@ -35,6 +37,7 @@ mod migrate;
 mod ram;
 mod resize;
 mod segment;
+mod segment_full;
 mod store;
 
 pub use guided::guided_filter;
@@ -47,6 +50,7 @@ pub use install::{download, remove};
 pub use migrate::{Migration, migrate_old_models};
 pub use ram::{check_memory, min_total_memory, physical_memory};
 pub use segment::{SEGMENT_SIZE, segment_subject, segment_subject_with};
+pub use segment_full::{SEGMENT_FULL_SIZE, segment_subject_full_with};
 pub use store::{
     Located, MODELS_DIR_VAR, Model, ModelFile, Source, disable_models, install_dir, model_location, model_path, model_present, models_dir, models_disabled,
 };

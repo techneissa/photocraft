@@ -161,9 +161,18 @@ pub(super) fn privacy(ui: &mut egui::Ui) {
     ui.add_space(8.0);
 }
 
+/// A row's title. The full BiRefNet's is in Title Case (and English only, like SAM 3's); the older rows keep the
+/// label the error messages use.
+fn title(model: Model) -> &'static str {
+    match model {
+        Model::Birefnet => tl!("Subject Segmentation (Full BiRefNet)"),
+        other => tl!(other.label()),
+    }
+}
+
 fn powers(model: Model) -> &'static str {
     match model {
-        Model::BirefnetLite => tl!("Select Subject, Remove Background"),
+        Model::Birefnet | Model::BirefnetLite => tl!("Select Subject, Remove Background"),
         Model::Lama => tl!("Remove Subject"),
         Model::Sam3 => tl!("Selection by click or by text"),
     }
@@ -206,7 +215,7 @@ fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, found: impl Fn(Model) -> 
         ui.push_id(row.model, |ui| {
             ui.separator();
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new(tl!(row.model.label())).font(crate::theme::semibold(12.5)).color(t.text));
+                ui.label(RichText::new(title(row.model)).font(crate::theme::semibold(12.5)).color(t.text));
                 if !matches!(state.phase, Phase::Downloading { .. }) {
                     ui.label(RichText::new(if state.phase == Phase::Installed { tl!("Installed") } else { tl!("Not installed") }).color(t.text_dim));
                 }
@@ -422,15 +431,15 @@ mod tests {
         assert_eq!(harness.get_all_by_label("Download").count(), downloadable().count());
         assert_eq!(harness.get_all_by_label("Not installed").count(), Model::ALL.len());
         for model in Model::ALL {
-            harness.get_by_label(model.label());
+            harness.get_by_label(title(model));
         }
     }
 
     #[test]
     fn dynamic_labels_are_translated_in_complete_languages() {
         for lang in crate::i18n::Lang::all().filter(|lang| lang.complete_menus()) {
-            // SAM 3 (the fork's) is English only.
-            for label in std::iter::once("AI Models").chain(downloadable().map(Model::label)) {
+            // SAM 3 (the fork's) and the full BiRefNet are English only.
+            for label in std::iter::once("AI Models").chain(downloadable().filter(|m| *m != Model::Birefnet).map(Model::label)) {
                 assert!(crate::i18n::has(lang, label), "{}: missing {label}", lang.code());
             }
         }

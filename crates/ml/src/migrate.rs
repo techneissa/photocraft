@@ -64,7 +64,8 @@ pub fn migrate_old_models() -> Migration {
     }
     let entries: Vec<Entry<'_>> = Model::ALL
         .into_iter()
-        .filter(|m| m.downloadable())
+        // The full BiRefNet was never in the old folder (LightCraft's file, always in the shared one): nothing to move.
+        .filter(|m| m.downloadable() && *m != Model::Birefnet)
         .map(|m| Entry { id: m.id(), files: m.files(), retired: if m == Model::Lama { &RETIRED_LAMA } else { &[] } })
         .collect();
     migrate(&Roots::current(), &entries)

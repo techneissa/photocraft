@@ -35,6 +35,7 @@ photocraft-plugins = { path = "crates/plugins" }
 photocraft-engine = { path = "crates/engine" }
 photocraft-ml = { path = "crates/ml" }
 photocraft-lama = { path = "crates/lama" }
+photocraft-birefnet = { path = "crates/birefnet" }
 photocraft-sam3 = { path = "crates/sam3" }
 photocraft-ui-egui = { path = "crates/ui-egui" }
 photocraft-testkit = { path = "crates/testkit" }

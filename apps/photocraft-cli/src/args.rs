@@ -217,7 +217,7 @@ pub(crate) enum ModelsAction {
 #[derive(Args)]
 pub(crate) struct ModelsFetchArgs {
     /// Which model to download
-    #[arg(long, value_name = "birefnet|lama|all", default_value = "all", value_parser = ["birefnet", "lama", "all"])]
+    #[arg(long, value_name = "birefnet|birefnet-full|lama|all", default_value = "all", value_parser = ["birefnet", "birefnet-full", "lama", "all"])]
     pub(crate) model: String,
 }
 

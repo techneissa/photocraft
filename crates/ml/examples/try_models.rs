@@ -1,9 +1,10 @@
 //! Runs the installed models on a photo, for eyeballing results:
 //! `cargo run --release -p photocraft-ml --example try_models -- segment in.jpg matte.png`
+//! `cargo run --release -p photocraft-ml --example try_models -- segment-full in.jpg matte.png` (the full BiRefNet, LightCraft's file)
 //! `cargo run --release -p photocraft-ml --example try_models -- inpaint in.jpg mask.png out.png`
 //! `cargo run --release -p photocraft-ml --example try_models -- remove in.jpg out.png` (matte, grow, inpaint)
 
-use photocraft_ml::{Rgb, inpaint, segment_subject};
+use photocraft_ml::{Rgb, inpaint, segment_subject, segment_subject_full_with};
 use std::time::Instant;
 
 fn load(path: &str) -> Result<Rgb, Box<dyn std::error::Error>> {
@@ -54,6 +55,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let m = segment_subject(&img)?;
             save_gray(&m, img.w, img.h, output)?;
         }
+        ["segment-full", input, output] => {
+            let img = load(input)?;
+            let m = segment_subject_full_with(&img, &|| false)?;
+            save_gray(&m, img.w, img.h, output)?;
+        }
         ["inpaint", input, mask, output] => {
             let img = load(input)?;
             let mask = image::open(mask)?.to_luma8();
@@ -69,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             save_gray(&g, img.w, img.h, &format!("{output}.mask.png"))?;
             save_rgb(&inpaint(&img, &g)?, output)?;
         }
-        _ => return Err("usage: try_models segment <in> <out> | inpaint <in> <mask> <out> | remove <in> <out>".into()),
+        _ => return Err("usage: try_models segment <in> <out> | segment-full <in> <out> | inpaint <in> <mask> <out> | remove <in> <out>".into()),
     }
     println!("done {:?}", t.elapsed());
     Ok(())
