@@ -1,7 +1,7 @@
 //! Popup menu buttons that behave like native menus (#2071), as Photoshop's Layers panel footer
 //! buttons do: the menu opens on the press, so one gesture can press the button, drag onto an item
-//! and release to choose it. A plain click still opens the menu and leaves it open for a second
-//! click; a release on nothing (or back on the button) chooses nothing. A secondary click opens it
+//! and release to choose it. A plain click (quick, without moving) still opens the menu and leaves it open for a second
+//! click, picking nothing; only a drag or a press held 0.3 s picks on release; a release on nothing (or back on the button) chooses nothing. A secondary click opens it
 //! too. The menu bar has its own copy of this gesture in `menus.rs`, which also spans titles.
 
 use egui::{Popup, PopupCloseBehavior, Response, SetOpenCommand, Ui};
@@ -14,6 +14,37 @@ fn gesture_id() -> egui::Id {
 /// menus run in one frame (the Layers footer has two): each owns only its own gesture.
 fn gesture_owner(ctx: &egui::Context) -> Option<egui::Id> {
     ctx.data(|d| d.get_temp::<egui::Id>(gesture_id()))
+}
+
+/// Where and when the current press started, to tell a quick click from a press-drag-release.
+fn press_id() -> egui::Id {
+    egui::Id::unique("press-menu-gesture-start")
+}
+
+/// A pointer travel (points) or press length (seconds) past which a release counts as a pick,
+/// as on macOS: a quick click that stays put only opens the list.
+const DRAG_DISTANCE: f32 = 4.0;
+const LONG_PRESS: f64 = 0.3;
+
+/// Starts a press-drag gesture for `popup`, recording where and when the press began.
+fn begin_gesture(ctx: &egui::Context, popup: egui::Id) {
+    let start = ctx.input(|i| (i.pointer.latest_pos().unwrap_or_default(), i.time));
+    ctx.data_mut(|d| {
+        d.insert_temp(gesture_id(), popup);
+        d.insert_temp(press_id(), start);
+    });
+}
+
+/// Does a release at `pos` and `now` pick the item under it, for a press at `start`? Only after a
+/// drag or a long press; a quick click only opens the list.
+fn release_picks(start: (egui::Pos2, f64), pos: egui::Pos2, now: f64) -> bool {
+    start.0.distance(pos) > DRAG_DISTANCE || now - start.1 >= LONG_PRESS
+}
+
+/// Is the release this frame a pick: the press-drag gesture was dragged or held long enough?
+fn gesture_released_as_pick(ctx: &egui::Context) -> bool {
+    let Some(start) = ctx.data(|d| d.get_temp::<(egui::Pos2, f64)>(press_id())) else { return false };
+    ctx.input(|i| i.pointer.latest_pos().is_some_and(|pos| release_picks(start, pos, i.time)))
 }
 
 /// This frame's open/close command for `button`'s popup: a primary press opens a closed menu
@@ -31,7 +62,7 @@ fn open_command(button: &Response, popup: egui::Id) -> Option<SetOpenCommand> {
     }
     let open = Popup::is_id_open(ctx, popup);
     if !open {
-        ctx.data_mut(|d| d.insert_temp(gesture_id(), popup));
+        begin_gesture(ctx, popup);
     }
     Some(SetOpenCommand::Bool(!open))
 }
@@ -49,7 +80,12 @@ impl PressMenu {
     /// Was `item` chosen this frame: clicked, or the press-drag gesture that opened this menu was
     /// released on it?
     pub fn chosen(&self, ui: &Ui, item: &Response) -> bool {
-        item.clicked() || (item.enabled() && item.contains_pointer() && ui.input(|i| i.pointer.primary_released()) && self.owns_gesture(ui.ctx()))
+        item.clicked()
+            || (item.enabled()
+                && item.contains_pointer()
+                && ui.input(|i| i.pointer.primary_released())
+                && self.owns_gesture(ui.ctx())
+                && gesture_released_as_pick(ui.ctx()))
     }
 
     /// A menu item button; true (and the menu closes) when it is chosen.
@@ -154,7 +190,11 @@ impl PressCombo {
     /// Was option `item` (in the open list `ui`) chosen this frame: clicked, or the press-drag
     /// gesture that opened the list released on it? The list closes when it was.
     pub fn chosen(&self, ui: &Ui, item: &Response) -> bool {
-        let released_on = item.enabled() && item.contains_pointer() && ui.input(|i| i.pointer.primary_released()) && self.owns_gesture(ui.ctx());
+        let released_on = item.enabled()
+            && item.contains_pointer()
+            && ui.input(|i| i.pointer.primary_released())
+            && self.owns_gesture(ui.ctx())
+            && gesture_released_as_pick(ui.ctx());
         if released_on {
             ui.close();
         }
@@ -169,7 +209,7 @@ impl PressCombo {
         if pressed && !Popup::is_id_open(ctx, self.popup) {
             // Opened now, the list counts as open this frame and egui shows it from the next.
             Popup::open_id(ctx, self.popup);
-            ctx.data_mut(|d| d.insert_temp(gesture_id(), self.popup));
+            begin_gesture(ctx, self.popup);
             ctx.request_repaint();
         } else if self.owns_gesture(ctx) && ctx.input(|i| i.pointer.primary_released() || !i.pointer.primary_down()) {
             ctx.data_mut(|d| d.remove::<egui::Id>(gesture_id()));
@@ -191,6 +231,8 @@ mod tests {
         ctx: egui::Context,
         buttons: [Rect; 2],
         items: [Vec<Rect>; 2],
+        /// The clock for the next frames; `None` steps one 60 Hz frame.
+        now: Option<f64>,
     }
 
     #[derive(Debug, Default)]
@@ -205,7 +247,7 @@ mod tests {
 
     impl Rig {
         fn new() -> Self {
-            let mut rig = Rig { ctx: egui::Context::default(), buttons: [Rect::NOTHING; 2], items: [Vec::new(), Vec::new()] };
+            let mut rig = Rig { ctx: egui::Context::default(), buttons: [Rect::NOTHING; 2], items: [Vec::new(), Vec::new()], now: None };
             rig.frame(Vec::new());
             rig
         }
@@ -216,7 +258,7 @@ mod tests {
             let rect = Rect::from_min_size(Pos2::ZERO, vec2(400.0, 400.0));
             let mut buttons = [Rect::NOTHING; 2];
             let mut labels = Vec::new();
-            let mut output = self.ctx.run_ui(egui::RawInput { screen_rect: Some(rect), events, ..Default::default() }, |ui| {
+            let mut output = self.ctx.run_ui(egui::RawInput { screen_rect: Some(rect), events, time: self.now, ..Default::default() }, |ui| {
                 ui.add_space(20.0);
                 ui.horizontal(|ui| {
                     for (m, name) in ["First menu", "Second menu"].into_iter().enumerate() {
@@ -284,6 +326,27 @@ mod tests {
         let f = rig.press(curves, false);
         assert_eq!(f.chosen, Some("Curves"), "releasing on Curves chose it");
         assert!(!rig.frame(Vec::new()).open, "and closed the menu");
+    }
+
+    #[test]
+    fn a_quick_click_picks_nothing_but_a_drag_or_long_press_does() {
+        let start = (pos2(10.0, 10.0), 1.0);
+        assert!(!release_picks(start, pos2(12.0, 10.0), 1.1), "a quick click that stays put opens only");
+        assert!(release_picks(start, pos2(30.0, 10.0), 1.1), "a drag picks");
+        assert!(release_picks(start, pos2(10.0, 10.0), 1.3), "a long press picks");
+    }
+
+    #[test]
+    fn a_long_press_released_on_an_item_chooses_it() {
+        let mut rig = Rig::new();
+        let at = rig.buttons[0].center();
+        rig.frame(vec![Event::PointerMoved(at)]);
+        rig.press(at, true);
+        rig.frame(Vec::new());
+        let levels = rig.item_center(0);
+        rig.frame(vec![Event::PointerMoved(levels)]);
+        rig.now = Some(10.0);
+        assert_eq!(rig.press(levels, false).chosen, Some("Levels"), "a long press released on Levels chose it");
     }
 
     #[test]
