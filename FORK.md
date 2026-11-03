@@ -65,9 +65,8 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
    test nothing on this Mac: Fork CI checks `custom`.
 6. Once per batch of merges, on `custom` on this Mac (techneissa, 2026-11-02: the Mac rebuilt the same code minutes
    apart): add each merged feature's line at the end of `fork/features.md`, and a short line for each feature you can see in the app under the right group of "What I added" in `.github/README.md` (the page GitHub shows for this fork); if a feature added commands,
-   `cargo xtask parity` and commit `docs/parity-checklist.md`; run
-   `fork/tests.sh <slug>...` for the features merged in the batch plus `select-subject-macos` (the macOS-only
-   tests Fork CI cannot run; Fork CI already ran the rest on Linux); push once; when GitHub's Fork build of that commit is
+   `cargo xtask parity` and commit `docs/parity-checklist.md`; push once (no test run on this Mac: each lane ran
+   its own new tests, and Fork CI tests `custom` after the push; techneissa, 2026-11-03); when GitHub's Fork build of that commit is
    done, run `update-photocraft.sh`, which then downloads the app instead of building it.
 
 **Lanes on this Mac** (techneissa, 2026-11-02): at most 3 feature lanes at a time. Each lane takes a free slot
@@ -86,6 +85,6 @@ To find which feature owns an official file: `grep -l '<path>' fork/*.md`.
 `docs/parity-checklist.md` is regenerated on `custom` once per batch (step 6); clashes there with an official
 update are fixed by the update script (both sides kept).
 
-Every feature's tests: `fork/tests.sh`; one batch's: `fork/tests.sh <slug>...` (FORK.md step 6).
+Every feature's tests, by hand only: `fork/tests.sh` (or `fork/tests.sh <slug>...`). No merge or batch runs it.
 
 More: [GitHub builds](fork/github-builds.md), [Open as Layers interface (for LightCraft)](fork/open-as-layers-interface.md), [Known failures](fork/known-failures.md).
