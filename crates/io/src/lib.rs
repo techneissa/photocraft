@@ -47,6 +47,7 @@ pub mod doc_path;
 pub mod effects_map;
 pub mod exr_parts;
 mod flat;
+pub mod fork_background_lock;
 mod gradient_bake;
 pub mod guides_map;
 pub use gradient_bake::{Method as GradientMethod, bake as bake_gradient};
@@ -351,6 +352,8 @@ pub struct ImportOptions {
     /// PSD layer/mask/merged pixel allowance, including conversion workspace. May lower the
     /// default cap; does not cover metadata or smart-filter caches.
     pub psd_max_pixel_bytes: u64,
+    /// Fork: a flat photo opens as a locked Background layer (the default); off, as "Layer 0".
+    pub lock_background: bool,
 }
 
 impl Default for ImportOptions {
@@ -359,6 +362,7 @@ impl Default for ImportOptions {
             max_group_depth: photocraft_doc::MAX_GROUP_DEPTH,
             demosaic: raw::Demosaic::default(),
             psd_max_pixel_bytes: DEFAULT_PSD_IMPORT_PIXEL_BYTES,
+            lock_background: true,
         }
     }
 }
@@ -535,7 +539,7 @@ fn import_stages(name: &str, bytes: &[u8], ctl: &photocraft_raster::Interrupt, o
         return pdn::import(name, bytes, ctl);
     }
     if raw::is_raw(bytes) {
-        return raw::import_raw_demosaic(name, bytes, opts.demosaic);
+        return fork_background_lock::apply(raw::import_raw_demosaic(name, bytes, opts.demosaic), opts);
     }
     if is_svg_input(name, bytes) {
         return svg::import_svg_with_group_depth(name, bytes, opts.max_group_depth);
@@ -547,7 +551,7 @@ fn import_stages(name: &str, bytes: &[u8], ctl: &photocraft_raster::Interrupt, o
             PsdFile::from_bytes_and_merged_preflight(bytes, want, recover)
         });
     }
-    flat::import_flat_with_limit(name, bytes, opts.psd_max_pixel_bytes.min(DEFAULT_PSD_IMPORT_PIXEL_BYTES))
+    fork_background_lock::apply(flat::import_flat_with_limit(name, bytes, opts.psd_max_pixel_bytes.min(DEFAULT_PSD_IMPORT_PIXEL_BYTES)), opts)
 }
 
 /// Extension names can be wrong (for example, an image downloaded as WebP and renamed `.svg`).
