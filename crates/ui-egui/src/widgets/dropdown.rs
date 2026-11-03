@@ -57,10 +57,10 @@ fn dropdown_with<T: PartialEq + Clone>(
     let wheel_id = ui.make_persistent_id(id).with("wheel");
     let wheel = wheel && ui.is_enabled();
     let (mut over_list, mut wheeled, mut keyed) = (false, false, false);
-    // A wheel step scrolls the open list to the new value: at once over the list, the next frame
-    // after a step over the button.
+    // A wheel step or an arrow key scrolls the open list to the new value: at once over the list,
+    // the next frame after a step over the button or a key.
     let reveal_id = wheel_id.with("reveal");
-    let mut reveal = wheel && ui.data_mut(|d| d.remove_temp::<bool>(reveal_id)).unwrap_or(false);
+    let mut reveal = ui.data_mut(|d| d.remove_temp::<bool>(reveal_id)).unwrap_or(false);
     // The list opens on the press: press, drag onto an option and release to choose it (#2735).
     let (press, close) = crate::press_menu::PressCombo::before(ui, id);
     // The labels as shown: made only for an open list, not for the dozens a screen draws closed.
