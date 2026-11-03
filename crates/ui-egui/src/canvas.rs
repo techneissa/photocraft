@@ -1019,6 +1019,11 @@ fn handle_canvas_tool_stroke(
         tool_event(app, ToolEvent::Down { x: d[0], y: d[1], pressure: app.stylus.pressure() }, press_mods);
         app.press_stroke = app.drag.is_some();
     }
+    // Control+Option on a painting tool: the brush resize begins on the press (`brush_resize::press`).
+    crate::brush_resize::begin_on_press(app, ui, rect, xf, tool, mods);
+    if crate::brush_resize::owns_press(app) {
+        (buttons.started, buttons.clicked) = (false, false);
+    }
     let press_stroke = app.press_stroke;
     // A live tool's press that went to the ⌥ eyedropper keeps sampling for the whole press: the
     // drag recognised later must not decide again with ⌥ already let go and paint (#7802).
@@ -1039,7 +1044,7 @@ fn handle_canvas_tool_stroke(
     // recognises a drag (past its click distance): otherwise the first few points are lost
     // and the stroke starts with a straight segment and no pressure ramp.
     let press_stroke_moving = press_stroke && app.drag.is_some();
-    if buttons.dragged || buttons.stopped || press_stroke_moving {
+    if buttons.dragged || buttons.stopped || press_stroke_moving || crate::brush_resize::moves_on_press(app, ui) {
         // Feed every pointer move the OS delivered this frame, not just the latest position, so
         // a fast stroke is sampled densely and renders as a smooth curve instead of a coarse
         // polyline. egui-winit pushes one `PointerMoved` per `CursorMoved`, and they accumulate
@@ -1135,6 +1140,7 @@ fn handle_canvas_tool_stroke(
     if press_stroke && (app.drag.is_none() || !ui.input(|i| i.pointer.primary_down())) {
         app.press_stroke = false;
     }
+    crate::brush_resize::finish_on_release(app, ui, xf, mods);
 }
 
 fn handle_canvas_tool_clicks(

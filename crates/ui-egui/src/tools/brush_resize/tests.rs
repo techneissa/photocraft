@@ -387,11 +387,11 @@ fn the_tip_preview_follows_the_brush_falloff() {
 #[test]
 fn the_tip_preview_uses_the_brush_preview_colour() {
     let mut app = app(Tool::Brush);
-    assert_eq!(preview_tint(&app), Color32::from_rgba_unmultiplied(255, 0, 0, 110));
+    assert_eq!(preview_tint(&app), Color32::from_rgba_unmultiplied(255, 0, 0, 128));
     app.run("prefs.set", json!({"path": "cursors.brushPreviewColor", "value": "#00ff80"})).unwrap();
-    assert_eq!(preview_tint(&app), Color32::from_rgba_unmultiplied(0, 255, 128, 110));
+    assert_eq!(preview_tint(&app), Color32::from_rgba_unmultiplied(0, 255, 128, 128));
     app.session.prefs.edit(|p| p.cursors.brush_preview_color = "nonsense".into());
-    assert_eq!(preview_tint(&app), Color32::from_rgba_unmultiplied(255, 0, 0, 110), "unreadable values keep the red");
+    assert_eq!(preview_tint(&app), Color32::from_rgba_unmultiplied(255, 0, 0, 128), "unreadable values keep the red");
 }
 
 #[test]
