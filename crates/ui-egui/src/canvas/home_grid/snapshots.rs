@@ -37,7 +37,14 @@ fn take(out: &std::path::Path, phase: &str, samples: &std::path::Path) {
         let mut h = Harness::builder().with_size(size).with_pixels_per_point(2.0).with_max_steps(64).wgpu().build_eframe(move |cc| {
             PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
             let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-            app.session.edit_prefs(|p| p.file_handling.recent_files = recent.clone());
+            // Opened a few minutes, hours and days ago (the last file, the missing one, has no time).
+            let now = web_time::SystemTime::now().duration_since(web_time::UNIX_EPOCH).unwrap().as_secs();
+            let ages = [120, 3 * 3600, 30 * 3600, 6 * 86_400, 40 * 86_400, 90 * 86_400, 200 * 86_400];
+            let opened: std::collections::BTreeMap<String, u64> = recent.iter().zip(ages).map(|(f, age)| (f.clone(), now - age)).collect();
+            app.session.edit_prefs(|p| {
+                p.file_handling.recent_files = recent.clone();
+                p.file_handling.recent_opened = opened.clone();
+            });
             app.ui.recent_files = recent;
             app
         });

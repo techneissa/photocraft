@@ -197,3 +197,37 @@ fn a_psd_preview_is_the_merged_image_not_an_import_of_its_layers() {
     let px = thumbs::first_pixel(&path.to_string_lossy()).unwrap();
     assert!(px[0] > 0.9 && px[1] < 0.1, "{px:?}");
 }
+
+#[test]
+fn the_dim_line_gives_the_size_and_how_long_ago_the_file_was_opened() {
+    use super::caption::line;
+    let now = 1_762_171_200; // 3 Nov 2025, 12:00 UTC
+    let size = Some((6000, 4000));
+    assert_eq!(line(size, Some(now - 30), now), "6000 × 4000 · Just now");
+    assert_eq!(line(size, Some(now - 5 * 60), now), "6000 × 4000 · 5 min ago");
+    assert_eq!(line(size, Some(now - 2 * 3600 - 10), now), "6000 × 4000 · 2 h ago");
+    assert_eq!(line(size, Some(now - 30 * 3600), now), "6000 × 4000 · Yesterday");
+    assert_eq!(line(size, Some(now - 5 * 86_400), now), "6000 × 4000 · 29 Oct");
+    assert_eq!(line(None, Some(now - 3600), now), "1 h ago", "no size until the preview is decoded");
+}
+
+#[test]
+fn an_entry_without_a_time_shows_only_the_size_and_nothing_without_either() {
+    use super::caption::line;
+    assert_eq!(line(Some((90, 60)), None, 1_762_171_200), "90 × 60");
+    assert_eq!(line(None, None, 1_762_171_200), "");
+}
+
+#[test]
+fn opening_a_file_records_its_time_and_taking_it_off_recent_forgets_it() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.push_recent_at("/tmp/a.png", 1000);
+    app.push_recent_at("/tmp/b.png", 2000);
+    app.push_recent_at("/tmp/a.png", 3000);
+    let opened = app.session.prefs().file_handling.recent_opened.clone();
+    assert_eq!((opened.get("/tmp/a.png"), opened.get("/tmp/b.png")), (Some(&3000), Some(&2000)), "opening again updates the time");
+    app.remove_recent("/tmp/b.png");
+    assert!(!app.session.prefs().file_handling.recent_opened.contains_key("/tmp/b.png"));
+    app.clear_recent();
+    assert!(app.session.prefs().file_handling.recent_opened.is_empty());
+}

@@ -3,6 +3,7 @@
 //! Clicking a preview opens the file; the hovered preview shows a × that takes it off Recent, and
 //! right-click offers Remove from Recent and Clear Recent Files, as the official list did.
 
+mod caption;
 #[cfg(test)]
 mod snapshots;
 #[cfg(test)]
@@ -53,7 +54,7 @@ const MAX_GRID_WIDTH: f32 = 1600.0;
 /// A preview's picture is this tall for its width (4:3).
 const IMAGE_ASPECT: f32 = 0.75;
 
-/// Height of the name and folder lines under a preview.
+/// Height of the name and size-and-date lines under a preview.
 const CAPTION_HEIGHT: f32 = 44.0;
 
 /// Columns, preview width and left edge of the grid in a canvas `width` points wide.
@@ -182,6 +183,7 @@ fn recent_grid(app: &mut PhotocraftApp, ui: &mut egui::Ui, recent: &[String]) {
     let heading = ui.painter().layout_no_wrap(tl!("Recent").into(), crate::theme::semibold(13.0), t.text_dim);
     ui.painter().galley(egui::pos2(x0 + 2.0, space.top()), heading, t.text_dim);
     let thumbs = thumbs::cache(ui.ctx());
+    let now = web_time::SystemTime::now().duration_since(web_time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let mut action = GridAction::default();
     {
         let mut cache = thumbs.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -193,7 +195,8 @@ fn recent_grid(app: &mut PhotocraftApp, ui: &mut egui::Ui, recent: &[String]) {
             let tile = Rect::from_min_size(min, egui::vec2(tile_w, tile_h));
             // Only previews on screen are decoded; the rest wait until they are scrolled to.
             let thumb = if ui.is_rect_visible(tile) { cache.thumb(ui.ctx(), path) } else { Thumb::Loading };
-            recent_tile(ui, path, tile, image_h, thumb, &mut action);
+            let line = caption::line(cache.size_of(path), app.session.prefs().file_handling.recent_opened.get(path).copied(), now);
+            recent_tile(ui, path, tile, image_h, thumb, &line, &mut action);
         }
     }
     if action.clear {
@@ -208,8 +211,9 @@ fn recent_grid(app: &mut PhotocraftApp, ui: &mut egui::Ui, recent: &[String]) {
     }
 }
 
-/// One preview: the picture cropped to fill a 4:3 frame, the file name and its folder under it.
-fn recent_tile(ui: &mut egui::Ui, path: &str, tile: Rect, image_h: f32, thumb: Thumb, action: &mut GridAction) {
+/// One preview: the picture cropped to fill a 4:3 frame, the file name and one dim line (size and
+/// when last opened) under it; the full path is in the tooltip.
+fn recent_tile(ui: &mut egui::Ui, path: &str, tile: Rect, image_h: f32, thumb: Thumb, line: &str, action: &mut GridAction) {
     let t = crate::theme::Tokens::get(ui.ctx());
     let name = crate::file_open::display_name(path);
     let resp = ui.interact(tile, ui.scope_id().with(("home-recent", path)), Sense::click());
@@ -238,9 +242,8 @@ fn recent_tile(ui: &mut egui::Ui, path: &str, tile: Rect, image_h: f32, thumb: T
     ui.painter().rect_stroke(image, radius, border, egui::StrokeKind::Inside);
     let name_g = crate::tab_strip::elided(ui, &name, egui::FontId::proportional(12.5), t.text, tile.width() - 4.0);
     ui.painter().galley(egui::pos2(tile.left() + 2.0, image.bottom() + 8.0), name_g, t.text);
-    let folder = std::path::Path::new(path).parent().and_then(|d| d.file_name()).map(|d| d.to_string_lossy().into_owned()).unwrap_or_default();
-    if !folder.is_empty() {
-        let g = crate::tab_strip::elided(ui, &folder, egui::FontId::proportional(11.5), t.text_faint, tile.width() - 4.0);
+    if !line.is_empty() {
+        let g = crate::tab_strip::elided(ui, line, egui::FontId::proportional(11.5), t.text_faint, tile.width() - 4.0);
         ui.painter().galley(egui::pos2(tile.left() + 2.0, image.bottom() + 25.0), g, t.text_faint);
     }
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));

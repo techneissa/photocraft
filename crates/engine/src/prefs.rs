@@ -541,6 +541,9 @@ pub struct FileHandling {
     pub recent_file_count: u32,
     /// Most recently opened files, newest first (File › Open Recent).
     pub recent_files: Vec<String>,
+    /// Fork (`fork/home-grid-size-date.md`): when each recent file was last opened here, in seconds
+    /// since 1970; entries of older versions have none.
+    pub recent_opened: BTreeMap<String, u64>,
     /// A folder whose `.cube`, `.3dl` and `.look` files Color Lookup lists under its built-in
     /// looks (native only, #6558). Empty lists none.
     pub lut_folder: String,
@@ -571,6 +574,7 @@ impl Default for FileHandling {
             rasterize_svg_groups_deeper_than: photocraft_doc::MAX_GROUP_DEPTH as u32,
             recent_file_count: 20,
             recent_files: Vec::new(),
+            recent_opened: BTreeMap::new(),
             lut_folder: String::new(),
         }
     }
