@@ -96,6 +96,7 @@
 - **Levels and Curves:** ⌥-drag to see clipping, and a histogram that is never empty.
 
 **Shortcuts, menus and settings**
+- **Shortcuts in right-click menus:** the Layers, canvas, tab and Paths menus show each command's shortcut, as the menu bar does.
 - **Centred windows:** Settings and dialogs open centred, and each window remembers where you put it.
 - **Keyboard Shortcuts:** chords, conditions, clash warnings, export and import, resizable window.
 - **Assign Shortcut…:** right-click any command to give it a key.
