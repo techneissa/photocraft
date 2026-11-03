@@ -350,3 +350,35 @@ fn the_list_keeps_its_width_across_frames_while_a_query_is_typed() {
     h.run_steps(30);
     assert!((list_width(&h) - width).abs() < 0.5, "{} against {width}", list_width(&h));
 }
+
+#[test]
+fn the_first_letter_typed_into_an_open_list_stays_first() {
+    let mut h = dropdown_harness();
+    // Open with nothing typed: the first letter makes the field, the rest go after it.
+    open(&mut h);
+    for text in ["l", "i", "n", "e", "a", "r"] {
+        type_text(&mut h, text);
+    }
+    h.run_steps(3);
+    assert!(shown(&h, "Linear Light"), "\"linear\" in typing order finds Linear Light");
+    assert!(!shown(&h, "Normal"));
+}
+
+#[test]
+fn a_long_list_opened_low_in_the_window_fits_the_window() {
+    let labels: &'static [String] = Vec::leak((0..60).map(|i| format!("Option {i}")).collect());
+    let options: Vec<(usize, &str)> = labels.iter().enumerate().map(|(i, l)| (i, l.as_str())).collect();
+    let mut h = Harness::builder().with_size(egui::vec2(300.0, 400.0)).build_ui_state(
+        move |ui, selected: &mut usize| {
+            ui.add_space(300.0);
+            crate::widgets::dropdown(ui, "low", tl!("Low"), selected, &options, 120.0);
+        },
+        0,
+    );
+    open(&mut h);
+    h.run_steps(5);
+    let bottom = h
+        .ctx
+        .memory(|m| m.layer_ids().filter(|l| l.order == egui::Order::Foreground).filter_map(|l| m.area_rect(l.id)).map(|r| r.bottom()).fold(0.0, f32::max));
+    assert!(bottom <= 400.0, "the list ends at {bottom}, past the window's 400");
+}

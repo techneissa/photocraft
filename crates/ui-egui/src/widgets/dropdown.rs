@@ -126,6 +126,8 @@ fn dropdown_with<T: PartialEq + Clone>(
     press.after(&response);
     if combo_box_arrow_keys(ui, &response, current, options) {
         chosen.push(current.clone());
+        // The arrow keys moved the value: the next pass scrolls its row into view.
+        ui.data_mut(|d| d.insert_temp(reveal_id, true));
     }
     if wheel && !over_list {
         let stepped = wheel_steps(ui, wheel_id, response.hovered(), current, options);
@@ -234,12 +236,19 @@ pub fn menu_scroll<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> R
     egui::ScrollArea::vertical().max_height(room).min_scrolled_height(room).show(ui, add_contents).inner
 }
 
-/// The tallest a dropdown's list may ask to be: the part of the window that can be seen, and never
-/// less than [`MENU_MIN_HEIGHT`] (#7261). `craft_ui::ComboBox` keeps the list to the room on the
-/// side of its box it opens on, so this only lifts the old fixed 420 pt cap: the Layers panel's
-/// 27 blend modes show whole, and scroll only when the window is shorter than that.
+/// The tallest a dropdown's list may ask to be: the room from its button to the window's edge on
+/// the roomier side (below, or above where `craft_ui::ComboBox` flips the list), less a margin, and
+/// never less than [`MENU_MIN_HEIGHT`] (#7261). The list is as tall as its rows up to that, and
+/// scrolls past it. Call it before the combo box is shown: the cursor is then at the button.
 fn list_height(ui: &Ui) -> f32 {
-    crate::work_area::visible_rect(ui.ctx()).height().max(MENU_MIN_HEIGHT)
+    let visible = crate::work_area::visible_rect(ui.ctx());
+    let top = ui.cursor().top();
+    let button = ui.spacing().interact_size.y;
+    let below = visible.bottom() - (top + button);
+    let above = top - visible.top();
+    // The popup frame's margin and stroke, and a small gap to the window's edge.
+    let frame = ui.spacing().menu_margin.sum().y + 2.0 + MENU_EDGE;
+    (below.max(above) - frame).max(MENU_MIN_HEIGHT)
 }
 
 /// Gap kept between a context menu and the window's edges, and the shortest it gets.
