@@ -37,7 +37,7 @@ mod tests {
     #[test]
     fn the_official_release_check_is_never_asked_in_this_fork() {
         // Answers before any network call: the engine's service reports a short message.
-        assert!(photocraft_ui_egui::fork_update::OFFICIAL_CHECK_OFF);
+        const { assert!(photocraft_ui_egui::fork_update::OFFICIAL_CHECK_OFF) };
         let message = check().unwrap_err();
         assert!(message.contains("not the official"), "{message}");
     }

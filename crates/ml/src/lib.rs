@@ -37,6 +37,7 @@ mod migrate;
 mod ram;
 mod resize;
 mod segment;
+#[cfg(not(target_arch = "wasm32"))]
 mod segment_full;
 mod store;
 
@@ -50,7 +51,14 @@ pub use install::{download, remove};
 pub use migrate::{Migration, migrate_old_models};
 pub use ram::{check_memory, min_total_memory, physical_memory};
 pub use segment::{SEGMENT_SIZE, segment_subject, segment_subject_with};
+#[cfg(not(target_arch = "wasm32"))]
 pub use segment_full::{SEGMENT_FULL_SIZE, segment_subject_full_with};
+
+/// The browser build has no full BiRefNet (its engine is native only): never installed.
+#[cfg(target_arch = "wasm32")]
+pub fn segment_subject_full_with(_: &Rgb, _: Cancel<'_>) -> Result<Vec<f32>, MlError> {
+    Err(MlError::ModelMissing { model: Model::Birefnet, path: String::new() })
+}
 pub use store::{
     Located, MODELS_DIR_VAR, Model, ModelFile, Source, disable_models, install_dir, model_location, model_path, model_present, models_dir, models_disabled,
 };

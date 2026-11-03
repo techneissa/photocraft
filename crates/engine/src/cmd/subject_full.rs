@@ -32,6 +32,12 @@ pub(super) fn installed() -> bool {
     !cfg!(target_arch = "wasm32") && photocraft_ml::model_path(photocraft_ml::Model::Birefnet).is_some()
 }
 
+/// The full model's memory floor on this computer.
+#[cfg(not(test))]
+pub(super) fn check_memory() -> std::result::Result<(), MlError> {
+    photocraft_ml::check_memory(photocraft_ml::Model::Birefnet)
+}
+
 #[cfg(not(test))]
 pub(super) fn segment() -> Segment {
     photocraft_ml::segment_subject_full_with
@@ -46,6 +52,12 @@ thread_local! {
 #[cfg(test)]
 pub(super) fn installed() -> bool {
     TEST_FULL.with(std::cell::Cell::get).is_some()
+}
+
+/// A test's stand-in model is never refused for the memory of the machine running the tests.
+#[cfg(test)]
+pub(super) fn check_memory() -> std::result::Result<(), MlError> {
+    Ok(())
 }
 
 #[cfg(test)]

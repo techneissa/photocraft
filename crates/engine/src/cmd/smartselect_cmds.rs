@@ -496,7 +496,7 @@ pub(crate) fn find_subject_region(
     let full = subject_full::installed();
     if subject_full::tried_first(engine, full) {
         // Refused before the photo is sampled: running out of memory on the GPU can take the process down.
-        let tried = photocraft_ml::check_memory(photocraft_ml::Model::Birefnet)
+        let tried = subject_full::check_memory()
             .and_then(|()| with_doc_sampler(doc, layer, all_layers, |smp, _| model_subject_with(smp, area, ctl, subject_full::segment())));
         match subject_full::step(engine, tried)? {
             subject_full::Step::Done(region) => return Ok(Subject { region, used: "model-full", note: None }),
