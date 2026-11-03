@@ -36,6 +36,11 @@ pub struct Resize {
     key: u64,
     /// Begun by an Alt+right-drag (#297): it ends when the right button is up.
     pub secondary: bool,
+    /// Where the brush stands now, unrounded, and where the pointer was at the last move (document
+    /// pixels from the anchor). A drag moves the brush by the pointer's travel, so a value held at
+    /// a limit leaves it as soon as the pointer turns back, with no dead stretch to retrace.
+    now: (f32, f32),
+    last: [f64; 2],
 }
 
 /// Tools the gesture resizes: every painting tool, and Quick Selection (it has a brush too).
@@ -83,7 +88,8 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers, ar
                 let b = &app.session.tools.brush;
                 (b.size, if vary { b.hardness } else { b.opacity })
             };
-            app.brush_resize = Some(Resize { anchor: [x, y], start: (size, v), key: KEY.fetch_add(1, Ordering::Relaxed), secondary: armed });
+            app.brush_resize =
+                Some(Resize { anchor: [x, y], start: (size, v), key: KEY.fetch_add(1, Ordering::Relaxed), secondary: armed, now: (size, v), last: [0.0, 0.0] });
             true
         }
         ToolEvent::Move { x, y, .. } => match app.brush_resize {
@@ -111,6 +117,22 @@ pub fn release_stale(app: &mut PhotocraftApp, secondary_down: bool) {
     }
 }
 
+/// The diameter and hardness after the pointer moved to (`dx`, `dy`) from the anchor: the brush
+/// moves by the travel since the last move, held at its limits (the size 2 px per pointer pixel).
+fn travel(app: &mut PhotocraftApp, r: Resize, dx: f64, dy: f64, zoom: f32) -> (f32, f32) {
+    let fin = |v: f64| if v.is_finite() { v as f32 } else { 0.0 };
+    let (mx, my) = (fin(dx - r.last[0]), fin(dy - r.last[1]));
+    let size = (r.now.0 + 2.0 * mx).clamp(*SIZE.start(), *SIZE.end());
+    let zoom = if zoom.is_finite() && zoom > 0.0 { zoom } else { 1.0 };
+    let v = (r.now.1 + my * zoom / HARDNESS_TRAVEL).clamp(0.0, 1.0);
+    if let Some(live) = app.brush_resize.as_mut() {
+        live.now = (size, v);
+        live.last = [dx, dy];
+    }
+    // Whole pixels and percents, like the readout and the options bar.
+    (size.round(), (v * 100.0).round() / 100.0)
+}
+
 fn update(app: &mut PhotocraftApp, r: Resize, x: f64, y: f64) {
     // Screen-relative, as in Photoshop (#4228): right is bigger and down harder on screen, however
     // the view is rotated or flipped. The screen delta over the zoom is in document pixels at 0°.
@@ -122,7 +144,7 @@ fn update(app: &mut PhotocraftApp, r: Resize, x: f64, y: f64) {
         // No view: document axes, mirrored by View › Flip Horizontal.
         _ => ((x - r.anchor[0]) * if app.ui.view.flip_horizontal { -1.0 } else { 1.0 }, y - r.anchor[1], app.point_zoom()),
     };
-    let (size, v) = resized(r.start, dx, dy, zoom);
+    let (size, v) = travel(app, r, dx, dy, zoom);
     // "Vary Round Brush Hardness on HUD" (Preferences ▸ Tools, on by default): off, the vertical
     // movement takes the opacity instead of the hardness, as in Photoshop.
     let vary = app.session.prefs().tools.vary_round_brush_hardness_on_hud;
@@ -137,8 +159,9 @@ fn update(app: &mut PhotocraftApp, r: Resize, x: f64, y: f64) {
     }
 }
 
-/// Draw the resize feedback: the brush circle at the anchor, filled with the brush preview
-/// colour as a dab of the brush's hardness covers (Photoshop's), and the readout beside the pointer.
+/// Draw the resize feedback in Photoshop's look: the brush circle at the anchor, filled with a
+/// translucent overlay (red by default) that is solid to the edge for a hard tip and fades out for
+/// a soft one, its outline, and a small dark label beside the pointer (`look`).
 /// Returns true while a resize is in progress (the canvas then hides its cursor).
 pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) -> bool {
     let Some(r) = app.brush_resize else { return false };
@@ -151,19 +174,17 @@ pub fn draw(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform) -> boo
     // Photoshop hides the pointer while the circle stays put.
     painter.ctx().set_cursor_icon(egui::CursorIcon::None);
     let at = painter.ctx().pointer_latest_pos().unwrap_or(c);
-    let (label, value) = if app.session.prefs().tools.vary_round_brush_hardness_on_hud {
-        (tl!("Hardness:"), format!("{}%", (b.hardness * 100.0).round() as i64))
-    } else {
-        (tl!("Opacity:"), format!("{}%", (b.opacity * 100.0).round() as i64))
-    };
-    crate::canvas::draw_readout(painter.ctx(), "brush-resize-readout", at, [tl!("Diameter:"), label], [format!("{} px", b.size.round() as i64), value]);
+    let vary = app.session.prefs().tools.vary_round_brush_hardness_on_hud;
+    let (name, value) = if vary { (tl!("Hardness:"), b.hardness) } else { (tl!("Opacity:"), b.opacity) };
+    let lines = look::lines(b.size, (name, value), value != r.start.1);
+    look::label(painter.ctx(), "brush-resize-readout", at, &lines);
     true
 }
 
 /// The tip preview's tint: Preferences ▸ Cursors ▸ Brush Preview colour (red by default, as in
 /// Photoshop), at the overlay's alpha. Unreadable values keep the red.
 fn preview_tint(app: &PhotocraftApp) -> Color32 {
-    let alpha = 110;
+    let alpha = look::OVERLAY_ALPHA;
     crate::color_picker_ui::parse_hex(&app.session.prefs().cursors.brush_preview_color).map_or(Color32::from_rgba_unmultiplied(255, 0, 0, alpha), |c| {
         Color32::from_rgba_unmultiplied((c[0] * 255.0).round() as u8, (c[1] * 255.0).round() as u8, (c[2] * 255.0).round() as u8, alpha)
     })
@@ -242,5 +263,11 @@ fn tip_preview(painter: &egui::Painter, c: Pos2, radius: f32, zoom: f32, hardnes
     painter.add(mesh);
 }
 
+mod look;
+mod press;
+pub use press::{begin_on_press, finish_on_release, moves_on_press, owns_press};
+
+#[cfg(test)]
+mod drag_tests;
 #[cfg(test)]
 mod tests;
