@@ -461,3 +461,28 @@ fn arrows_scroll_a_long_list_to_the_match_after_typing() {
         assert_row_visible(&h, &format!("Option {i}"), "↑ after typing");
     }
 }
+
+/// How many option rows egui's own arrow-key focus has outlined (a second highlight next to the value's).
+fn focused_rows(h: &Harness<'static, usize>) -> usize {
+    h.query_all_by_label_contains("Option ").filter(|n| egui_kittest::kittest::NodeT::accesskit_node(n).is_focused()).count()
+}
+
+/// One highlight only: the value's row, never a second row outlined by egui's focus, and the keys stop at the ends.
+#[test]
+fn an_open_list_has_one_highlight_that_stops_at_the_last_row() {
+    let mut h = long_harness(false);
+    open(&mut h);
+    h.run_steps(3);
+    for _ in 0..64 {
+        press_arrow(&mut h, egui::Key::ArrowDown);
+        assert_eq!(focused_rows(&h), 0, "↓: a second row is outlined next to the value");
+    }
+    assert_eq!(*h.state(), 59, "↓ stops on the last row");
+    assert_row_visible(&h, "Option 59", "↓ held at the end");
+    for _ in 0..3 {
+        press_arrow(&mut h, egui::Key::ArrowUp);
+        assert_eq!(focused_rows(&h), 0, "↑: a second row is outlined next to the value");
+    }
+    assert_eq!(*h.state(), 56);
+    assert_row_visible(&h, "Option 56", "↑ after the end");
+}
