@@ -5,6 +5,7 @@
 //! cargo run -p photocraft-ui-egui --example dialog_place_snapshot -- \
 //!     --out settings.png --size 1440x900 --moved 900,520 --script '[["ui.menu.invoke", {"id": "edit.preferences.interface"}]]'
 //! ```
+//! `--load-prompt DIR` opens the Load Settings from Folder prompt (a sync folder in DIR).
 use photocraft_ui_egui::control::{ControlRequest, Outcome, handle};
 use photocraft_ui_egui::{PhotocraftApp, Services};
 use serde_json::Value;
@@ -46,6 +47,23 @@ fn main() {
         });
     harness.run_steps(4);
     let ctx = harness.ctx.clone();
+    // `--load-prompt DIR`: sync folder DIR, then Edit > Preferences > Load Settings from Folder
+    // (the confirm prompt with Cancel / Import), as a person opens it.
+    if let Some(dir) = arg(&args, "--load-prompt") {
+        let app = harness.state_mut();
+        std::fs::create_dir_all(&dir).expect("create the sync folder");
+        app.run("prefs.set", serde_json::json!({"path": "sync.folder", "value": dir})).expect("choose the folder");
+        app.run("edit.preferences.saveSettingsToFolder", serde_json::json!({"dryRun": false})).expect("save a file to load");
+        // The file says which Mac saved it: give it a neutral name for the picture.
+        let file = std::path::Path::new(&dir).join("photocraft.pcsettings");
+        let mut text: Value = serde_json::from_str(&std::fs::read_to_string(&file).expect("read the file")).expect("json");
+        text["savedBy"]["computer"] = "Studio Mac".into();
+        std::fs::write(&file, text.to_string()).expect("write the file");
+        let ctx = harness.ctx.clone();
+        let (req, _rx) = ControlRequest::new("ui.menu.invoke", serde_json::json!({"id": "edit.preferences.loadSettingsFromFolder"}));
+        eprintln!("load: {:?}", matches!(handle(harness.state_mut(), &ctx, &req), Outcome::Done(_)));
+        harness.run_steps(6);
+    }
     for (method, params) in script {
         let (req, _rx) = ControlRequest::new(&method, params);
         if let Outcome::Done(v) = handle(harness.state_mut(), &ctx, &req)
