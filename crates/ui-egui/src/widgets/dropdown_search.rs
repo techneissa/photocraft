@@ -322,6 +322,12 @@ pub fn before_with(ui: &mut Ui, salt: &str, labels: impl FnOnce() -> Vec<String>
         });
         return Filter::default();
     }
+    // egui moves its own keyboard focus between the rows on ↑/↓ and wraps at the ends, which drew a
+    // second (outlined) highlight beside the value's. In an open list the arrows belong to the
+    // dropdown and the search alone: one highlight, stopping at the first and last rows.
+    if ui.input(|i| i.key_pressed(Key::ArrowUp) || i.key_pressed(Key::ArrowDown)) {
+        ui.memory_mut(|m| m.move_focus(egui::FocusDirection::None));
+    }
     let labels = labels();
     let texts: Vec<&str> = labels.iter().map(String::as_str).collect();
     let mut search: Search = ui.data(|d| d.get_temp(id)).unwrap_or_default();
