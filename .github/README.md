@@ -110,6 +110,7 @@
 - **Updates:** Help ▸ Check for Updates and Settings update to this fork's own builds, never the official release.
 
 **Fixes**
+- **Big PSDs:** a PSD needing more than 2 GB opens (the limit is half the Mac's memory), and Home shows its preview from the image saved inside it.
 - PSD files with many fonts open without a long wait.
 - Cropping with Delete Cropped Pixels off no longer quits the app.
 - A few official fixes taken early, for masks, the Polygonal Lasso and Select ▸ Modify.
