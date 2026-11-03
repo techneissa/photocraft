@@ -10,6 +10,10 @@ use super::PhotocraftApp;
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct Clicks;
 
+pub(super) fn row_matches(_: &str) -> bool {
+    false
+}
+
 pub(super) fn row(_: &mut egui::Ui, _: &PhotocraftApp, _: &mut Map<String, Value>) -> Clicks {
     Clicks
 }

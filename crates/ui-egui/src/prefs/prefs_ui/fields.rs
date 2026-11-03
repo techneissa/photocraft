@@ -193,7 +193,7 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
             super::settings_sync::icons(ui)
         })
         .inner;
-    let folder = super::settings_folder::row(ui, app, f);
+    let mut folder = super::settings_folder::Clicks::default();
     super::settings_sync::message_line(ui, f);
     let mut found = preference_sections(&values, &search);
     let q = search.trim().to_lowercase();
@@ -289,6 +289,9 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                         #[cfg(not(target_arch = "wasm32"))]
                         if section == "general" && crate::fork_update::row_matches(filter) {
                             crate::fork_update::settings_row(ui, app);
+                        }
+                        if section == "general" && super::settings_folder::row_matches(filter) {
+                            folder = super::settings_folder::row(ui, app, f);
                         }
                         if section == "fileHandling" {
                             ui.label(

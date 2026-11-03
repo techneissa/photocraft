@@ -136,7 +136,7 @@ fn choose_asks_for_a_folder_and_remembers_it_here_and_for_the_other_apps() {
     assert_eq!(shared, json!({"path": folder.s()}));
     h.run_steps(4);
     assert!(!h.get_by_label("Save to Folder").accesskit_node().is_disabled(), "a folder is chosen");
-    assert_eq!(message(h.state())["warning"], false);
+    assert_eq!(message(h.state()), Value::Null, "the row shows the folder; no message repeats it");
     // It is kept with the other preferences.
     let ctx = egui::Context::default();
     tick(h.state_mut(), &ctx);

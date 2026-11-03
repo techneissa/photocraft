@@ -41,11 +41,15 @@ fn tilde(path: &str) -> String {
     }
 }
 
-/// The room the checkbox takes, a little over its label.
-const KEEP_WIDTH: f32 = 130.0;
+/// The row's search words: it shows while searching for them.
+pub(super) fn row_matches(filter: &str) -> bool {
+    let q = filter.trim().to_lowercase();
+    q.is_empty() || ["sync folder", "keep in sync", "save to folder", "load from folder"].iter().any(|w| w.contains(&q) || tl!(*w).to_lowercase().contains(&q))
+}
 
-/// The row under the search field: Sync Folder, the chosen folder (or the one the other ArtCraft
-/// apps use, to take in one click), Choose…, Save to Folder, Load from Folder and Keep in Sync.
+/// The Sync Folder block at the bottom of General: its title, the chosen folder (or the one the
+/// other ArtCraft apps use, to take in one click) on its own line in small type so the whole path
+/// shows, and under it Choose…, Save to Folder, Load from Folder and Keep in Sync on one line.
 pub(super) fn row(ui: &mut egui::Ui, app: &PhotocraftApp, f: &mut Map<String, Value>) -> Clicks {
     let t = Tokens::get(ui.ctx());
     let sync = &app.session.prefs().sync;
@@ -57,28 +61,22 @@ pub(super) fn row(ui: &mut egui::Ui, app: &PhotocraftApp, f: &mut Map<String, Va
         cached.as_str().filter(|s| !s.is_empty()).map(str::to_string)
     };
     let mut clicks = Clicks::default();
+    ui.add_space(10.0);
+    ui.label(RichText::new(tl!("Sync Folder")).color(t.text));
+    let (shown, full, color) = match (&sync.folder, &offered) {
+        (folder, _) if chosen => (tilde(folder), folder.clone(), t.text_dim),
+        (_, Some(o)) => (tilde(o), o.clone(), t.text_faint),
+        _ => (tl!("None chosen").to_string(), String::new(), t.text_faint),
+    };
+    ui.add_space(2.0);
+    // Small type, wrapped: the whole path shows, never cut off.
+    let path = ui.add(egui::Label::new(RichText::new(shown).size(11.0).color(color)).wrap());
+    if !full.is_empty() {
+        path.on_hover_text(full);
+    }
     ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        ui.label(RichText::new(tl!("Sync Folder")).color(t.text));
-        let (choose, use_it, save, load) = (tl!("Choose…"), tl!("Use This Folder"), tl!("Save to Folder"), tl!("Load from Folder"));
-        let mut labels = vec![choose, save, load];
-        if offered.is_some() {
-            labels.push(use_it);
-        }
-        let gap = ui.spacing().item_spacing.x;
-        let reserved = labels.iter().map(|l| crate::widgets::button_width(ui, &[*l])).sum::<f32>() + KEEP_WIDTH + gap * (labels.len() as f32 + 1.0);
-        let width = (ui.available_width() - reserved).max(80.0);
-        let (shown, full, color) = match (&sync.folder, &offered) {
-            (folder, _) if chosen => (tilde(folder), folder.clone(), t.text_dim),
-            (_, Some(o)) => (tilde(o), o.clone(), t.text_faint),
-            _ => (tl!("None chosen").to_string(), String::new(), t.text_faint),
-        };
-        let label = ui.allocate_ui_with_layout(egui::vec2(width, ui.spacing().interact_size.y), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-            ui.add(egui::Label::new(RichText::new(shown).color(color)).truncate())
-        });
-        if !full.is_empty() {
-            label.inner.on_hover_text(full);
-        }
+    let (choose, use_it, save, load) = (tl!("Choose…"), tl!("Use This Folder"), tl!("Save to Folder"), tl!("Load from Folder"));
+    ui.horizontal_wrapped(|ui| {
         if offered.is_some() && crate::widgets::secondary_button(ui, use_it, 0.0).clicked() {
             clicks.use_offered = true;
         }
@@ -140,10 +138,8 @@ fn choose_dialog(app: &mut PhotocraftApp) -> Result<Value, String> {
 /// Use `folder`: remember it here and for the other ArtCraft apps.
 pub(super) fn choose_folder(app: &mut PhotocraftApp, folder: &str) -> Result<Value, String> {
     match app.session.choose_sync_folder(folder) {
-        Ok(()) => {
-            let message = crate::i18n::fmt(tl!("Sync folder: {path}"), &[("path", &tilde(folder))]);
-            settings_sync::report(app, &message, false);
-        }
+        // The row shows the folder; no message repeating it under the search field.
+        Ok(()) => {}
         Err(e) => settings_sync::report(app, &e, true),
     }
     Ok(json!({"folder": folder}))
