@@ -5634,7 +5634,7 @@ dependencies = [
 
 [[package]]
 name = "photocraft-birefnet"
-version = "0.19.0"
+version = "0.20.1"
 dependencies = [
  "candle-core",
  "candle-nn",
@@ -5875,7 +5875,7 @@ version = "0.20.1"
 
 [[package]]
 name = "photocraft-lama"
-version = "0.19.0"
+version = "0.20.1"
 dependencies = [
  "candle-core",
  "candle-nn",
@@ -5886,7 +5886,7 @@ dependencies = [
 
 [[package]]
 name = "photocraft-macvision"
-version = "0.19.0"
+version = "0.20.1"
 dependencies = [
  "image",
  "objc2 0.6.5",
@@ -5900,7 +5900,7 @@ dependencies = [
 
 [[package]]
 name = "photocraft-ml"
-version = "0.19.0"
+version = "0.20.1"
 dependencies = [
  "image",
  "photocraft-birefnet",
@@ -5988,7 +5988,7 @@ dependencies = [
 
 [[package]]
 name = "photocraft-sam3"
-version = "0.19.0"
+version = "0.20.1"
 dependencies = [
  "candle-core",
  "candle-nn",
