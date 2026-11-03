@@ -23,6 +23,14 @@ fn ago(now: u64, then: u64) -> String {
         60..3600 => crate::i18n::fmt(tl!("{n} min ago"), &[("n", &(secs / 60).to_string())]),
         3600..86_400 => crate::i18n::fmt(tl!("{n} h ago"), &[("n", &(secs / 3600).to_string())]),
         86_400..172_800 => tl!("Yesterday").to_string(),
-        _ => i64::try_from(then).ok().and_then(|s| chrono::DateTime::from_timestamp(s, 0)).map_or_else(String::new, |d| d.format("%-d %b").to_string()),
+        _ => i64::try_from(then).ok().and_then(|s| chrono::DateTime::from_timestamp(s, 0)).map_or_else(String::new, short_date),
     }
+}
+
+/// `3 Nov`, in this Mac's time zone (a file opened just after midnight shows that day, not the one
+/// before in UTC). The browser build has no local clock here: UTC.
+fn short_date(d: chrono::DateTime<chrono::Utc>) -> String {
+    #[cfg(not(target_arch = "wasm32"))]
+    let d = d.with_timezone(&chrono::Local);
+    d.format("%-d %b").to_string()
 }
