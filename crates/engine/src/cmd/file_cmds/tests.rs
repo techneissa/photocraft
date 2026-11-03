@@ -1989,3 +1989,17 @@ fn sanitize_keeps_windows_device_names_off_the_disk() {
         assert_eq!(sanitize(name), name);
     }
 }
+
+/// Fork: Settings › General › Lock the Background Layer. Off (the default), an opened photo is an
+/// unlocked "Layer 0"; on, the locked Background.
+#[test]
+fn lock_background_layer_setting_decides_how_a_photo_opens() {
+    let path = png(&tmp("lock-background"), "p.png", 8, 8, "#336699");
+    let mut s = Session::new();
+    s.execute("file.openAs", json!({"path": path})).unwrap();
+    let d = &s.active().unwrap().doc;
+    assert!(d.background().is_none() && d.layers[0].name == "Layer 0" && !d.layers[0].locks.position);
+    s.edit_prefs(|p| p.general.lock_background_layer = true);
+    s.execute("file.openAs", json!({"path": path})).unwrap();
+    assert!(s.active().unwrap().doc.background().is_some());
+}

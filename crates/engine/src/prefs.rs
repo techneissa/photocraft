@@ -221,6 +221,8 @@ pub struct General {
     pub beep_when_done: bool,
     pub export_clipboard: bool,
     pub resize_image_during_place: bool,
+    /// Fork: opened photos and new documents get a locked Background layer.
+    pub lock_background_layer: bool,
     pub always_create_smart_objects_when_placing: bool,
     /// Scroll wheel zooms instead of panning.
     pub zoom_with_scroll_wheel: bool,
@@ -241,6 +243,7 @@ impl Default for General {
             beep_when_done: false,
             export_clipboard: true,
             resize_image_during_place: true,
+            lock_background_layer: false,
             always_create_smart_objects_when_placing: true,
             zoom_with_scroll_wheel: false,
             animated_zoom: true,
