@@ -12,6 +12,8 @@ use crate::args::{ModelsAction, ModelsArgs};
 fn chosen(name: &str) -> Vec<Model> {
     match name {
         "birefnet" => vec![Model::BirefnetLite],
+        // The full BiRefNet, LightCraft's file (444 MB).
+        "birefnet-full" => vec![Model::Birefnet],
         "lama" => vec![Model::Lama],
         // The models PhotoCraft can download (SAM 3 has no public download).
         _ => Model::ALL.into_iter().filter(|m| m.downloadable()).collect(),
@@ -74,8 +76,9 @@ mod tests {
 
     #[test]
     fn model_names_pick_the_models() {
-        assert_eq!(chosen("all"), vec![Model::BirefnetLite, Model::Lama], "SAM 3 has no public download");
+        assert_eq!(chosen("all"), vec![Model::Birefnet, Model::BirefnetLite, Model::Lama], "SAM 3 has no public download");
         assert_eq!(chosen("birefnet"), vec![Model::BirefnetLite]);
+        assert_eq!(chosen("birefnet-full"), vec![Model::Birefnet]);
         assert_eq!(chosen("lama"), vec![Model::Lama]);
     }
 

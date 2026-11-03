@@ -5623,6 +5623,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "photocraft-birefnet"
+version = "0.19.0"
+dependencies = [
+ "candle-core",
+ "candle-nn",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "photocraft-cli"
 version = "0.19.0"
 dependencies = [
@@ -5882,6 +5892,7 @@ name = "photocraft-ml"
 version = "0.19.0"
 dependencies = [
  "image",
+ "photocraft-birefnet",
  "photocraft-lama",
  "reqwest",
  "sha2",

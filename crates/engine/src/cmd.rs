@@ -143,6 +143,7 @@ mod smartselect_macos;
 pub mod solid_fill_cmds;
 pub mod stamp_cmds;
 pub mod style_asl_cmds;
+mod subject_full;
 pub mod swatch_cmds;
 pub mod symmetry_cmds;
 pub(super) mod timeline_cmds;

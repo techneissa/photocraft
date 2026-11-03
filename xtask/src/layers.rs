@@ -64,6 +64,8 @@ pub const TABLE: &[(&str, Class)] = &[
     ("viewport", Class::Layer(4)),
     // LaMa on candle (a port of LightCraft's `lama`); `ml` runs it for Remove Subject.
     ("lama", Class::Layer(4)),
+    // BiRefNet on candle (a port of LightCraft's `birefnet`); `ml` runs it for the full-size Select Subject model.
+    ("birefnet", Class::Layer(4)),
     ("ml", Class::Layer(4)),
     // SAM 3 on candle (a port of LightCraft's `segment`); uses `ml`'s types and model folders.
     ("sam3", Class::Layer(4)),
@@ -85,8 +87,8 @@ pub const TABLE: &[(&str, Class)] = &[
 /// The L0 foundation is a small chain: `raster` builds on `color` and
 /// `geom`, which the §3 diagram draws on one line. The GPU backend (`gpu`)
 /// reuses the CPU reference (`compose`) for LUTs and parity tests. `sam3` uses `ml`'s error type,
-/// image type and model folders; `ml` runs `lama`.
-pub const INTRA_LAYER_ORDER: &[&[&str]] = &[&["geom", "cms", "color", "raster"], &["compose", "gpu"], &["lama", "ml", "sam3"]];
+/// image type and model folders; `ml` runs `lama` and `birefnet`.
+pub const INTRA_LAYER_ORDER: &[&[&str]] = &[&["geom", "cms", "color", "raster"], &["compose", "gpu"], &["lama", "birefnet", "ml", "sam3"]];
 
 fn intra_layer_allowed(from: &str, to: &str) -> bool {
     let (from, to) = (short_name(from), short_name(to));

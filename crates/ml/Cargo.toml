@@ -14,6 +14,8 @@ workspace = true
 tract-onnx = "0.23.9"
 # LaMa (big-lama.pt) on candle, for Remove Subject.
 photocraft-lama = { workspace = true }
+# The full BiRefNet (model.safetensors, the file LightCraft shares) on candle, for Select Subject.
+photocraft-birefnet = { workspace = true }
 # Model downloads (Settings › AI Models, `photocraft-cli models fetch`); both already in the lockfile.
 reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "rustls"] }
 sha2 = "0.10.9"

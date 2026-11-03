@@ -9,6 +9,12 @@ use crate::{MlError, Model};
 /// Total memory below which BiRefNet-lite is not loaded (its peak is about 9 GB).
 const BIREFNET_MIN_TOTAL: u64 = 12 << 30;
 
+/// Total memory below which the full BiRefNet is not loaded. Measured on an Apple-silicon Mac (Metal, release build,
+/// `/usr/bin/time -l` on `try_models segment-full`, a 12 MP photo): 15.3 GB peak footprint (1.4 GB resident; the rest
+/// is GPU buffers), whatever the photo's size (the model takes a 1024 px square). Metal lets a process use about three
+/// quarters of the memory, so a computer needs 24 GB for those 15 GB.
+const BIREFNET_FULL_MIN_TOTAL: u64 = 24 << 30;
+
 /// Total memory below which SAM 3 is not loaded. Measured on an Apple-silicon Mac (Metal, release
 /// build, `/usr/bin/time -l` on `cargo run -p photocraft-sam3 --example sam3_probe`): 1.9 GB peak with
 /// the model loaded, 19.0 GB while an image is encoded, 20.3 GB with a text prompt too, whatever the
@@ -19,6 +25,7 @@ const SAM3_MIN_TOTAL: u64 = 32 << 30;
 /// The total memory `model` needs this computer to have, in bytes (0: not measured, no limit).
 pub fn min_total_memory(model: Model) -> u64 {
     match model {
+        Model::Birefnet => BIREFNET_FULL_MIN_TOTAL,
         Model::BirefnetLite => BIREFNET_MIN_TOTAL,
         Model::Lama => 0,
         Model::Sam3 => SAM3_MIN_TOTAL,
@@ -88,6 +95,17 @@ mod tests {
         // Not told: the model loads rather than being refused on a guess; LaMa has no limit.
         assert!(check_total(Model::BirefnetLite, None).is_ok());
         assert!(check_total(Model::Lama, gb(1)).is_ok());
+    }
+
+    #[test]
+    fn the_full_birefnet_needs_24_gb_of_total_memory() {
+        let gb = |n: u64| Some(n << 30);
+        assert_eq!(check_total(Model::Birefnet, gb(16)), Err(MlError::LowMemory { have: 16 << 30, needs: 24 << 30 }));
+        assert!(check_total(Model::Birefnet, gb(23)).is_err());
+        assert!(check_total(Model::Birefnet, gb(24)).is_ok());
+        assert!(check_total(Model::Birefnet, None).is_ok());
+        // A computer too small for it still runs BiRefNet-lite.
+        assert!(check_total(Model::BirefnetLite, gb(16)).is_ok());
     }
 
     #[test]
