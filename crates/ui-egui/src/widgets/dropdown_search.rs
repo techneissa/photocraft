@@ -343,6 +343,15 @@ pub fn before_with(ui: &mut Ui, salt: &str, labels: impl FnOnce() -> Vec<String>
                 search.composing = !text.is_empty();
                 return true;
             }
+            // A commit ends the composition and replaces the preedit (already mirrored into
+            // `query` via the field), not appends to it.
+            if let Event::Ime(egui::ImeEvent::Commit(text)) = event {
+                search.query.clear();
+                search.composing = false;
+                let applied = search.apply(Input::Text(text), &texts, enabled);
+                picked = picked.or(applied.pick);
+                return false;
+            }
             let Some(input) = input_of(event) else { return true };
             if editing && matches!(input, Input::Text(_) | Input::Backspace | Input::Clear) {
                 return true;

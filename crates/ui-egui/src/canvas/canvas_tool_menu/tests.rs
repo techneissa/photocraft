@@ -556,7 +556,7 @@ fn view_menu_zoom_in_keeps_the_clicked_point_under_the_pointer() {
     let p = screen_of(h.state(), doc);
     right_click(&mut h, p, Modifiers::NONE);
     // Chosen in the menu itself: the canvas frame that draws the menu must keep the new view.
-    h.get_by_label("Zoom In").click();
+    h.get_by_label_contains("Zoom In").click();
     h.run_steps(3);
     assert!(h.state().ui.canvas_tool_menu.is_none());
     let after = h.state().ui.views[0].zoom;
@@ -566,7 +566,7 @@ fn view_menu_zoom_in_keeps_the_clicked_point_under_the_pointer() {
     assert_eq!(h.state().session.journal.last().map(|(id, _)| id.as_str()), Some("view.zoomIn"));
     // Zoom Out returns to where it was.
     right_click(&mut h, p, Modifiers::NONE);
-    h.get_by_label("Zoom Out").click();
+    h.get_by_label_contains("Zoom Out").click();
     h.run_steps(3);
     assert_eq!(h.state().ui.views[0].zoom, zoom);
     assert!((screen_of(h.state(), doc) - p).length() < 1.0);
@@ -628,7 +628,7 @@ fn view_menu_zoom_in_centres_the_clicked_point_with_the_preference() {
     let doc = [300.0, 100.0];
     let p = screen_of(h.state(), doc);
     right_click(&mut h, p, Modifiers::NONE);
-    h.get_by_label("Zoom In").click();
+    h.get_by_label_contains("Zoom In").click();
     h.run_steps(3);
     assert_eq!(h.state().ui.views[0].center, doc);
 }
@@ -643,7 +643,7 @@ fn view_menu_fits_fills_and_sets_fixed_zooms() {
     let ppp = h.state().canvas_ppp();
     let pick = |h: &mut Harness<'static, PhotocraftApp>, label: &str| {
         right_click(h, p, Modifiers::NONE);
-        h.get_by_label(label).click();
+        h.get_by_label_contains(label).click();
         h.run_steps(3);
         h.state().ui.views[0].zoom
     };

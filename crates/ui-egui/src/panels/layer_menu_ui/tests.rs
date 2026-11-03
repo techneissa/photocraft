@@ -405,7 +405,8 @@ fn multi_selection_menu_greys_what_acts_on_one_layer() {
         "Link Layers",
         "Merge Layers",
     ] {
-        assert!(!h.get_by_label(label).accesskit_node().is_disabled(), "{label} acts on the selection");
+        // Right-click menus show the command's shortcut in the accesskit name.
+        assert!(!h.get_by_label_contains(label).accesskit_node().is_disabled(), "{label} acts on the selection");
     }
     // Greyed here only for lack of something to act on: no style on the clipboard, no style to clear.
     for label in ["Paste Layer Style", "Clear Layer Style"] {

@@ -273,6 +273,8 @@ fn a_composing_ime_shows_the_field_before_any_text_is_typed() {
     h.run();
     assert!(h.query_by_label("Search").is_some(), "the field shows to take the preedit");
     assert!(h.query_by_label("Dissolve").is_some() && h.query_by_label("Multiply").is_none(), "the rows follow the preedit text");
+    // Clear the preedit, then commit (the sequence real IMEs send).
+    h.event(egui::Event::Ime(egui::ImeEvent::Preedit { text: String::new(), active_range_chars: None }));
     h.event(egui::Event::Ime(egui::ImeEvent::Commit("dar".into())));
     h.run();
     h.run();
