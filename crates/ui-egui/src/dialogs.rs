@@ -3,6 +3,8 @@
 
 use serde_json::{Value, json};
 
+mod placement;
+
 use crate::PhotocraftApp;
 use crate::state::{Dialog, DialogKind};
 use crate::widgets::{ButtonRole, DialogButton, dialog_buttons};
@@ -169,10 +171,7 @@ fn first_field_focused<R>(ui: &mut egui::Ui, id: egui::Id, body: impl FnOnce(&mu
 /// Where a dialog's last position is remembered: per command for command dialogs (each filter has
 /// its own), per kind for the rest.
 fn place_id(d: &Dialog) -> egui::Id {
-    match d.fields.get("__command").and_then(Value::as_str) {
-        Some(cmd) => egui::Id::unique(("dialog-place", cmd)),
-        None => egui::Id::unique(("dialog-place", format!("{:?}", d.kind))),
-    }
+    placement::place_id(d)
 }
 
 /// Whether another dialog is drawn above `live` (egui's layer order, back to front).
@@ -597,7 +596,11 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         // effects, extends down and right instead of re-centring.
         let pinned: Option<egui::Vec2> = ctx.data(|m| m.get_temp(id));
         let place = place_id(&d);
-        let start = pinned.or_else(|| ctx.data_mut(|m| m.get_persisted::<egui::Vec2>(place))).or_else(|| crate::blur_pins::first_place(&d.fields, ctx));
+        let start = pinned
+            .or_else(|| {
+                placement::start_offset(ctx.data_mut(|m| m.get_persisted::<egui::Vec2>(place)).filter(|_| !placement::is_alert(&d)), ctx.content_rect())
+            })
+            .or_else(|| crate::blur_pins::first_place(&d.fields, ctx));
         let mut drag = egui::Vec2::ZERO;
         let mut close_clicked = false;
         let mut esc_close = false;
@@ -750,7 +753,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
             let offset = (pinned.unwrap_or(modal.response.rect.min - screen.min) + drag).clamp(egui::Vec2::ZERO, room);
             ctx.data_mut(|m| m.insert_temp(id, offset));
             // A dialog the user moved reopens there (Photoshop remembers each dialog's place).
-            if drag != egui::Vec2::ZERO {
+            if drag != egui::Vec2::ZERO && !placement::is_alert(&d) {
                 ctx.data_mut(|m| m.insert_persisted(place, offset));
             }
         }
