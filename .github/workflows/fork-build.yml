@@ -137,6 +137,12 @@ jobs:
 
       - name: Build the app
         if: steps.built.outputs.skip != 'true'
+        # Fast compile, not the fastest app (techneissa, 2026-11-03): 16 code units per crate and no
+        # link-time optimisation, in place of the official release's 1 unit and thin LTO. The app
+        # runs a few percent slower; the build takes about half the time (23 min on 3 cores before).
+        env:
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+          CARGO_PROFILE_RELEASE_LTO: "off"
         run: packaging/macos/package.sh --arch aarch64
 
       - name: Publish as custom-build
