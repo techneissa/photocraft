@@ -48,6 +48,9 @@ pub mod effects_map;
 pub mod exr_parts;
 mod flat;
 pub mod fork_background_lock;
+pub mod fork_psd_budget;
+#[cfg(any(unix, windows))]
+pub mod fork_psd_preview;
 mod gradient_bake;
 pub mod guides_map;
 pub use gradient_bake::{Method as GradientMethod, bake as bake_gradient};
@@ -361,7 +364,7 @@ impl Default for ImportOptions {
         ImportOptions {
             max_group_depth: photocraft_doc::MAX_GROUP_DEPTH,
             demosaic: raw::Demosaic::default(),
-            psd_max_pixel_bytes: DEFAULT_PSD_IMPORT_PIXEL_BYTES,
+            psd_max_pixel_bytes: fork_psd_budget::psd_import_pixel_bytes(),
             lock_background: true,
         }
     }
@@ -473,12 +476,12 @@ pub fn import_file_for_open_with(
         let bytes = photocraft_format::read_file(path).map_err(read_failed)?;
         return import_for_open_with(name, &bytes, opts, ctl);
     }
-    import_source_with_limit(name, photocraft_psd::Source::new(source), ctl, opts.psd_max_pixel_bytes.min(DEFAULT_PSD_IMPORT_PIXEL_BYTES))
+    import_source_with_limit(name, photocraft_psd::Source::new(source), ctl, opts.psd_max_pixel_bytes.min(fork_psd_budget::psd_import_pixel_bytes()))
 }
 
 /// [`import_file_for_open_with`] for a PSD/PSB in any [`photocraft_psd::ReadAt`] source.
 pub fn import_source_for_open_with(name: &str, source: photocraft_psd::Source, ctl: &photocraft_raster::Interrupt) -> Result<(ImportResult, bool), IoError> {
-    import_source_with_limit(name, source, ctl, DEFAULT_PSD_IMPORT_PIXEL_BYTES)
+    import_source_with_limit(name, source, ctl, fork_psd_budget::psd_import_pixel_bytes())
 }
 
 fn import_source_with_limit(
@@ -512,7 +515,7 @@ fn import_stages(name: &str, bytes: &[u8], ctl: &photocraft_raster::Interrupt, o
     // Magic first: an Affinity file renamed .psd is still Affinity (#5258 corpus
     // preview_never_saves_back_to_its_native_or_renamed_source).
     if is_psd(bytes) {
-        return import_psd(name, ctl, damaged, opts.psd_max_pixel_bytes.min(DEFAULT_PSD_IMPORT_PIXEL_BYTES), |want, recover| {
+        return import_psd(name, ctl, damaged, opts.psd_max_pixel_bytes.min(fork_psd_budget::psd_import_pixel_bytes()), |want, recover| {
             PsdFile::from_bytes_and_merged_preflight(bytes, want, recover)
         });
     }
@@ -547,11 +550,11 @@ fn import_stages(name: &str, bytes: &[u8], ctl: &photocraft_raster::Interrupt, o
     // A `.psd`/`.psb`/`.psdt` with no raster signature keeps the PSD error instead of
     // `codec: unrecognized image format` (#5258). Magic already returned above.
     if is_psd_input(name, bytes) {
-        return import_psd(name, ctl, damaged, opts.psd_max_pixel_bytes.min(DEFAULT_PSD_IMPORT_PIXEL_BYTES), |want, recover| {
+        return import_psd(name, ctl, damaged, opts.psd_max_pixel_bytes.min(fork_psd_budget::psd_import_pixel_bytes()), |want, recover| {
             PsdFile::from_bytes_and_merged_preflight(bytes, want, recover)
         });
     }
-    fork_background_lock::apply(flat::import_flat_with_limit(name, bytes, opts.psd_max_pixel_bytes.min(DEFAULT_PSD_IMPORT_PIXEL_BYTES)), opts)
+    fork_background_lock::apply(flat::import_flat_with_limit(name, bytes, opts.psd_max_pixel_bytes.min(fork_psd_budget::psd_import_pixel_bytes())), opts)
 }
 
 /// Extension names can be wrong (for example, an image downloaded as WebP and renamed `.svg`).

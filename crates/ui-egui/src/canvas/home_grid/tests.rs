@@ -180,3 +180,20 @@ fn a_file_taken_off_recent_loses_its_preview_and_a_saved_file_gets_a_new_one() {
     write_png(std::path::Path::new(&b), 64, 32, [200, 200, 200]);
     assert!(wait_for(&mut h, |h| matches!(thumb_of(h, &b), Thumb::Ready(_, s) if s == egui::vec2(64.0, 32.0))), "the new save is shown");
 }
+
+#[test]
+fn a_psd_preview_is_the_merged_image_not_an_import_of_its_layers() {
+    use photocraft_psd::{
+        PsdBuilder,
+        builder::{LayerSpec, PixelData},
+    };
+    // The layer is green and the merged image red: only a read of the merged image gives red.
+    let mut b = PsdBuilder::new(8, 8);
+    b.push_layer(LayerSpec::new("Layer", 0, 0, 8, 8, PixelData::Rgba8([0, 255, 0, 255].repeat(64))));
+    b.composite(PixelData::Rgba8([255, 0, 0, 255].repeat(64)));
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("big.psd");
+    std::fs::write(&path, b.to_bytes().unwrap()).unwrap();
+    let px = thumbs::first_pixel(&path.to_string_lossy()).unwrap();
+    assert!(px[0] > 0.9 && px[1] < 0.1, "{px:?}");
+}

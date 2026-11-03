@@ -309,6 +309,10 @@ fn stamp(path: &str) -> Stamp {
 fn decode(path: &str) -> Result<Decoded, String> {
     let p = std::path::Path::new(path);
     let len = std::fs::metadata(p).map_err(|e| e.to_string())?.len();
+    // Fork: a PSD or PSB shows the picture it carries (thumbnail, else merged image) before any layer import.
+    if let Some(d) = psd_preview(p) {
+        return Ok(d);
+    }
     if len > MAX_PREVIEW_FILE_BYTES {
         return Err(format!("{len} bytes is too large for a preview"));
     }
@@ -321,4 +325,23 @@ fn decode(path: &str) -> Result<Decoded, String> {
     };
     let buffer = photocraft_compose::thumbnail_buffer(&doc, PREVIEW_SIDE);
     Ok(Decoded { buffer, mode: doc.mode, depth: doc.depth, icc: doc.icc_profile.clone() })
+}
+
+/// Fork: the preview a PSD or PSB carries (see `photocraft_io::fork_psd_preview`), as a [`Decoded`].
+#[cfg(not(target_arch = "wasm32"))]
+fn psd_preview(p: &std::path::Path) -> Option<Decoded> {
+    let ext = p.extension()?.to_str()?;
+    if !(ext.eq_ignore_ascii_case("psd") || ext.eq_ignore_ascii_case("psb")) {
+        return None;
+    }
+    let img = photocraft_io::fork_psd_preview::preview(p, PREVIEW_SIDE)?;
+    let rect = photocraft_geom::Rect::from_xywh(0, 0, img.width, img.height);
+    let px = img.rgba.chunks_exact(4).map(|c| [f32::from(c[0]) / 255.0, f32::from(c[1]) / 255.0, f32::from(c[2]) / 255.0, f32::from(c[3]) / 255.0]).collect();
+    Some(Decoded { buffer: photocraft_compose::Buffer { rect, px }, mode: ColorMode::Rgb, depth: SampleType::U8, icc: img.icc.map(Arc::new) })
+}
+
+/// The first pixel of the preview [`decode`] makes for `path` (for tests).
+#[cfg(all(test, not(target_arch = "wasm32")))]
+pub(super) fn first_pixel(path: &str) -> Result<[f32; 4], String> {
+    decode(path).map(|d| d.buffer.px[0])
 }
