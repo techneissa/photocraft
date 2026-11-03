@@ -49,7 +49,7 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
      (`cargo test -p <crate> --lib <filter>`), `cargo clippy -p <crate> --all-targets -- -D warnings` for the crates it
      touched (the known official lints below excepted), and `cargo fmt --all --check`;
    - the full suite runs on GitHub, not on this Mac: Fork CI (`fork-ci.yml`, `fork/ci.sh`: the steps of
-     `cargo xtask ci` on Linux) runs on every pull request to `custom` and every push to it, and skips the tests in
+     `cargo xtask ci` on Linux) runs on every push to `custom` (once per batch; not on pull requests), and skips the tests in
      `fork/known-failures.txt`, so a red run is a new failure. Check it with
      `gh run list -R techneissa/photocraft -w "Fork CI"` and fix a failure in the next round.
 
@@ -60,7 +60,7 @@ Local folder: `~/Documents/workspace/gitClones/photocraft`. Git remembers how a 
    block). Leave FORK.md, `fork/features.md` and `.github/README.md` (the batch adds the lines, step 6), `fork/tests.sh`, the generated
    `docs/parity-checklist.md` and `docs/scorecard.md`, and the official parity docs (`docs/gaps.md`,
    `docs/*-parity.md`, `ROADMAP.md`) alone; then two feature branches never clash on shared notes.
-5. `git push mine feat/<name>` and open a pull request to `custom`; Fork CI checks it. Merge it (GitHub's button,
+5. `git push mine feat/<name>` and open a pull request to `custom` (no Fork CI on it; the batch is tested once). Merge it (GitHub's button,
    or `git switch custom && git merge --no-ff feat/<name> && git push mine custom`). After a single merge, build and
    test nothing on this Mac: Fork CI checks `custom`.
 6. Once per batch of merges, on `custom` on this Mac (techneissa, 2026-11-02: the Mac rebuilt the same code minutes

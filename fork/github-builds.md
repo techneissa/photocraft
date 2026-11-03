@@ -10,8 +10,8 @@ failure. The run pushes its merge with the secret `FORK_PUSH_TOKEN`, the fine-gr
 workflow file. Without the secret it uses GitHub's own token.
 
 The workflow `.github/workflows/fork-ci.yml` (Actions ▸ Fork CI) runs the official Linux gate (the steps of
-`cargo xtask ci`, through `fork/ci.sh`) on every pull request to `custom` and every push to it, the daily merge
-included, so the full suite runs on GitHub and not on this Mac (the fork is public, so GitHub's runners are free).
+`cargo xtask ci`, through `fork/ci.sh`) on every push to `custom`, the daily merge included, but not on pull requests
+(techneissa, 2026-11-03: a batch of PRs is merged and tested once), so the full suite runs on GitHub and not on this Mac (the fork is public, so GitHub's runners are free).
 It skips the accepted failures in `fork/known-failures.txt`, so a red run is a new failure: fix it, or add the test
 there with a `#` line saying why. A pull request tests only the packages it can affect (`fork/affected.py`: the
 changed packages and every package that depends on them; a Markdown-only change runs no Rust checks; a change to
