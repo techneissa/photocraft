@@ -1156,6 +1156,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
                     };
                     let text = if crop_label_is_ui(&command) { tl!(&label).to_string() } else { label };
                     let item = egui::Button::selectable(mode_checked(app, &menu, &command), text).min_size(egui::vec2(200.0, 20.0));
+                    let item = crate::menu_custom::shortcut::show(app, &command, item);
                     if ui.add_enabled(entry_enabled(app, &menu, &command), item).clicked() {
                         selected = Some(command);
                     }
@@ -1166,6 +1167,7 @@ pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
                         continue;
                     };
                     let item = egui::Button::selectable(mode_checked(app, &menu, command), tl!(label)).min_size(egui::vec2(200.0, 20.0));
+                    let item = crate::menu_custom::shortcut::show(app, command, item);
                     if ui.add_enabled(entry_enabled(app, &menu, command), item).clicked() {
                         selected = Some((*command).to_string());
                     }

@@ -8,6 +8,8 @@
 //! rows a menu builds now, so what depends on state stays intact: the layer kind's rows, the crop and
 //! spelling rows, a command that is greyed. A saved id this build does not know is skipped.
 //!
+//! Every row of these menus shows its command's shortcut at the right ([`shortcut`]).
+//!
 //! Hooks: `canvas_tool_menu::show` / `available` ([`canvas_rows`], [`canvas_has`]),
 //! `layer_menu_ui::show` ([`layer_rows`]) and the document tab menu ([`tab_rows`]). Three presets
 //! keep whole sets of arrangements ([`presets`]), and a `.json` file backs them up ([`backup`]).
@@ -32,6 +34,7 @@ pub mod editor;
 pub mod menus;
 pub mod presets;
 mod presets_ui;
+pub mod shortcut;
 
 #[cfg(test)]
 mod presets_tests;
