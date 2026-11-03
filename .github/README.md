@@ -84,6 +84,7 @@
 - **Refine Hair:** a button in Select and Mask for cleaner hair edges.
 - **Remove Subject:** fills with the LaMa model, running on the Mac's GPU.
 - **Shared models:** every AI model is stored once, shared with the other Craft apps.
+- **Full BiRefNet:** Select Subject and Remove Background use LightCraft's full BiRefNet when it is installed, for finer fur and hair.
 
 **Layers and editing**
 - **Unlocked photos:** a photo opens as a normal layer you can move above or below; Settings › General › Lock the Background Layer brings the lock back.
@@ -95,6 +96,7 @@
 - **Levels and Curves:** ⌥-drag to see clipping, and a histogram that is never empty.
 
 **Shortcuts, menus and settings**
+- **Centred windows:** Settings and dialogs open centred, and each window remembers where you put it.
 - **Keyboard Shortcuts:** chords, conditions, clash warnings, export and import, resizable window.
 - **Assign Shortcut…:** right-click any command to give it a key.
 - **Command palette:** also on ⌘P.
