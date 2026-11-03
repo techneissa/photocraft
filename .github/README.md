@@ -86,6 +86,7 @@
 - **Shared models:** every AI model is stored once, shared with the other Craft apps.
 
 **Layers and editing**
+- **Unlocked photos:** a photo opens as a normal layer you can move above or below; Settings › General › Lock the Background Layer brings the lock back.
 - **Double Exposure:** Layer ▸ Double Exposure blends the top layer in one step.
 - **Live blend in Transform:** Free Transform and the warps show the layer's blend mode while you move it.
 - **Place Photos:** Place Embedded on ⇧⌘P, several photos at once, and a Place Photo button in Layers.
@@ -100,7 +101,7 @@
 - **Context menu editor:** hide, reorder and add right-click menu items, with presets.
 - **Top bar items:** show or hide each item in the top bar.
 - **Searchable dropdowns:** type to filter an open list, like the blend modes.
-- **Settings sync:** move every setting to another Mac in one file.
+- **Settings sync:** move every setting to another Mac in one file, or keep them in a sync folder (bottom of Settings › General).
 - **Mac keys:** ⌘, opens Settings; ⌘, or Esc closes it.
 - **Home screen:** recent files as a grid of previews; hover a preview for its ×, and choose how many show.
 - **Updates:** Help ▸ Check for Updates and Settings update to this fork's own builds, never the official release.
