@@ -83,6 +83,7 @@
 - **Select Subject engines:** choose macOS's own cutout, an AI model, SAM 3 or Classic.
 - **Refine Hair:** a button in Select and Mask for cleaner hair edges.
 - **Remove Subject:** fills with the LaMa model, running on the Mac's GPU.
+- **Home details:** each recent file shows its size and when you last opened it.
 - **Shared models:** every AI model is stored once, shared with the other Craft apps.
 - **Full BiRefNet:** Select Subject and Remove Background use LightCraft's full BiRefNet when it is installed, for finer fur and hair.
 
@@ -110,6 +111,7 @@
 - **Updates:** Help ▸ Check for Updates and Settings update to this fork's own builds, never the official release.
 
 **Fixes**
+- **Brush resize drag:** Control+Option+drag follows the pointer without sticking, with Photoshop's red brush preview and size label.
 - **Big PSDs:** a PSD needing more than 2 GB opens (the limit is half the Mac's memory), and Home shows its preview from the image saved inside it.
 - PSD files with many fonts open without a long wait.
 - Cropping with Delete Cropped Pixels off no longer quits the app.
