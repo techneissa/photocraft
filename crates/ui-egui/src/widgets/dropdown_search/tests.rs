@@ -382,3 +382,82 @@ fn a_long_list_opened_low_in_the_window_fits_the_window() {
         .memory(|m| m.layer_ids().filter(|l| l.order == egui::Order::Foreground).filter_map(|l| m.area_rect(l.id)).map(|r| r.bottom()).fold(0.0, f32::max));
     assert!(bottom <= 400.0, "the list ends at {bottom}, past the window's 400");
 }
+
+/// A 60-option list in a window too short for it, so the list scrolls.
+fn long_harness(wheel: bool) -> Harness<'static, usize> {
+    let labels: &'static [String] = Vec::leak((0..60).map(|i| format!("Option {i}")).collect());
+    let options: Vec<(usize, &str)> = labels.iter().enumerate().map(|(i, l)| (i, l.as_str())).collect();
+    Harness::builder().with_size(egui::vec2(300.0, 260.0)).build_ui_state(
+        move |ui, selected: &mut usize| {
+            if wheel {
+                crate::widgets::dropdown_wheel_hovered(ui, "long", tl!("Long"), selected, &options, 120.0);
+            } else {
+                crate::widgets::dropdown(ui, "long", tl!("Long"), selected, &options, 120.0);
+            }
+        },
+        0,
+    )
+}
+
+/// The open list's rect (the only foreground layer).
+fn list_rect(h: &Harness<'static, usize>) -> egui::Rect {
+    h.ctx
+        .memory(|m| m.layer_ids().filter(|l| l.order == egui::Order::Foreground).filter_map(|l| m.area_rect(l.id)).fold(egui::Rect::NOTHING, |a, r| a.union(r)))
+}
+
+/// Asserts the row `label` lies inside the open list's visible rect.
+fn assert_row_visible(h: &Harness<'static, usize>, label: &str, what: &str) {
+    let list = list_rect(h);
+    let Some(row) = h.query_by_label(label) else { panic!("{what}: row {label} is not drawn") };
+    let rect = egui_kittest::kittest::NodeT::accesskit_node(&row)
+        .bounding_box()
+        .map(|b| egui::Rect::from_min_max(egui::pos2(b.x0 as f32, b.y0 as f32), egui::pos2(b.x1 as f32, b.y1 as f32)))
+        .unwrap();
+    assert!(rect.min.y >= list.min.y - 0.5 && rect.max.y <= list.max.y + 0.5, "{what}: row {label} at {rect:?} is outside the list {list:?}");
+}
+
+fn press_arrow(h: &mut Harness<'static, usize>, key: egui::Key) {
+    h.key_press(key);
+    h.run_steps(3);
+}
+
+fn arrows_keep_the_row_in_view(wheel: bool) {
+    let mut h = long_harness(wheel);
+    open(&mut h);
+    h.run_steps(3);
+    for i in 1..=30 {
+        press_arrow(&mut h, egui::Key::ArrowDown);
+        assert_row_visible(&h, &format!("Option {i}"), "↓ with nothing typed");
+    }
+    for i in (0..30).rev() {
+        press_arrow(&mut h, egui::Key::ArrowUp);
+        assert_row_visible(&h, &format!("Option {i}"), "↑ with nothing typed");
+    }
+}
+
+#[test]
+fn arrows_scroll_a_long_list_to_the_value() {
+    arrows_keep_the_row_in_view(false);
+}
+
+#[test]
+fn arrows_scroll_a_long_wheel_list_to_the_value() {
+    arrows_keep_the_row_in_view(true);
+}
+
+#[test]
+fn arrows_scroll_a_long_list_to_the_match_after_typing() {
+    let mut h = long_harness(false);
+    open(&mut h);
+    type_text(&mut h, "o");
+    h.run_steps(3);
+    // The first match is the highlighted row; ↓ walks down the matches (every option here).
+    for i in 1..=30 {
+        press_arrow(&mut h, egui::Key::ArrowDown);
+        assert_row_visible(&h, &format!("Option {i}"), "↓ after typing");
+    }
+    for i in (0..30).rev() {
+        press_arrow(&mut h, egui::Key::ArrowUp);
+        assert_row_visible(&h, &format!("Option {i}"), "↑ after typing");
+    }
+}
