@@ -215,6 +215,10 @@ impl Filter {
             crate::icons::paint(ui, icon, "search", 14.0, t.text_faint);
             ui.memory_mut(|m| m.request_focus(field_id));
             let field = text_field(ui, field_id, &mut query, "", width, false);
+            // The first key opened the list and is already in the text: the next letters go after it.
+            if field.gained_focus() {
+                end_cursor(ui, field_id, &query);
+            }
             field.accessible_name(tl!("Search"));
         });
         ui.add_space(2.0);
@@ -273,6 +277,14 @@ impl Filter {
             ui.label(egui::RichText::new(tl!("No match")).color(Tokens::get(ui.ctx()).text_faint));
         }
     }
+}
+
+/// Puts the text cursor of field `id` after the last character of `text`.
+fn end_cursor(ui: &Ui, id: egui::Id, text: &str) {
+    let mut state = egui::TextEdit::load_state(ui.ctx(), id).unwrap_or_default();
+    let end = egui::text::CCursor::new(text.chars().count());
+    state.cursor.set_char_range(Some(egui::text::CCursorRange::one(end)));
+    state.store(ui.ctx(), id);
 }
 
 /// The narrowest the field gets, and its width before a row has told how wide the list is. Narrow
