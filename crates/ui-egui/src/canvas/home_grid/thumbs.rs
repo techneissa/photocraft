@@ -55,6 +55,8 @@ struct Entry {
     stamp: Option<Stamp>,
     checked: web_time::Instant,
     texture: Option<egui::TextureHandle>,
+    /// The file's own size in pixels, once its preview is decoded.
+    size: Option<(u32, u32)>,
     /// A check or decode is queued or running.
     pending: bool,
     failed: bool,
@@ -67,6 +69,8 @@ struct Decoded {
     mode: ColorMode,
     depth: SampleType,
     icc: Option<Arc<Vec<u8>>>,
+    /// The file's own size in pixels (the preview is a reduction of it).
+    size: (u32, u32),
 }
 
 /// What the thread found for one queued file.
@@ -123,7 +127,7 @@ impl ThumbCache {
         let mut job = None;
         match self.entries.get_mut(path) {
             None => {
-                self.entries.insert(path.to_string(), Entry { stamp: None, checked: now, texture: None, pending: true, failed: false });
+                self.entries.insert(path.to_string(), Entry { stamp: None, checked: now, texture: None, size: None, pending: true, failed: false });
                 job = Some(None);
             }
             Some(e) if !e.pending && now.duration_since(e.checked) >= RECHECK => {
@@ -142,6 +146,11 @@ impl ThumbCache {
             None if e.failed => Thumb::Unavailable,
             None => Thumb::Loading,
         }
+    }
+
+    /// The file's own size in pixels, once its preview is decoded.
+    pub(super) fn size_of(&self, path: &str) -> Option<(u32, u32)> {
+        self.entries.get(path).and_then(|e| e.size)
     }
 
     /// Forgets previews of files no longer on the list (their textures are freed).
@@ -187,6 +196,7 @@ impl ThumbCache {
                     let Some(e) = self.entries.get_mut(&d.path) else { continue };
                     e.pending = false;
                     e.stamp = Some(stamp);
+                    let size = result.as_ref().ok().map(|d| d.size);
                     let uploaded = result.and_then(|decoded| {
                         uploads += 1;
                         upload(app, ctx, &d.path, decoded)
@@ -194,11 +204,13 @@ impl ThumbCache {
                     match uploaded {
                         Ok(t) => {
                             e.texture = Some(t);
+                            e.size = size;
                             e.failed = false;
                         }
                         Err(err) => {
                             log::debug!("no Home preview for {}: {err}", d.path);
                             e.texture = None;
+                            e.size = None;
                             e.failed = true;
                         }
                     }
@@ -324,7 +336,7 @@ fn decode(path: &str) -> Result<Decoded, String> {
         photocraft_io::import(&crate::file_open::display_name(path), &bytes).map_err(|e| e.to_string())?.document
     };
     let buffer = photocraft_compose::thumbnail_buffer(&doc, PREVIEW_SIDE);
-    Ok(Decoded { buffer, mode: doc.mode, depth: doc.depth, icc: doc.icc_profile.clone() })
+    Ok(Decoded { buffer, mode: doc.mode, depth: doc.depth, icc: doc.icc_profile.clone(), size: (doc.size.width, doc.size.height) })
 }
 
 /// Fork: the preview a PSD or PSB carries (see `photocraft_io::fork_psd_preview`), as a [`Decoded`].
@@ -337,7 +349,7 @@ fn psd_preview(p: &std::path::Path) -> Option<Decoded> {
     let img = photocraft_io::fork_psd_preview::preview(p, PREVIEW_SIDE)?;
     let rect = photocraft_geom::Rect::from_xywh(0, 0, img.width, img.height);
     let px = img.rgba.chunks_exact(4).map(|c| [f32::from(c[0]) / 255.0, f32::from(c[1]) / 255.0, f32::from(c[2]) / 255.0, f32::from(c[3]) / 255.0]).collect();
-    Some(Decoded { buffer: photocraft_compose::Buffer { rect, px }, mode: ColorMode::Rgb, depth: SampleType::U8, icc: img.icc.map(Arc::new) })
+    Some(Decoded { buffer: photocraft_compose::Buffer { rect, px }, mode: ColorMode::Rgb, depth: SampleType::U8, icc: img.icc.map(Arc::new), size: img.full })
 }
 
 /// The first pixel of the preview [`decode`] makes for `path` (for tests).

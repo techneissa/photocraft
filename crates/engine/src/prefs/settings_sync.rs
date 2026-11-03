@@ -58,6 +58,7 @@ const EXTRA_SECTIONS: [&str; 2] = ["historyOptions", "layerMaskOverlay"];
 /// `section.key` (or a whole section) of Preferences that stay out of the file, with the reason.
 pub const LEFT_OUT: &[(&str, &str)] = &[
     ("fileHandling.recentFiles", "the recent files list"),
+    ("fileHandling.recentOpened", "the recent files list"),
     ("fileHandling.lutFolder", "a folder on this Mac"),
     ("historyLog.filePath", "a file on this Mac"),
     ("scratchDisks", "disks of this Mac"),

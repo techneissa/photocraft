@@ -7,10 +7,12 @@
 
 use photocraft_psd::{FileSource, PsdFile, ReadAt, Source, header::ColorMode, resources::ids};
 
-/// A preview image: 8-bit RGBA in the colours of `icc` (sRGB when `None`).
+/// A preview image: 8-bit RGBA in the colours of `icc` (sRGB when `None`). `full` is the file's own
+/// size in pixels, from its header.
 pub struct PsdPreview {
     pub width: u32,
     pub height: u32,
+    pub full: (u32, u32),
     pub rgba: Vec<u8>,
     pub icc: Option<Vec<u8>>,
 }
@@ -56,7 +58,8 @@ pub fn thumbnail(source: &dyn ReadAt) -> Option<PsdPreview> {
     }
     let img = photocraft_codecs::decode(&data[28..]).ok()?;
     let (width, height) = (img.width(), img.height());
-    Some(PsdPreview { width, height, rgba: img.to_rgba8(), icc: None })
+    let full = (u32::from_be_bytes(head[18..22].try_into().ok()?), u32::from_be_bytes(head[14..18].try_into().ok()?));
+    Some(PsdPreview { width, height, full, rgba: img.to_rgba8(), icc: None })
 }
 
 /// The data of the first resource `id` in an image resources section.
@@ -130,7 +133,7 @@ pub fn merged(source: Source, max_side: u32) -> Option<PsdPreview> {
             rgba.extend(sum.map(|s| (s / n) as u8));
         }
     }
-    Some(PsdPreview { width: ow as u32, height: oh as u32, rgba, icc: file.icc_profile().map(<[u8]>::to_vec) })
+    Some(PsdPreview { width: ow as u32, height: oh as u32, full: (h.width, h.height), rgba, icc: file.icc_profile().map(<[u8]>::to_vec) })
 }
 
 #[cfg(test)]
@@ -162,6 +165,7 @@ mod tests {
         bytes.truncate(end);
         let p = thumbnail(&bytes).expect("thumbnail");
         assert_eq!((p.width, p.height), (8, 4));
+        assert_eq!(p.full, (8, 4));
         assert!(p.rgba[0] > 200 && p.rgba[1] < 60, "{:?}", &p.rgba[..4]);
     }
 
@@ -183,6 +187,7 @@ mod tests {
         let bytes = b.to_bytes().unwrap();
         let p = merged(Source::new(bytes), 4).expect("merged");
         assert_eq!((p.width, p.height), (4, 4));
+        assert_eq!(p.full, (8, 8), "the file's own size, not the reduced one");
         assert_eq!(&p.rgba[..4], &[10, 200, 30, 255]);
     }
 }
