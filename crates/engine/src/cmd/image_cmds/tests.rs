@@ -486,6 +486,17 @@ fn extending_the_canvas_keeps_the_backgrounds_hidden_pixels() {
             })
             .unwrap();
             s.execute("image.crop", json!({"x": 50, "y": 0, "width": 50, "height": 100, "deleteCroppedPixels": false})).unwrap();
+            // That crop makes the Background "Layer 0" now (#10867); a Background with pixels past
+            // the canvas is still in documents saved before, so lock it back into one.
+            s.edit("relock", |doc, _| {
+                let l = doc.layers.first_mut().unwrap();
+                l.name = "Background".into();
+                l.locks.transparency = true;
+                l.locks.position = true;
+                Ok(())
+            })
+            .unwrap();
+            assert!(doc(s).background().is_some());
             s.tools.background = [0.0, 0.0, 0.0, 1.0];
         };
         let mut s = Session::new();
@@ -832,7 +843,9 @@ fn crop_target_budgets_the_hidden_pixels_it_resamples() {
             p["angle"] = json!(a);
         }
         let err = s.execute("image.crop", p).unwrap_err().to_string();
-        assert!(err.contains("200000 x 200000 px is 40000 megapixels"), "{angle:?}: {err}");
+        // A rotated Delete-Cropped-Pixels-off crop can estimate a few pixels past 200000×200000
+        // after unlock-background (origin); still refused as tens of gigapixels of hidden data.
+        assert!(err.contains("megapixels") && err.contains("outside the canvas"), "{angle:?}: {err}");
         assert_eq!(doc(&s).size, Size::new(2000, 2000), "{angle:?}: the document is unchanged");
         assert_eq!(s.active().unwrap().history.past_len(), past, "{angle:?}: no history step");
         // The turned crop rotates first: the painting symmetry turns back with the document.
