@@ -14,6 +14,7 @@ mod automation;
 mod batch;
 mod document;
 mod error;
+mod gpu;
 mod models;
 mod output;
 

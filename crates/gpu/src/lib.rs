@@ -134,6 +134,8 @@ use W::{F, I, U};
 mod batch;
 mod cells;
 mod consts;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod context;
 mod convert;
 mod encode;
 mod fx_passes;
@@ -141,7 +143,7 @@ mod kit;
 mod live;
 mod paging;
 #[cfg(not(target_arch = "wasm32"))]
-mod readback;
+pub mod readback;
 mod setup;
 mod textures;
 
@@ -150,6 +152,8 @@ use batch::{BATCH, batch_kernel, batch_op_words, batch_runs, op_words, run_start
 #[cfg(test)]
 use consts::OP_UNIFORM;
 pub use consts::{ACC_FORMAT, CHUNK, FX_BUDGET, PAGE, PATTERN_BUDGET, PATTERN_IDLE_FRAMES, RESIDENT_BUDGET};
+#[cfg(not(target_arch = "wasm32"))]
+pub use context::{GpuContextError, NativeContext, NativeContextOptions};
 use convert::W;
 #[cfg(test)]
 use convert::{CONVERT_BATCH, colour_managed, convert_tile, convert_tiles, rgb_gray16_to_f16, rgb_gray32_to_f16};
@@ -162,7 +166,7 @@ use paging::first_error;
 #[cfg(test)]
 use paging::{lru_victims, uniform_buffer_len};
 #[cfg(not(target_arch = "wasm32"))]
-pub use readback::{render_to_vec, render_to_vec_stats};
+pub use readback::{ReadbackError, render_bands, render_to_vec, render_to_vec_stats};
 #[cfg(test)]
 use textures::TexKind;
 use textures::{CachedPattern, FxEntry, FxKey, ResKey, Resident, Tex};
