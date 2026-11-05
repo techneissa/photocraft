@@ -174,7 +174,8 @@ fn reopened_canvas_menus_still_choose_their_actions() {
     dismiss_outside(&mut h, Popup::Tool);
     tap(&mut h, at, Modifiers::NONE, true);
     assert!(is_open(&h, Popup::Tool));
-    h.get_by_label(crate::i18n::t("Deselect")).click();
+    // Fork (context menu shortcuts): the row's label ends with its shortcut.
+    h.get_by_label_contains(crate::i18n::t("Deselect")).click();
     h.run_steps(3);
     assert!(!is_open(&h, Popup::Tool));
     assert!(h.state().session.active().unwrap().doc.selection.is_none());
