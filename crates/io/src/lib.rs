@@ -50,7 +50,6 @@ mod exr_native;
 pub mod exr_parts;
 mod flat;
 pub mod fork_background_lock;
-pub mod fork_psd_budget;
 #[cfg(any(unix, windows))]
 pub mod fork_psd_preview;
 mod gradient_bake;
@@ -604,7 +603,7 @@ impl Default for ImportOptions {
         ImportOptions {
             max_group_depth: photocraft_doc::MAX_GROUP_DEPTH,
             demosaic: raw::Demosaic::default(),
-            psd_max_pixel_bytes: fork_psd_budget::psd_import_pixel_bytes(),
+            psd_max_pixel_bytes: 0,
             flat_max_pixel_bytes: 0,
             lock_background: true,
             psd_high_memory_approved: false,
