@@ -1,9 +1,14 @@
 use super::PhotocraftApp;
-use std::hash::{Hash, Hasher};
+use std::hash::Hasher;
 
-fn clip_signature(w: u32, h: u32, px: &[u8]) -> u64 {
+/// Fork: every byte counts, so a same-sized external image with one changed pixel is not taken
+/// for our own copy (official code samples every 997th byte). [`svg_clip_signature`] must give
+/// the same value for the same pixels: an unchanged SVG mirror is recognised by an equal one.
+pub(super) fn clip_signature(w: u32, h: u32, px: &[u8]) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    (w, h, px).hash(&mut hasher);
+    hasher.write_u32(w);
+    hasher.write_u32(h);
+    hasher.write(px);
     hasher.finish()
 }
 
@@ -24,23 +29,20 @@ fn os_clipboard_pixels(clip: &photocraft_engine::edit_cmds::Clip, budget: u64) -
     Ok(pixels)
 }
 
-/// Match the bitmap signature by sampling the bounded SVG mirror, without another full pixel buffer.
+/// [`clip_signature`] of the bounded SVG mirror, read one row at a time, without another full pixel buffer.
 fn svg_clip_signature(clip: &photocraft_engine::edit_cmds::Clip) -> u64 {
     let b = clip.bounds;
     let (w, h) = (b.width(), b.height());
-    let mut sig = (u64::from(w) << 32) | u64::from(h);
-    if w == 0 || h == 0 {
-        return sig;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    hasher.write_u32(w);
+    hasher.write_u32(h);
+    let mut row = vec![[0u8; 4]; w as usize];
+    for y in 0..h {
+        let y = b.y0.saturating_add(y as i32);
+        clip.surface.read_rgba8_into(photocraft_geom::Rect::from_xywh(b.x0, y, w, 1), &mut row);
+        hasher.write(row.as_flattened());
     }
-    for i in (0..b.size().area().saturating_mul(4)).step_by(997) {
-        let x = b.x0.saturating_add((i / 4 % u64::from(w)) as i32);
-        let y = b.y0.saturating_add((i / 4 / u64::from(w)) as i32);
-        let mut pixel = [[0; 4]];
-        clip.surface.read_rgba8_into(photocraft_geom::Rect::from_xywh(x, y, 1, 1), &mut pixel);
-        let value = pixel[0].get((i % 4) as usize).copied().unwrap_or_default();
-        sig = sig.rotate_left(5) ^ u64::from(value);
-    }
-    sig
+    hasher.finish()
 }
 
 impl PhotocraftApp {
