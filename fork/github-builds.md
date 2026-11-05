@@ -11,7 +11,7 @@ The update script downloads it (above). A merge that clashes is left out: the ru
 workflow file. Without the secret it uses GitHub's own token.
 
 The workflow `.github/workflows/fork-ci.yml` (Actions ▸ Fork CI) runs the official Linux gate (the steps of
-`cargo xtask ci`, through `fork/ci.sh`) on every push to `custom`, the daily merge included, but not on pull requests
+`cargo xtask ci`, through `fork/ci.sh`) on every push to `custom`, the Monday upstream merge included, but not on pull requests
 (techneissa, 2026-11-03: a batch of PRs is merged and tested once), so the full suite runs on GitHub and not on this Mac (the fork is public, so GitHub's runners are free).
 It skips the accepted failures in `fork/known-failures.txt`, so a red run is a new failure: fix it, or add the test
 there with a `#` line saying why. A pull request tests only the packages it can affect (`fork/affected.py`: the

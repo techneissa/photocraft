@@ -5,7 +5,7 @@ name: Fork CI
 # calls the same shared gate as ci.yml's `gate` job, with ci.yml's pins, but runs fork/ci.sh: the steps of
 # `cargo xtask ci` minus the accepted failures in fork/known-failures.txt, so a red run is a new failure.
 # The fork is Mac only, so ci.yml's Windows, web and corpus jobs are left out; ci.yml itself is untouched.
-# fork-build.yml pushes its daily upstream merge with FORK_PUSH_TOKEN, so that merge is tested too.
+# fork-build.yml pushes its Monday upstream merge with FORK_PUSH_TOKEN, so that merge is tested too.
 
 on:
   # Not on pull requests (techneissa, 2026-11-03): a batch of PRs is merged and tested once, so a
