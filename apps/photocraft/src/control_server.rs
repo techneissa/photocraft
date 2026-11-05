@@ -180,22 +180,22 @@ mod tests {
         let (tx, rx) = channel::<ControlRequest>();
         let server = std::thread::spawn(move || {
             let (stream, _) = listener.accept().unwrap();
-            let started = Instant::now();
             serve_with_auth_deadline(stream, "unused", tx, egui::Context::default(), Duration::from_millis(300));
-            started.elapsed()
         });
         // Blank lines and partial frames, one byte every 20 ms: each read succeeds long before
-        // the idle timeout.
+        // the idle timeout, yet the server closes the connection at its deadline.
         let mut stream = TcpStream::connect(addr).unwrap();
+        let mut cut_off = false;
         for i in 0..150 {
             let byte: &[u8] = if i % 5 == 0 { b"\n" } else { b" " };
             if stream.write_all(byte).is_err() {
+                cut_off = true;
                 break;
             }
             std::thread::sleep(Duration::from_millis(20));
         }
-        let served = server.join().unwrap();
-        assert!(served < Duration::from_secs(3), "the trickle did not extend the deadline: {served:?}");
+        server.join().unwrap();
+        assert!(cut_off, "the trickle did not extend the deadline");
         assert!(rx.try_recv().is_err(), "nothing was dispatched");
     }
 

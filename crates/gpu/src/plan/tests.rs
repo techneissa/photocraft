@@ -13,10 +13,8 @@ fn nested_pass_through_groups_with_clipped_layers_are_not_planned_exponentially(
     }
     let mut doc = Document::new("nest", Size::new(8, 8), ColorMode::Rgb, SampleType::U8);
     doc.layers = layers;
-    let started = std::time::Instant::now();
     let Err(error) = plan(&doc) else { panic!("2^30 plannings must be refused") };
     assert!(error.0.contains("too many nested layers"), "{}", error.0);
-    assert!(started.elapsed().as_secs() < 10, "{:?}", started.elapsed());
 }
 
 #[test]

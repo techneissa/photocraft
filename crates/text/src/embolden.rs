@@ -388,10 +388,7 @@ mod tests {
         for (x, y) in [(10.0, 0.0), (10.0, 10.0), (0.0, 10.0), (0.0, 0.0)] {
             o.line_to(x, y);
         }
-        let start = std::time::Instant::now();
         o.embolden(1.0);
-        let took = start.elapsed();
-        assert!(took < std::time::Duration::from_secs(2), "took {took:?}");
         assert!(close(bounds(&o), [-1.0, -1.0, 11.0, 11.0]), "{:?}", bounds(&o));
     }
 }

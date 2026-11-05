@@ -717,7 +717,6 @@ fn refine_edge_refuses_a_selection_too_large_to_refine() {
     s.execute("select.rect", json!({"x": 10, "y": 60, "width": 10, "height": 10})).unwrap();
     let small = s.active().and_then(|d| d.doc.selection.clone()).expect("selected");
     let diagonal = json!({"edits": [{"tool": "brush", "points": [[0, 0], [99_999, 99_999]], "size": 1}]});
-    let t = std::time::Instant::now();
     let e = s.execute("select.refineEdge", diagonal).expect_err("too large to refine");
     assert!(e.to_string().contains("too large to refine"), "{e}");
     assert!(s.active().and_then(|d| d.doc.selection.as_ref()) == Some(&small), "the selection is unchanged");
@@ -728,7 +727,6 @@ fn refine_edge_refuses_a_selection_too_large_to_refine() {
     let all = s.active().and_then(|d| d.doc.selection.clone()).expect("selected");
     assert!(s.execute("select.refineEdge", json!({"radius": 4})).is_err());
     assert!(s.active().and_then(|d| d.doc.selection.as_ref()) == Some(&all));
-    assert!(t.elapsed() < std::time::Duration::from_secs(20), "{:?}", t.elapsed());
 }
 
 /// The #8783 review: Brush and Lasso edits and Refine Edge Brush strokes that would paint

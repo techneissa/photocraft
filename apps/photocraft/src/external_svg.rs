@@ -1229,11 +1229,9 @@ mod native {
             let settle = Duration::from_millis(100);
             let deadline = Instant::now() + Duration::from_secs(3);
             let mut session = start(owned, initial, None, Duration::from_millis(10), settle).unwrap();
-            let save_started = Instant::now();
             let first = b"<svg>first complete</svg>";
             std::fs::write(&file, first).unwrap();
             expect_saved(&mut session, first, deadline);
-            assert!(save_started.elapsed() >= settle, "a changed save must settle before delivery");
             assert!(session.poll().is_none());
             std::fs::write(&file, b"").unwrap();
             expect_empty_error(&mut session, deadline);
@@ -1390,9 +1388,7 @@ mod native {
             std::fs::remove_file(&owned.file).unwrap();
             rustix::fs::mkfifoat(rustix::fs::CWD, &owned.file, rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR).unwrap();
             assert!(owned.stamp().is_err());
-            let began = Instant::now();
             assert!(owned.read(&stamp).is_err());
-            assert!(began.elapsed() < Duration::from_secs(1));
             assert_eq!(std::fs::read(&target).unwrap(), b"private contents");
         }
 

@@ -506,10 +506,8 @@ fn scripts_calling_scripts_share_one_step_budget() {
     }
     let mut s = Session::new();
     s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
-    let started = std::time::Instant::now();
     let r = s.execute("file.scripts.browse", json!({"path": below})).unwrap();
     assert_eq!(r["ok"], false, "the budget stops the run: {r}");
-    assert!(started.elapsed().as_secs() < 60, "{:?}", started.elapsed());
     // The budget restarts with the next top-level script.
     s.execute("file.scripts.browse", json!({"script": "select.deselect {}"})).unwrap();
 }

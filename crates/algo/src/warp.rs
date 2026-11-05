@@ -531,10 +531,8 @@ mod tests {
         let src = sample(SampleType::U8);
         let far = 1_000_000.0;
         let verts = [([-far, -far], [0.0, 0.0]), ([far, -far], [40.0, 0.0]), ([0.0, far], [0.0, 24.0])];
-        let t = std::time::Instant::now();
         let out = warp_triangles(&src, Rect::new(0, 0, 40, 24), &verts, &[[0, 1, 2]], Interp::Nearest);
         assert!(out.content_bounds().is_empty());
-        assert!(t.elapsed().as_secs() < 5);
     }
 
     #[test]

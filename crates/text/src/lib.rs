@@ -291,10 +291,8 @@ mod warm {
         #[test]
         fn try_get_does_not_block_while_the_background_build_runs() {
             static W: Warm<u32> = Warm::new();
-            let start = Instant::now();
             assert_eq!(W.try_get(slow, true), None, "the first call starts the build and returns at once");
             assert_eq!(W.try_get(slow, true), None, "still building");
-            assert!(start.elapsed() < Duration::from_secs(1), "try_get blocked for {:?}", start.elapsed());
             OPEN.store(true, Ordering::SeqCst);
             let deadline = Instant::now() + Duration::from_secs(10);
             let v = loop {

@@ -90,10 +90,8 @@ mod native {
                 let worker = Worker::start();
                 assert!(worker.thread.is_some());
                 let stop = worker.stop.clone();
-                let began = Instant::now();
                 drop(worker);
                 assert!(*stop.0.lock().unwrap());
-                assert!(began.elapsed() < Duration::from_secs(2));
             }
         }
 

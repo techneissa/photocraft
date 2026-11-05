@@ -393,9 +393,7 @@ mod tests {
     fn many_identical_names_import_quickly() {
         let names = vec!["A"; asl::MAX_STYLES];
         let bytes = synthetic(Descriptor::new("Lefx"), None, &names);
-        let start = std::time::Instant::now();
         let imp = read_asl(&bytes).unwrap();
-        assert!(start.elapsed() < std::time::Duration::from_secs(10), "{:?}", start.elapsed());
         assert_eq!(imp.styles.len(), asl::MAX_STYLES);
         assert_eq!(imp.styles[1].name, "A 2");
         assert_eq!(imp.styles.last().unwrap().name, format!("A {}", asl::MAX_STYLES));

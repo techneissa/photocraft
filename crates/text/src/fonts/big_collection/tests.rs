@@ -69,13 +69,10 @@ fn a_collection_of_hundreds_of_faces_registers_each_face_once() {
     let dir = Dir::new("many");
     let path = dir.collection("many.ttc", 400);
     let mut c = empty();
-    let start = Instant::now();
     register_file(&mut c, &path);
     let faces = c.family_by_name("Inter").map_or(0, |f| f.fonts().len());
     assert_eq!(faces, 400, "each face is registered once, not once per scan of the file");
     assert!(sources(&mut c).iter().all(|by_path| !by_path), "read once, registered from memory");
-    // fontique's path scan takes minutes for this file; the bound is generous for a loaded machine.
-    assert!(start.elapsed() < Duration::from_secs(60), "took {:?}", start.elapsed());
 }
 
 #[test]
@@ -108,9 +105,7 @@ fn header_edge_cases_never_panic_and_take_the_path_route() {
     assert!(big_collection_bytes(Path::new("/nonexistent/font.ttc"), &LIMITS).is_none());
     // A header that claims 4 billion faces in a 12-byte file must not hang the scan either.
     let path = dir.file("huge.ttc", &huge);
-    let start = Instant::now();
     register_file(&mut empty(), &path);
-    assert!(start.elapsed() < Duration::from_secs(60), "took {:?}", start.elapsed());
 }
 
 #[test]

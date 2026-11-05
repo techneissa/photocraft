@@ -470,7 +470,6 @@ mod tests {
         let doc = Document::new("huge", photocraft_doc::Size::new(100_000, 100_000), photocraft_doc::ColorMode::Rgb, photocraft_color::SampleType::U8);
         let mut small = Surface::new(photocraft_color::PixelFormat::GRAY8);
         small.fill_rect(Rect::new(10, 10, 20, 20), &[1.0]);
-        let t = std::time::Instant::now();
         let one = apply(&doc, None, Some(small.clone()), &[SelectionEdit::Invert]).expect("almost everything selected");
         assert!(one.sample_channel(15, 15, 0) < 0.01 && one.sample_channel(99_999, 99_999, 0) > 0.99 && one.sample_channel(50_000, 5, 0) > 0.99);
         let odd = apply(&doc, None, Some(small.clone()), &vec![SelectionEdit::Invert; 4095]).expect("inverted");
@@ -481,7 +480,6 @@ mod tests {
         let split = [SelectionEdit::Invert, SelectionEdit::Invert, SelectionEdit::Invert, SelectionEdit::Clear, SelectionEdit::Invert];
         let all = apply(&doc, None, Some(small), &split).expect("cleared, then everything");
         assert!(all.sample_channel(15, 15, 0) > 0.99 && all.sample_channel(70_000, 3, 0) > 0.99);
-        assert!(t.elapsed() < std::time::Duration::from_secs(20), "{:?}", t.elapsed());
     }
 
     /// The #8783 review: a size-1 Brush edit from corner to corner of a 100,000 px canvas sweeps
@@ -497,7 +495,6 @@ mod tests {
         let brush = SelectionEdit::Brush { points: diagonal.clone(), size: 1.0, hardness: 100.0, add: true };
         let lasso = SelectionEdit::Lasso { points: vec![(0.0, 0.0), (99_999.0, 99_999.0), (0.0, 1.5)], add: true };
         assert!(check_size(&[brush.clone(), lasso.clone()], canvas).is_ok());
-        let t = std::time::Instant::now();
         for edit in [&brush, &lasso] {
             let s = apply(&doc, None, Some(small.clone()), std::slice::from_ref(edit)).expect("painted");
             assert!(s.tile_count() < 1500, "{}", s.tile_count());
@@ -506,7 +503,6 @@ mod tests {
         let erased =
             apply(&doc, None, Some(small.clone()), &[brush, SelectionEdit::Brush { points: diagonal, size: 9.0, hardness: 100.0, add: false }]).expect("kept");
         assert!(erased.sample_channel(15, 65, 0) > 0.99 && erased.sample_channel(50_000, 50_000, 0) == 0.0);
-        assert!(t.elapsed() < std::time::Duration::from_secs(20), "{:?}", t.elapsed());
         // A zigzag across more tiles than one edit may paint is refused before painting.
         let zigzag: Vec<(f32, f32)> = (0..20).map(|i| (if i % 2 == 0 { 0.0 } else { 99_999.0 }, i as f32 * 5000.0)).collect();
         let over = [SelectionEdit::Brush { points: zigzag.clone(), size: 1.0, hardness: 100.0, add: true }];

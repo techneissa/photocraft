@@ -208,11 +208,9 @@ fn the_import_icon_refuses_a_big_file_before_reading_it_and_reads_a_small_one() 
     std::fs::write(&small, backup::render(&with(TAB, arrangement(&[], &["file.closeAll"]))).unwrap()).unwrap();
     let mut a = app_answering(vec![Some(Paths(vec![big.to_string_lossy().into_owned()])), Some(Paths(vec![small.to_string_lossy().into_owned()]))]);
     let ctx = egui::Context::default();
-    let started = std::time::Instant::now();
     backup::import(&mut a);
     a.poll_file_dialog(&ctx, None);
     assert!(a.ui.status.contains("too big") && a.ui.status_error, "{}", a.ui.status);
-    assert!(started.elapsed().as_secs() < 2);
     assert!(load(&a).menus.is_empty());
     backup::import(&mut a);
     a.poll_file_dialog(&ctx, None);

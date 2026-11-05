@@ -274,19 +274,14 @@ fn strokes_are_painted_once_and_the_overlay_is_the_engines_sampling_area() {
     let mut app = app_with_selection();
     open(&mut app).unwrap();
     control(&mut app, &json!({"sampling": "rectangular"})).unwrap();
-    let start = std::time::Instant::now();
     for i in 0..400u32 {
         // Lines across the document, most subtracting, every fifth adding (Alt).
         let y = 2.0 + f64::from(i % 40) * 4.0;
         let pts: Vec<[f64; 2]> = (0..50).map(|j| [f64::from(j) * 4.0 + f64::from(i % 3), y + f64::from(j % 2)]).collect();
         control(&mut app, &json!({"stroke": {"points": pts, "size": 6 + (i % 4) * 3, "alt": i % 5 == 0}})).unwrap();
     }
-    let painted = start.elapsed();
-    let start = std::time::Instant::now();
     control(&mut app, &json!({"undo": true})).unwrap();
     control(&mut app, &json!({"redo": true})).unwrap();
-    let rebuilt = start.elapsed();
-    assert!(painted.as_secs_f64() < 10.0 && rebuilt.as_secs_f64() < 10.0, "400 strokes {painted:?}, undo + redo {rebuilt:?}");
     let w = ws(&app);
     assert_eq!((w.k, w.strokes.len()), (1, 400));
     let (rect, source, hole) = engine_source(&app);

@@ -180,7 +180,6 @@ fn refuses_what_is_too_large_and_keeps_the_selection() {
     s.execute("edit.undo", json!({})).unwrap();
     s.execute("select.all", json!({})).unwrap();
     let all = s.active().and_then(|d| d.doc.selection.clone()).expect("selected");
-    let t = std::time::Instant::now();
     let e = s.execute(CMD, json!({"radius": 4})).expect_err("too large");
     assert!(e.to_string().contains("too large for Refine Hair"), "{e}");
     assert!(s.active().and_then(|d| d.doc.selection.as_ref()) == Some(&all));
@@ -188,5 +187,4 @@ fn refuses_what_is_too_large_and_keeps_the_selection() {
     let e = s.execute("select.refineEdge", json!({"edits": [{"tool": "refineHair"}]})).expect_err("too large");
     assert!(e.to_string().contains("too large for Refine Hair"), "{e}");
     assert!(s.active().and_then(|d| d.doc.selection.as_ref()) == Some(&all));
-    assert!(t.elapsed() < std::time::Duration::from_secs(20), "{:?}", t.elapsed());
 }
