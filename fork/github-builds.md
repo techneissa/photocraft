@@ -1,11 +1,12 @@
 # GitHub builds the app
 
-The workflow `.github/workflows/fork-build.yml` (Actions ▸ Fork build) runs daily, on every push to `custom`, and
-by hand. It merges the official update into `custom` the same way the script does, builds the Mac app with the
+The workflow `.github/workflows/fork-build.yml` (Actions ▸ Fork build) builds on every push to `custom` and
+on Mondays at 08:17, and runs by hand. On Monday, and on a hand run with the box **merge** ticked, it first merges the
+official update into `custom` the same way the script does (a push never merges: the official update comes once a
+week, techneissa, 2026-11-05). Then it builds the Mac app with the
 fonts of the official release (craft-fonts at `release.yml`'s `craft-fonts-ref`), and publishes it as the release
 [`custom-build`](https://github.com/techneissa/photocraft/releases/tag/custom-build) (its notes name the commit).
-The update script downloads it (above). A run that hits a merge clash fails and changes nothing; GitHub emails the
-failure. The run pushes its merge with the secret `FORK_PUSH_TOKEN`, the fine-grained token "BuildCraft forks"
+The update script downloads it (above). A merge that clashes is left out: the run builds `custom` as it is and warns; the Monday agent writes the clash into the issue "Upstream merge pending". The run pushes its merge with the secret `FORK_PUSH_TOKEN`, the fine-grained token "BuildCraft forks"
 (Contents and Workflows: read and write): GitHub's own token may not push an official update that changes a
 workflow file. Without the secret it uses GitHub's own token.
 
