@@ -116,6 +116,8 @@ Then append a terse entry to `log/devlog.md` (what landed, numbers, what's still
 
 ## 6. Parallel agents
 
+**Quick changes.** When techneissa calls a change quick or fast, the lane reads only the files the brief names, takes no pictures, runs `cargo check -p <crate>`, `cargo fmt` and only the tests it adds or changes, once, then opens the PR without waiting for CI. A full lane run costs about 40 minutes for a five-minute edit.
+
 - Use your own target dir (`CARGO_TARGET_DIR=target/agent-<name>`) to avoid the Cargo build lock, and edit only the files you own. Shared files (`engine/src/lib.rs`, the `v.extend(...)` list in `engine/src/commands.rs`, `ui-egui/src/menus.rs`, `state.rs`) get small, surgical edits; re-read before editing.
 - Put new commands in a **new module** (`engine/src/<area>_cmds.rs` with a `specs()` function) rather than growing a shared file.
 - If someone else's in-progress edit breaks the build, wait and retry; don't fix their files.
