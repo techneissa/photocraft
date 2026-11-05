@@ -53,7 +53,7 @@ pub const MAX_BYTES: usize = 8_000_000;
 pub const PARTS: [&str; 9] = ["preferences", "colorSettings", "shortcuts", "menus", "toolbar", "contextMenus", "workspaces", "remembered", "dictionary"];
 
 /// Preferences sections outside the Preferences window's list that the `preferences` part holds.
-const EXTRA_SECTIONS: [&str; 2] = ["historyOptions", "layerMaskOverlay"];
+const EXTRA_SECTIONS: [&str; 3] = ["actions", "historyOptions", "layerMaskOverlay"];
 
 /// `section.key` (or a whole section) of Preferences that stay out of the file, with the reason.
 pub const LEFT_OUT: &[(&str, &str)] = &[
