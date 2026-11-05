@@ -329,6 +329,9 @@ fn a_check_from_settings_shows_beside_the_button_without_a_window() {
 fn a_second_request_while_checking_starts_nothing() {
     let fake = Fake::built("identical");
     let mut app = app_with(fake.clone(), commit_known, update_unused);
+    // The launch check would start on the first frame once this one has finished, a second check
+    // that depends on how fast the fake answers.
+    app.session.edit_prefs(|p| p.general.automatically_check_updates = false);
     super::start(&mut app, Origin::Menu);
     super::start(&mut app, Origin::Menu);
     super::start(&mut app, Origin::Settings);
