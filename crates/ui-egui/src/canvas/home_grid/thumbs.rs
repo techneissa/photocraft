@@ -348,7 +348,13 @@ fn psd_preview(p: &std::path::Path) -> Option<Decoded> {
     }
     let img = photocraft_io::fork_psd_preview::preview(p, PREVIEW_SIDE)?;
     let rect = photocraft_geom::Rect::from_xywh(0, 0, img.width, img.height);
-    let px = img.rgba.chunks_exact(4).map(|c| [f32::from(c[0]) / 255.0, f32::from(c[1]) / 255.0, f32::from(c[2]) / 255.0, f32::from(c[3]) / 255.0]).collect();
+    let px = img
+        .rgba
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|c| [f32::from(c[0]) / 255.0, f32::from(c[1]) / 255.0, f32::from(c[2]) / 255.0, f32::from(c[3]) / 255.0])
+        .collect();
     Some(Decoded { buffer: photocraft_compose::Buffer { rect, px }, mode: ColorMode::Rgb, depth: SampleType::U8, icc: img.icc.map(Arc::new), size: img.full })
 }
 

@@ -3,7 +3,7 @@
 
 use egui::PointerButton;
 
-use super::*;
+use super::{PhotocraftApp, Tool, ToolEvent, ViewXform, applies, is_gesture};
 use crate::canvas::tool_event;
 
 /// A press with Control+Option on a painting tool begins the resize at the press point.
