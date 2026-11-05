@@ -172,7 +172,7 @@ fn surface_hash(s: &Surface) -> u64 {
     h.update(s.default_bytes());
     for (c, t) in s.tiles() {
         h.update(format!("{c:?}").as_bytes());
-        h.update(t.bytes());
+        h.update(&t.bytes());
     }
     hash_u64(&h)
 }

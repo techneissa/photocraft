@@ -320,14 +320,7 @@ pub(crate) fn resample_doc(doc: &mut Document, cmd: &str, nw: u32, nh: u32, filt
 }
 
 /// Resize document content while optionally retaining layer-effect sizes in pixels.
-fn resample_doc_with_styles(
-    doc: &mut Document,
-    cmd: &str,
-    nw: u32,
-    nh: u32,
-    filter: Resample,
-    scale_styles: bool,
-) -> Result<()> {
+fn resample_doc_with_styles(doc: &mut Document, cmd: &str, nw: u32, nh: u32, filter: Resample, scale_styles: bool) -> Result<()> {
     let (ow, oh) = (doc.size.width, doc.size.height);
     let (sx, sy) = (nw as f64 / ow.max(1) as f64, nh as f64 / oh.max(1) as f64);
     if (sx - 1.0).abs() < 1e-12 && (sy - 1.0).abs() < 1e-12 {

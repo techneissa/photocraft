@@ -122,8 +122,8 @@ pub fn merged(source: Source, max_side: u32) -> Option<PsdPreview> {
             for y in oy * step..((oy + 1) * step).min(hh) {
                 for x in ox * step..((ox + 1) * step).min(w) {
                     let i = y * w + x;
-                    for c in 0..3 {
-                        sum[c] += sample(c, i);
+                    for (c, s) in sum.iter_mut().enumerate().take(3) {
+                        *s += sample(c, i);
                     }
                     sum[3] += if alpha { sample(3, i) } else { 255 };
                     n += 1;

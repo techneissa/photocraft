@@ -728,9 +728,8 @@ fn paste(s: &mut Session, p: &Value, in_place: bool) -> Result<Value> {
     let board = shift.map(|(_, _, b)| b);
     let (dx, dy) = shift.map(|(dx, dy, _)| (dx, dy)).unwrap_or_else(|| paste_offset(&clip, d.doc.id, canvas, p, in_place));
     if mode.is_none()
-        && let Some(layers) = clip.layers.as_deref().filter(|_| {
-            crate::layer_copy_cmds::layered(d.doc.mode) && p.get("pixels").and_then(Value::as_bool) != Some(true)
-        })
+        && let Some(layers) =
+            clip.layers.as_deref().filter(|_| crate::layer_copy_cmds::layered(d.doc.mode) && p.get("pixels").and_then(Value::as_bool) != Some(true))
     {
         return paste_layers(s, layers, dx, dy, board);
     }
