@@ -18,7 +18,8 @@ changed packages and every package that depends on them; a Markdown-only change 
 `Cargo.toml`, `Cargo.lock`, CI files or a file outside the packages tests everything); a push to `custom` always tests
 the whole workspace. The tests run on three machines at once (`--part 1/3` to `3/3`); the first also runs fmt,
 clippy, layers, panic_hunt, doctests and the web check. The official `CI` workflow (`ci.yml`, with Windows and web) is switched off in this fork (2026-11-02): it always
-stopped at the scorecard check here, and the fork is Mac only.
+stopped at the scorecard check here, and the fork is Mac only. It calls techneissa's copy of the shared gate, `techneissa/craft-common-actions` (storytold's plus an `sccache`
+input, on here, that also caches the workspace crates' compiled code; merged from storytold weekly, see FORK.md there).
 
 The official project's other workflows (Docs, FreeBSD, Nix, Packaging lint, Perf nightly, Release, SonarCloud,
 Windows arm64) are switched off in this fork: the official project runs them. A workflow the official project
