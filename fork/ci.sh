@@ -108,7 +108,7 @@ if [ -n "$PACKAGES" ]; then
 fi
 # shellcheck disable=SC2086
 if [ -n "$DOC_PACKAGES" ]; then
-  step doctest cargo test --locked $DOC_PACKAGES $FEATURES --doc
+  step doctest cargo test --locked $DOC_PACKAGES $DOC_FEATURES --doc
 fi
 if [ "$ONEOFF" = 1 ] && [ "$RUST" = 1 ]; then
   # i18n only lists missing translations for the log; it never fails CI.

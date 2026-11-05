@@ -200,6 +200,13 @@ def features_for(names, pkgs):
     return [f"{n}/{FEATURE}" for n in sorted(closure(names, pkgs)) if pkgs[n]["feature"]]
 
 
+def doc_features_for(names, pkgs):
+    """The features a doc-test run may name: cargo takes `pkg/feature` only for a selected package or a direct
+    dependency of one, so the deeper part of `features_for` (and a package without a library, like the app) is left out."""
+    near = set(names).union(*(pkgs[n]["deps"] for n in names)) if names else set()
+    return [f"{n}/{FEATURE}" for n in sorted(near) if pkgs[n]["feature"]]
+
+
 def plan(scope_pkgs, pkgs, scope="full", groups=GROUPS, weights=None):
     """The machines: a list of dicts, group 1 first. Each has `crates` (the packages it tests), `shard` (`i/n` or ``),
     `oneoff` (runs the one-off steps), `panic_hunt`, `features`, `doc_packages`, `weight`."""
@@ -255,6 +262,7 @@ def shell_vars(result, part, pkgs):
         "PARTITION": f"count:{t['shard']}" if t and t["shard"] else "",
         "FEATURES": ("--features " + ",".join(t["features"])) if t and t["features"] else "",
         "DOC_PACKAGES": pkg_args(t["doc_packages"]) if t else "",
+        "DOC_FEATURES": ("--features " + ",".join(doc_features_for(t["doc_packages"], pkgs))) if t and doc_features_for(t["doc_packages"], pkgs) else "",
         "PANIC_HUNT": "1" if t and t["panic_hunt"] else "0",
         "SHARD": t["shard"] if t else "",
         # clippy runs in group 1 over everything in scope

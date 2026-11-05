@@ -190,6 +190,20 @@ class Features(unittest.TestCase):
     def test_a_package_with_the_feature_gets_its_own(self):
         self.assertIn("photocraft/heif", affected.features_for(["photocraft"], PKGS))
 
+    def test_doc_tests_name_only_their_packages_and_direct_dependencies(self):
+        # cargo refuses `pkg/heif` for a package neither selected nor a direct dependency (Fork CI, 2026-11-05)
+        self.assertEqual(affected.doc_features_for(["photocraft-engine"], PKGS), ["photocraft-io/heif"])
+        self.assertEqual(affected.doc_features_for(["photocraft-geom"], PKGS), [])
+        self.assertEqual(affected.doc_features_for([], PKGS), [])
+
+    def test_the_doc_step_names_no_feature_cargo_would_refuse(self):
+        r = plan()
+        for t in r["tests"]:
+            near = set(t["doc_packages"]).union(*(PKGS[n]["deps"] for n in t["doc_packages"]))
+            v = dict(line.split("=", 1) for line in affected.shell_vars(r, t["group"], PKGS).splitlines())
+            named = set(re.findall(r"([a-z0-9-]+)/heif", v["DOC_FEATURES"]))
+            self.assertLessEqual(named, near, t["group"])
+
     def test_clippy_runs_the_whole_workspace_on_a_push(self):
         self.assertEqual(affected.clippy_args(plan(), PKGS), "--workspace --features heif")
 
