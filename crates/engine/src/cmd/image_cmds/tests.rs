@@ -234,6 +234,48 @@ fn resolution_only_change() {
     assert_eq!(r, json!({"width": 40, "height": 20}));
 }
 
+/// #9260: a resolution outside the document range (1..=30000 ppi, as File › New and the
+/// dialog's field) is refused and leaves the document as it was, instead of being clamped;
+/// one inside it, also above 10000, is set as given.
+#[test]
+fn image_size_refuses_a_resolution_out_of_range() {
+    for extra in [json!({"resample": "none"}), json!({"resample": "bicubic"}), json!({"resample": "bicubic", "keepPrintSize": true})] {
+        for r in [json!(1e39), json!(-5), json!(0), json!(0.5), json!(30_001), json!("300")] {
+            let mut s = session();
+            let (size, dpi, past) = (doc(&s).size, doc(&s).resolution_dpi, s.active().unwrap().history.past_len());
+            let mut p = extra.clone();
+            p["resolution"] = r;
+            assert!(s.execute("image.imageSize", p.clone()).is_err(), "{p}");
+            assert_eq!((doc(&s).size, doc(&s).resolution_dpi, s.active().unwrap().history.past_len()), (size, dpi, past), "{p}: nothing changed");
+        }
+    }
+    let mut s = session();
+    s.execute("image.imageSize", json!({"resolution": 20_000, "resample": "none"})).unwrap();
+    assert_eq!((doc(&s).size, doc(&s).resolution_dpi), (Size::new(40, 20), 20_000.0));
+    s.execute("image.imageSize", json!({"resolution": null, "resample": "none"})).unwrap();
+    assert_eq!(doc(&s).resolution_dpi, 20_000.0, "null leaves the resolution as it is");
+    // An imported document's own resolution outside the range (a PNG pHYs of 1 px/m is
+    // 0.0254 ppi) still resizes: the Image Size dialog sends it back unchanged on OK.
+    for own in [0.0254_f32, 40_000.0] {
+        let mut s = session();
+        s.edit("ppi", |doc, _| {
+            doc.resolution_dpi = own;
+            Ok(())
+        })
+        .unwrap();
+        s.execute("image.imageSize", json!({"width": 80, "height": 40, "resolution": f64::from(own), "resample": "bicubic"})).unwrap();
+        assert_eq!((doc(&s).size, doc(&s).resolution_dpi), (Size::new(80, 40), own), "{own}");
+        assert!(s.execute("image.imageSize", json!({"resolution": 0.03, "resample": "none"})).is_err(), "{own}: another value is still checked");
+        // Only the exact value: one that merely rounds to it as f32 is refused.
+        let near = if own < 1.0 { f64::from(own) * (1.0 + 1e-9) } else { f64::from(own) + 0.001 };
+        assert_eq!(near as f32, own);
+        assert!(s.execute("image.imageSize", json!({"resolution": near, "resample": "none"})).is_err(), "{own}: {near}");
+        // keepPrintSize with the unchanged resolution keeps the pixels.
+        s.execute("image.imageSize", json!({"resolution": f64::from(own), "resample": "bicubic", "keepPrintSize": true})).unwrap();
+        assert_eq!((doc(&s).size, doc(&s).resolution_dpi), (Size::new(80, 40), own), "{own}: keepPrintSize");
+    }
+}
+
 /// Type keeps its pixel size across a resolution change: resampled 2x at twice the ppi it is
 /// twice as tall (not 4x), with Resample off it stays, and a later re-render doesn't jump.
 #[test]
@@ -868,10 +910,33 @@ fn image_size_budgets_the_hidden_pixels_it_resamples() {
     let past = s.active().unwrap().history.past_len();
     let err = s.execute("image.imageSize", json!({"width": 20000, "height": 20000})).unwrap_err().to_string();
     assert!(err.contains("200000 x 200000 px is 40000 megapixels"), "{err}");
+    // The hidden pixels are a pixel layer's: Delete Cropped Pixels would clear them.
+    assert!(err.contains("or delete them first (Crop with Delete Cropped Pixels)"), "{err}");
     assert_eq!((doc(&s).size, s.active().unwrap().history.past_len()), (Size::new(10, 10), past));
     // Without resampling only the resolution changes.
     s.execute("image.imageSize", json!({"resolution": 300, "resample": "none"})).unwrap();
     assert_eq!((doc(&s).size, doc(&s).resolution_dpi), (Size::new(10, 10), 300.0));
+}
+
+/// Delete Cropped Pixels clips pixel layers only: an alpha channel keeps its pixels outside the
+/// crop, so the refusal doesn't send the user to an option that can't clear it.
+#[test]
+fn hidden_resample_budget_names_what_delete_cropped_pixels_keeps() {
+    let mut s = Session::new();
+    s.execute("file.new", json!({"width": 100, "height": 100})).unwrap();
+    s.edit("channel", |doc, _| {
+        let fmt = photocraft_color::PixelFormat::new(ColorMode::Grayscale, doc.pixel_format().sample, false);
+        let mut ch = Surface::new(fmt);
+        ch.write_region(Rect::new(0, 0, 100, 100), &[1.0; 100 * 100]);
+        doc.channels.push(photocraft_doc::AlphaChannel::new("Alpha 1", ch));
+        Ok(())
+    })
+    .unwrap();
+    s.execute("image.crop", json!({"x": 0, "y": 0, "width": 10, "height": 10, "deleteCroppedPixels": true})).unwrap();
+    let err = s.execute("image.imageSize", json!({"width": 20000, "height": 20000})).unwrap_err().to_string();
+    assert!(err.contains("200000 x 200000 px is 40000 megapixels"), "{err}");
+    assert!(err.contains("channels") && !err.contains("delete them first"), "{err}");
+    assert_eq!(doc(&s).size, Size::new(10, 10));
 }
 
 #[test]
@@ -1020,6 +1085,24 @@ fn duplicate_document() {
     assert_eq!(s.documents().len(), 2);
     assert_eq!(doc(&s).layers.len(), 1);
     assert!(doc(&s).name.ends_with("copy"));
+}
+
+/// #9212: a bicubic shrink stores the image between its two passes with one axis at its old
+/// size. A Background whose kept pixels reach (69999, 69999), halved from 200 to 100 px, ends at
+/// about 35000 x 35000 px (4.9 GB, within the 8 GiB budget) but passes through about
+/// 35000 x 70000 px (9.8 GB): refused before allocating. Bilinear has one pass and fits. The
+/// check alone runs, so nothing that large is allocated either way.
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn hidden_resample_budget_counts_the_image_between_bicubic_passes() {
+    let mut s = Session::new();
+    s.execute("file.new", json!({"width": 200, "height": 200})).unwrap();
+    let mut d = doc(&s).clone();
+    let bg = d.background_mut().unwrap().surface_mut().unwrap();
+    bg.fill_rect(Rect::new(69_999, 69_999, 70_000, 70_000), &[1.0, 0.0, 0.0, 1.0]);
+    let err = check_hidden_resample_budget("image.imageSize", &mut d, 0.5, 0.5, Resample::Bicubic).unwrap_err().to_string();
+    assert!(err.contains(" x 70000 px is "), "{err}");
+    check_hidden_resample_budget("image.imageSize", &mut d, 0.5, 0.5, Resample::Bilinear).unwrap();
 }
 
 #[test]

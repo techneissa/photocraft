@@ -62,26 +62,26 @@ fn run(s: &mut Session, p: &Value) -> Result<Value> {
         move |doc, _, ctx| {
             // Cancel reaches the model and the min cuts inside Select Subject, so Esc doesn't wait.
             let found = ctx.stage(0.1, 0.6, "Finding subject", |ctl| find_subject_region(doc, Some(id), sample_all, area, engine, sam3.as_ref(), ctl))?;
-            let (mut region, used) = (found.region.ok_or_else(|| EngineError::Other("no subject found".into()))?, found.used);
+            let (region, used) = (found.region.ok_or_else(|| EngineError::Other("no subject found".into()))?, found.used);
+            let mut surface = matting::region_surface(&region);
             if ctx.cancelled() {
                 return Err(EngineError::Cancelled);
             }
             // The Mac's cutout and the AI matte are soft and edge-refined already; only Classic needs it.
             if refine && used == "classic" {
-                ctx.progress(0.6, "Refining edge");
-                let refined = with_doc_sampler(doc, Some(id), sample_all, |smp, _| {
-                    matting::refine_mask(smp, &matting::region_reader(&region), region.bbox, area, &REFINE)
+                let refined = ctx.stage(0.6, 0.95, "Refining edge", |interrupt| {
+                    with_doc_sampler(doc, Some(id), sample_all, |smp, _| matting::refine_surface_with_interrupt(smp, &surface, area, &REFINE, None, interrupt))
                 });
-                region = refined.unwrap_or(region);
+                surface = refined.map_err(|e| EngineError::Other(e.to_string()))?.unwrap_or(surface);
                 if ctx.cancelled() {
                     return Err(EngineError::Cancelled);
                 }
             }
             crate::extra_cmds::background_to_layer_for_mask(doc, id);
-            let mask = crate::commands::mask_at_depth(LayerMask { surface: matting::region_surface(&region), ..LayerMask::reveal_all() }, doc.depth)?;
+            let mask = crate::commands::mask_at_depth(LayerMask { surface: surface.clone(), ..LayerMask::reveal_all() }, doc.depth)?;
             doc.layer_mut(id).ok_or(EngineError::NoLayer(id))?.mask = Some(mask);
             doc.selection = None;
-            let b = region.bbox;
+            let b = surface.content_bounds();
             Ok([b.x0, b.y0, b.width() as i32, b.height() as i32])
         },
         move |bounds| json!({ "layer": id.0, "bounds": bounds }),

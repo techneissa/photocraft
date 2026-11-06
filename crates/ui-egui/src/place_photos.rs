@@ -41,7 +41,7 @@ fn place(app: &mut PhotocraftApp, ctx: &egui::Context, doc: photocraft_doc::DocI
         return Ok(result);
     };
     let count = queue.len();
-    app.drop_places.extend(queue);
+    app.drop_places.extend(queue.into_iter().map(|place| (doc, place)));
     // The first starts now; the rest follow as each Free Transform ends.
     app.place_next_dropped(ctx);
     Ok(json!({ "queued": count }))
