@@ -50,8 +50,9 @@ jobs:
 
   # Ten machines at once (free for a public repo; techneissa, 2026-11-05). Compiling is most of a machine's time, so
   # each machine builds and tests only its own packages, and the slow ones (ui-egui, the engine) are cut into shards
-  # with one machine each (SHARDS and WEIGHT_OVERRIDES in fork/affected.py); machine 1 also runs fmt, clippy, layers
-  # and wasm. A pull request tests only the packages it can affect; a push to `custom` tests everything.
+  # with one machine each (SHARDS and WEIGHT_OVERRIDES in fork/affected.py); machine 1 runs only fmt, clippy, layers
+  # and wasm, machine 2 the packages above the engine. A pull request tests only the packages it can affect; a push
+  # to `custom` tests everything.
   gate:
     needs: pins
     strategy:
@@ -69,6 +70,9 @@ jobs:
       dev-debug: "0"
       # the workspace crates' compiled code in the GitHub cache too (techneissa, 2026-11-05)
       sccache: true
+      # The dependency cache is saved once, by the first machine to finish. Machine 1 now finishes early with only
+      # check builds, so it has its own; ui-egui's machines (7-10), whose dependencies are the largest set, have theirs.
+      cache-version: ${{ matrix.part == 1 && 'v1-lint' || matrix.part >= 7 && 'v1-ui' || 'v1' }}
       env: |
         PHOTOCRAFT_FULL_SWEEP=0
         PHOTOCRAFT_NO_PRINT=1

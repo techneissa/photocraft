@@ -15,8 +15,9 @@ A push to `custom` passes --full: everything.
 The tests are split over --part N/T machines ("groups"), so the slowest one is as short as it can be. Compiling is
 most of a machine's time (a package's tests need the package and everything below it), so a package is never
 spread thinly: the slow packages (SHARDS) are cut into shards, one shard per machine, by `cargo nextest
---partition count:i/n`, and the other packages share the remaining machines by weight. Group 1 also runs the
-one-off steps (format, lint, layers, wasm). Tests: `python3 -I fork/test_affected.py`. Why and how: fork/github-builds.md.
+--partition count:i/n`. Group 1 runs the one-off steps (format, lint, layers, wasm) and no package. The packages
+above a sharded one share group 2, so only that machine compiles the engine for them; the rest share the other
+machines by weight. Tests: `python3 -I fork/test_affected.py`. Why and how: fork/github-builds.md.
 """
 
 import argparse
@@ -38,11 +39,11 @@ WORKSPACE_WIDE = (
 # Seconds one machine needs for a package: the part of the compile only it needs (the shared libraries below it are
 # compiled by every machine anyway) plus its tests on 4 cores (a third of the tests ran in 308 s on the first run
 # of 2026-11-03: 4911 tests, 3935 s of test time in all). A package missing here counts DEFAULT_WEIGHT. Measured from
-# the Fork CI runs of 2026-11-03 and 2026-11-05 (fork/github-builds.md, "Measured").
+# the Fork CI runs of 2026-11-03 and 2026-11-05; algo from the official run of 2026-11-18 (873 s of test time).
 WEIGHT_OVERRIDES = {
     "photocraft-engine": 540,
     "photocraft-ui-egui": 1025,
-    "photocraft-algo": 200,
+    "photocraft-algo": 400,
     "photocraft-io": 170,
     "photocraft-gpu": 170,
     "photocraft-compose": 90,
@@ -66,11 +67,12 @@ COMPILE_WEIGHT = {"photocraft-ui-egui": 600, "photocraft-engine": 250}
 SHARDS = {"photocraft-ui-egui": 4, "photocraft-engine": 2}
 
 # Machines (groups) a run uses when --part gives no total; .github/workflows/fork-ci.yml's matrix must match.
-# The other packages and the one-off steps take the first groups, the shards the last ones.
+# The one-off steps and the other packages take the first groups, the shards the last ones.
 GROUPS = 10
 
-# The one-off steps of group 1 (format, clippy on the planned packages, layers, wasm): about 2 minutes warm.
-ONEOFF_WEIGHT = 150
+# The one-off steps of group 1 (format, clippy on the planned packages, layers, wasm): 431 s without a compile cache
+# (2026-11-05), about 4 minutes warm.
+ONEOFF_WEIGHT = 430
 
 # The workspace feature `cargo test --workspace --features heif` turns on, for every package that has it.
 FEATURE = "heif"
@@ -164,13 +166,10 @@ def affected(changed, pkgs, force_full=False):
     return "some", sorted(seen)
 
 
-def balance(weights, groups, seed=None):
-    """Spread the packages over `groups` machines, heaviest first onto the lightest machine. `seed` is (name, weight)
-    already on machine 1. Returns [(weight, [names])], deterministic."""
+def balance(weights, groups):
+    """Spread the packages over `groups` machines, heaviest first onto the lightest machine.
+    Returns [(weight, [names])], deterministic."""
     out = [[0, []] for _ in range(groups)]
-    if seed:
-        out[0][0] += seed[1]
-        out[0][1].append(seed[0])
     for name, w in sorted(weights.items(), key=lambda kv: (-kv[1], kv[0])):
         lightest = min(range(groups), key=lambda i: (out[i][0], i))
         out[lightest][0] += w
@@ -200,11 +199,22 @@ def features_for(names, pkgs):
     return [f"{n}/{FEATURE}" for n in sorted(closure(names, pkgs)) if pkgs[n]["feature"]]
 
 
-def doc_features_for(names, pkgs):
-    """The features a doc-test run may name: cargo takes `pkg/feature` only for a selected package or a direct
-    dependency of one, so the deeper part of `features_for` (and a package without a library, like the app) is left out."""
-    near = set(names).union(*(pkgs[n]["deps"] for n in names)) if names else set()
-    return [f"{n}/{FEATURE}" for n in sorted(near) if pkgs[n]["feature"]]
+def plain_groups(names, pkgs, weights, machines):
+    """The machines that are not shards, as [(weight, [names])]. Group 1 runs the one-off steps and, when there is
+    another machine, no package (it was the slowest by far with both). The packages above a sharded one (the app, the
+    CLI, ...) share group 2: each of them compiles the engine, so apart they would compile it on several machines. The
+    groups after it take the other packages and never compile it."""
+    w = {n: weights.get(n, DEFAULT_WEIGHT) for n in names}
+    if machines == 1:
+        return [(ONEOFF_WEIGHT + sum(w.values()), list(w))]
+    top = {n: v for n, v in w.items() if closure([n], pkgs) & set(SHARDS)}
+    low = {n: v for n, v in w.items() if n not in top}
+    rest = machines - 1
+    out = [(ONEOFF_WEIGHT, [])]
+    if top and low and rest >= 2:
+        out.append((sum(top.values()), list(top)))
+        return out + balance(low, rest - 1)
+    return out + balance(w, rest)
 
 
 def plan(scope_pkgs, pkgs, scope="full", groups=GROUPS, weights=None):
@@ -213,11 +223,9 @@ def plan(scope_pkgs, pkgs, scope="full", groups=GROUPS, weights=None):
     w = dict(weights if weights is not None else {n: WEIGHT_OVERRIDES.get(n, DEFAULT_WEIGHT) for n in pkgs})
     counts = shard_counts(scope_pkgs, groups)
     others = [n for n in scope_pkgs if n not in counts]
-    shard_groups = sum(counts.values())
-    plain = groups - shard_groups
+    plain = groups - sum(counts.values())
     tests = []
-    for i, (weight, names) in enumerate(balance({n: w.get(n, DEFAULT_WEIGHT) for n in others}, plain, ("+oneoff", ONEOFF_WEIGHT))):
-        names = [n for n in names if n != "+oneoff"]
+    for i, (weight, names) in enumerate(plain_groups(others, pkgs, w, plain)):
         tests.append({"group": i + 1, "crates": sorted(names), "shard": "", "oneoff": i == 0, "weight": weight})
     for name, k in counts.items():
         for s in range(1, k + 1):
@@ -229,6 +237,7 @@ def plan(scope_pkgs, pkgs, scope="full", groups=GROUPS, weights=None):
         t["panic_hunt"] = "photocraft-engine" in t["crates"] and first
         t["features"] = features_for(t["crates"], pkgs) if t["crates"] else []
         # Doc tests of a sharded package run once, with its first shard; the build is the tests' own, so they are cheap.
+        # fork/ci.sh runs them with the build's own packages and features; this list says whether there are any.
         t["doc_packages"] = [n for n in t["crates"] if pkgs[n]["doc"] and first]
     return {"scope": scope, "crates": sorted(scope_pkgs), "tests": tests}
 
@@ -262,7 +271,6 @@ def shell_vars(result, part, pkgs):
         "PARTITION": f"count:{t['shard']}" if t and t["shard"] else "",
         "FEATURES": ("--features " + ",".join(t["features"])) if t and t["features"] else "",
         "DOC_PACKAGES": pkg_args(t["doc_packages"]) if t else "",
-        "DOC_FEATURES": ("--features " + ",".join(doc_features_for(t["doc_packages"], pkgs))) if t and doc_features_for(t["doc_packages"], pkgs) else "",
         "PANIC_HUNT": "1" if t and t["panic_hunt"] else "0",
         "SHARD": t["shard"] if t else "",
         # clippy runs in group 1 over everything in scope

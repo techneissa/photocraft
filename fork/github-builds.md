@@ -17,8 +17,17 @@ It skips the accepted failures in `fork/known-failures.txt`, so a red run is a n
 there with a `#` line saying why. A pull request tests only the packages it can affect (`fork/affected.py`: the
 changed packages and every package that depends on them; a Markdown-only change runs no Rust checks; a change to
 `Cargo.toml`, `Cargo.lock`, CI files or a file outside the packages tests everything); a push to `custom` always tests
-the whole workspace. The tests run on three machines at once (`--part 1/3` to `3/3`); the first also runs fmt,
-clippy, layers, panic_hunt, doctests and the web check. The official `CI` workflow (`ci.yml`, with Windows and web) is switched off in this fork (2026-11-02): it always
+the whole workspace.
+
+It runs on ten machines at once (`--part 1/10` to `10/10`; the plan is `fork/affected.py`, printed by
+`python3 -I fork/affected.py --full --summary`). Machine 1 runs only fmt, clippy, layers and the web check. Machine 2
+tests the packages above the engine (app, CLI, automation, web), machines 3 and 4 the other packages, 5 and 6 the
+engine's tests in halves (the first also runs panic_hunt), 7 to 10 ui-egui's tests in quarters. Compiling is most of a
+machine's time, so a package's tests are split only where they are long. Each machine runs its own doc tests.
+The dependency cache is saved by one machine per cache name, and GitHub drops a cache unused for 7 days: the first run
+after a quiet week or a large official merge compiles everything and is the slow one.
+
+The official `CI` workflow (`ci.yml`, with Windows and web) is switched off in this fork (2026-11-02): it always
 stopped at the scorecard check here, and the fork is Mac only. It calls techneissa's copy of the shared gate, `techneissa/craft-common-actions` (storytold's plus an `sccache`
 input, on here, that also caches the workspace crates' compiled code; merged from storytold weekly, see FORK.md there).
 
