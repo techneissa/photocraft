@@ -147,6 +147,7 @@ pub const KEYS: &[KeyDef] = &[
             ("ellipseShape", "Ellipse Tool", "Ellipse Tool"),
             ("triangle", "Triangle Tool", "Triangle Tool"),
             ("polygon", "Polygon Tool", "Polygon Tool"),
+            ("star", "Star Tool", "Star Tool"),
             ("line", "Line Tool", "Line Tool"),
             ("customShape", "Custom Shape Tool", "Custom Shape Tool"),
             ("slice", "Slice Tool", "Slice Tool"),

@@ -1,0 +1,5 @@
+# techneissa's fork: interface text for fork features, added to craft-i18n's locales/az/photocraft.tsv at build time (crates/ui-egui/fork_i18n.rs). Rows the official catalog already has are dropped.
+# Optional local AI models (fork: AI Models page)
+	AI Models	Süni intellekt modelləri
+	subject segmentation (BiRefNet-lite)	subyekt seqmentasiyası (BiRefNet-lite)
+	inpainting (LaMa)	boşluqların doldurulması (LaMa)

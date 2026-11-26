@@ -82,7 +82,7 @@ fn the_home_screens_own_widgets_keep_their_double_clicks() {
     clicks(&mut h, at, 2);
     assert_eq!(opens(&requests), 0, "the rail item took the double-click");
     // The New file button opens the New Document dialog, not File › Open.
-    let at = h.get_by_label_contains("New file").rect().center();
+    let at = h.get_by_label_contains("New document…").rect().center();
     clicks(&mut h, at, 1);
     assert_eq!(opens(&requests), 0);
     assert_eq!(h.state().ui.dialogs.len(), 1, "the New Document dialog");

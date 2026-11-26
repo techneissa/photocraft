@@ -1972,8 +1972,9 @@ fn start_screen_buttons_stay_inside_a_narrow_canvas() {
         PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
         h.state_mut().1 = true;
         h.run_steps(3);
-        for label in ["New file", "Open…"] {
-            let nodes: Vec<_> = h.query_all_by_label(label).collect();
+        // Fork (home-recent-grid): the Home grid's buttons carry their shortcut ("New document…  ⌘N").
+        for label in ["New document…", "Open…"] {
+            let nodes: Vec<_> = h.query_all_by_label_contains(label).collect();
             assert!(!nodes.is_empty(), "`{label}` is rendered in a {width}-point-wide canvas");
             for node in nodes {
                 let r = node.rect();
@@ -2024,8 +2025,8 @@ fn start_screen_narrow_window_renders_actions_row() {
     PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::default());
     h.state_mut().1 = true;
     h.run_steps(3);
-    assert!(h.query_by_label("New file").is_some(), "New file button must be present in narrow mode");
-    assert!(h.query_all_by_label("Open…").next().is_some(), "Open… button must be present in narrow mode");
+    assert!(h.query_by_label_contains("New document…").is_some(), "New file button must be present in narrow mode");
+    assert!(h.query_all_by_label_contains("Open…").next().is_some(), "Open… button must be present in narrow mode");
 }
 
 /// The Home screen's × takes a file off Recent without opening it, and its right-click menu
@@ -3973,7 +3974,8 @@ fn free_transform_redraws_only_the_moving_layer_when_the_box_opens_and_closes() 
     let rev = app.session.documents()[0].revision;
     crate::transform_tool::begin(&mut app, &egui::Context::default()).expect("the box opens");
     let (_, key) = display_doc(&mut app, 0);
-    assert_eq!(key, crate::transform_tool::preview_key(app.transform_preview.as_ref().unwrap().session));
+    // Fork (transform-live-blend): the canvas shows the live preview, under its own key.
+    assert!(key == crate::transform_tool::preview_key(app.transform_preview.as_ref().unwrap().session) || crate::transform_live::is_live_key(key), "{key}");
     let dk = canvas_display(&app, &app.session.documents()[0].doc, None).1;
     let opened = damage_since(&app, 0, (rev, dk), (rev, key), dk, (rev, None)).expect("opening the box has a damage area");
     assert!(opened.contains(20, 20) && opened.contains(59, 49), "{opened:?}");

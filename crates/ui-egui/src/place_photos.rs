@@ -37,7 +37,10 @@ fn place(app: &mut PhotocraftApp, ctx: &egui::Context, doc: photocraft_doc::DocI
         // One photo: exactly File › Place Embedded's single-file way.
         let (name, bytes) = read_picked(answer, usize::MAX)?;
         let result = app.place_bytes(&name, bytes, None)?;
-        crate::transform_tool::begin_placed(app, ctx)?;
+        // In the background (#10031), Free Transform starts when the layer has landed.
+        if result.get("frame").and_then(Value::as_u64).is_none() && !crate::jobs_ui::track_place(app, &name, &result) {
+            crate::transform_tool::begin_placed(app, ctx)?;
+        }
         return Ok(result);
     };
     let count = queue.len();

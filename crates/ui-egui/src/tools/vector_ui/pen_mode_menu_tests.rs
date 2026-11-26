@@ -93,6 +93,9 @@ fn the_keys_never_land_on_pixels() {
     h.event(egui::Event::Text("p".into()));
     h.run_steps(2);
     assert_eq!(mode(&h), "path", "type-ahead P");
+    // Fork (dropdown-search): the P narrowed the list; Esc clears the search, keeping it open.
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
     // The keys still step between the enabled rows.
     h.key_press(egui::Key::ArrowUp);
     h.run_steps(2);

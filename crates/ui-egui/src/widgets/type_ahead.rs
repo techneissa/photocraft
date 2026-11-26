@@ -130,17 +130,20 @@ mod tests {
         if !crate::i18n::needs_catalogs() {
             return;
         }
-        use egui::accesskit::Role;
-        use egui_kittest::{Harness, kittest::Queryable};
+        use egui_kittest::Harness;
         let az = crate::i18n::Lang::from_code("az").unwrap();
         crate::i18n::with_language(az, || {
+            // Fork (dropdown-search): `widgets::dropdown` narrows its list instead of jumping, so
+            // the type-ahead list is driven directly.
             let mut h = Harness::builder().with_size(egui::vec2(300.0, 400.0)).build_ui_state(
                 |ui, selected: &mut usize| {
-                    crate::widgets::dropdown(ui, "az-i-pairs", "Mode", selected, &[(0, "Normal"), (1, "İşıq"), (2, "ıraq")], 120.0);
+                    let labels = ["Normal", "İşıq", "ıraq"];
+                    if let Some(i) = super::keys(ui, egui::Id::unique("az-i-pairs"), Some(*selected), &labels) {
+                        *selected = i;
+                    }
                 },
                 0,
             );
-            h.get_by_role(Role::ComboBox).click();
             h.run();
             h.event(egui::Event::Text("İ".into()));
             h.run();
@@ -230,21 +233,23 @@ mod tests {
         if !crate::i18n::needs_catalogs() {
             return;
         }
-        use egui::accesskit::Role;
-        use egui_kittest::{Harness, kittest::Queryable};
+        use egui_kittest::Harness;
         let en = crate::i18n::Lang::EN;
         let de = crate::i18n::Lang::from_code("de").unwrap();
+        // Fork (dropdown-search): `widgets::dropdown` narrows its list as letters are typed instead
+        // of jumping, so the type-ahead list is driven directly here, as in the test below.
         // Short frames: the letters arrive well within the pause, so only the language change resets.
         let mut h = Harness::builder().with_size(egui::vec2(300.0, 400.0)).with_step_dt(1.0 / 60.0).build_ui_state(
             |ui, (selected, lang): &mut (usize, crate::i18n::Lang)| {
                 crate::i18n::with_language(*lang, || {
-                    let options = [(0, "Normal"), (1, "Dissolve"), (2, "Darken"), (3, "Add")];
-                    crate::widgets::dropdown(ui, "lang-switch", "Mode", selected, &options, 120.0);
+                    let labels = ["Normal", "Dissolve", "Darken", "Add"];
+                    if let Some(i) = super::keys(ui, egui::Id::unique("lang-switch"), Some(*selected), &labels) {
+                        *selected = i;
+                    }
                 });
             },
             (0, en),
         );
-        h.get_by_role(Role::ComboBox).click();
         h.run();
         type_key(&h, egui::Key::D, "d");
         h.run();
@@ -253,7 +258,6 @@ mod tests {
         h.step();
         h.state_mut().1 = en;
         h.step();
-        assert!(super::list_open(&h.ctx), "the list stays open across the language change");
         type_key(&h, egui::Key::A, "a");
         h.run();
         assert_eq!(h.state().0, 3, "a starts a new prefix (Add); the d typed before the change would make it da (Darken)");

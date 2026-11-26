@@ -161,8 +161,11 @@ pub(crate) fn damage(
     if opening || canceled {
         return Some(o.area);
     }
-    // Committed: the box's preview, replaced by the document with the transform applied.
-    if seen.1 == o.key && now.1 == 0 && seen.0 == o.revision && now.0 == o.revision + 1 {
+    // Committed: the box's preview, replaced by the document with the transform applied. Fork
+    // (transform-live-blend): a live preview (any of its keys) shows the layer where it lands, so
+    // the same area covers it.
+    let shown = seen.1 == o.key || crate::transform_live::is_live_key(seen.1);
+    if shown && now.1 == 0 && seen.0 == o.revision && now.0 == o.revision + 1 {
         let done = last_damage?;
         return Some(if done.is_empty() { o.area } else { o.area.union(&done) });
     }

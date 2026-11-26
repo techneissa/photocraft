@@ -301,7 +301,7 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
     } else {
         rec_steps.clear();
     }
-    let needle = filter.to_ascii_lowercase();
+    let needle = filter.trim().to_ascii_lowercase();
     let query = super::shortcuts_search::parse(&needle);
     let reveal = f.remove("reveal").is_some();
     let clashes = super::shortcuts_when::clash_notes(&items, (&overrides, &alt_overrides), &chords, &whens);
@@ -322,12 +322,15 @@ pub(super) fn shortcuts_body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut
                 let alts = eff_alts(&alt_overrides, id, cur.as_deref());
                 let (shown_path, shown_label) = shown(id, label, path);
                 // Match what is shown and the English name (commands are documented in English).
-                let hay =
-                    format!("{} {} {} {} {} {}", shown_path.join(" "), shown_label, path.join(" "), label, cur.clone().unwrap_or_default(), alts.join(" "))
-                        .to_lowercase();
+                // As the official search: the shown text in the interface language's case rules
+                // (Azerbaijani dotted I), the English names, keys and id in English's.
+                let local = format!("{} {}", shown_path.join(" "), shown_label);
+                let english = format!("{} {} {} {} {id}", path.join(" "), label, cur.clone().unwrap_or_default(), alts.join(" "));
                 let keys: Vec<String> =
                     cur.iter().chain(&alts).cloned().chain(chords.get(id).iter().flat_map(|c| c.split_whitespace().map(str::to_string))).collect();
-                if !query.matches(&keys, &|text| hay.contains(text) || id.to_ascii_lowercase().contains(text)) {
+                if !query.matches(&keys, &|text| {
+                    crate::i18n::current().contains_ignore_case(&local, text) || crate::i18n::Lang::EN.contains_ignore_case(&english, text)
+                }) {
                     continue;
                 }
                 if tab == 0 && path.is_empty() && def.is_none() && cur.is_none() && alts.is_empty() {

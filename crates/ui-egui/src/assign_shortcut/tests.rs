@@ -151,7 +151,9 @@ fn toolbar_harness() -> Harness<'static, PhotocraftApp> {
 
 #[test]
 fn right_click_on_the_toolbars_edit_and_quick_mask_buttons_offers_assign_shortcut() {
-    for (label, command) in [("Edit Toolbar…", "edit.toolbar"), ("Edit in Quick Mask Mode", "select.editInQuickMaskMode")] {
+    // The official right-click on "…" opens its own flyout ("Edit Toolbar…", as in Photoshop), so
+    // that button offers no Assign Shortcut… since the 2026-11-27 merge.
+    for (label, command) in [("Edit in Quick Mask Mode", "select.editInQuickMaskMode")] {
         let mut h = toolbar_harness();
         h.get_by_label_contains(label).click_secondary();
         h.run_steps(2);

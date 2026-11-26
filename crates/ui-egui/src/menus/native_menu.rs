@@ -661,6 +661,22 @@ pub fn app_layout(app: &PhotocraftApp, items: &[MenuItem], lang: Lang, language:
     for (key, system) in [("Cmd+,", "Settings"), ("Cmd+H", "Hide"), ("Cmd+M", "Minimize"), ("Ctrl+Cmd+H", "Hide"), ("Ctrl+Cmd+M", "Minimize")] {
         let parsed = crate::shortcuts::parse(key);
         let owner = bindings.iter().find(|(_, sc)| Some(*sc) == parsed).map(|(id, _)| id);
+        // Fork (settings-cmd-comma): ⌘, is Settings' own key (beside ⌘K), so the menu shows it there.
+        if key == "Cmd+," && owner.is_some_and(|c| c == "edit.preferences.general") {
+            fn show(nodes: &mut [Node], id: &str, key: &str) {
+                for n in nodes {
+                    match n {
+                        Node::Item(it) if it.id == id => it.shortcut = Some(key.into()),
+                        Node::Submenu { children, .. } => show(children, id, key),
+                        _ => {}
+                    }
+                }
+            }
+            for menu in &mut layout.bar.menus {
+                show(&mut menu.children, "edit.preferences.general", key);
+            }
+            continue;
+        }
         if let Some(command) = owner {
             let displayed = layout.bar.find(command).and_then(|it| it.shortcut.as_deref()).and_then(crate::shortcuts::parse);
             if displayed != parsed {

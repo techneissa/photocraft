@@ -69,8 +69,8 @@ fn clashes_are_resolved_in_photocrafts_favour() {
     assert!(!file.children.contains(&Node::Standard(Standard::CloseWindow)), "⌘W stays File › Close");
 }
 
-/// Settings saved on ⌘, (a restored profile) while Hide Layers keeps Photoshop's ⌘,: the menu
-/// shows ⌘, once, on Hide Layers, rather than on both.
+/// Settings saved on ⌘, (a restored profile). Fork (settings-cmd-comma): Hide Layers has no default
+/// key, so the menu shows ⌘, once, on Settings, and nothing clashes.
 #[test]
 fn a_saved_cmd_comma_on_settings_gives_way_to_hide_layers() {
     let mut a = app(true);
@@ -78,9 +78,8 @@ fn a_saved_cmd_comma_on_settings_gives_way_to_hide_layers() {
     a.session.prefs.edit(|p| p.shortcuts.insert("edit.preferences.general".into(), "Cmd+,".into()));
     let l = photocraft_layout(&crate::menus::menu_items(&a), Lang::EN, "auto");
     let comma: Vec<&str> = l.bar.items().into_iter().filter(|it| it.shortcut.as_deref() == Some("Cmd+,")).map(|it| it.id.as_str()).collect();
-    assert_eq!(comma, ["layer.hideLayers"]);
-    let clash = l.clashes.iter().find(|c| c.shortcut == "Cmd+,").unwrap();
-    assert_eq!((clash.command.as_str(), clash.resolution), ("layer.hideLayers", "Settings has no shortcut"));
+    assert_eq!(comma, ["edit.preferences.general"]);
+    assert!(!l.clashes.iter().any(|c| c.shortcut == "Cmd+,"));
 }
 
 /// A saved ⌘, on a command with no menu item: the key press runs that command, so the live
@@ -101,12 +100,12 @@ fn a_saved_cmd_comma_without_a_menu_item_takes_the_key_from_settings() {
     let l = app_layout(&a, &items, Lang::EN, "auto");
     assert!(l.bar.items().iter().all(|it| it.shortcut.as_deref() != Some("Cmd+,")));
     assert_eq!(l.clashes.iter().find(|c| c.shortcut == "Cmd+,").map(|c| c.command.as_str()), Some("edit.fillForeground"));
-    // With ⌘, free there is no clash, and Settings keeps Photoshop's ⌘K.
+    // With ⌘, Settings' own (the fork's default) there is no clash, and the menu shows it there.
     let mut free = app(true);
     free.session.prefs.edit(|p| p.shortcuts.insert("layer.hideLayers".into(), String::new()));
     let l = app_layout(&free, &crate::menus::menu_items(&free), Lang::EN, "auto");
     assert!(!l.clashes.iter().any(|c| c.shortcut == "Cmd+,"));
-    assert_eq!(l.bar.find("edit.preferences.general").unwrap().shortcut.as_deref(), Some("Cmd+K"));
+    assert_eq!(l.bar.find("edit.preferences.general").unwrap().shortcut.as_deref(), Some("Cmd+,"));
 }
 
 #[test]
@@ -163,11 +162,12 @@ fn photoshop_defaults_hold_on_every_platform() {
     assert_eq!(binding("Cmd+K"), Some("edit.preferences.general"));
     assert_eq!(binding("Cmd+H"), Some("view.extras"));
     assert_eq!(binding("Cmd+M"), Some("image.adjustments.curves"));
-    assert_eq!(binding("Cmd+,"), Some("layer.hideLayers"));
+    // Fork (settings-cmd-comma): ⌘, opens Settings, shown on its menu item; ⌘K still works.
+    assert_eq!(binding("Cmd+,"), Some("edit.preferences.general"));
     let l = app_layout(&a, &crate::menus::menu_items(&a), Lang::EN, "auto");
     assert_eq!(l.bar.find(HIDE).unwrap().shortcut.as_deref(), Some("Ctrl+Cmd+H"));
     assert_eq!(l.bar.find(MINIMIZE).unwrap().shortcut.as_deref(), Some("Ctrl+Cmd+M"));
-    assert_eq!(l.bar.find("edit.preferences.general").unwrap().shortcut.as_deref(), Some("Cmd+K"));
+    assert_eq!(l.bar.find("edit.preferences.general").unwrap().shortcut.as_deref(), Some("Cmd+,"));
 }
 
 /// A Photoshop `.kys` set imported through Edit › Keyboard Shortcuts moves ⌘M to Levels and gives

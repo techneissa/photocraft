@@ -763,7 +763,7 @@ pub(crate) fn render_list_row(
 /// Judge a click that opens the recent file `path` as File › Open Recent's item for it, as the
 /// menu does: synthetic input from a client confined to its automation roots can't plant a recent
 /// file outside them and click its Home card open. A user's own click is always allowed.
-fn open_recent_gate(app: &PhotocraftApp, path: &str) -> Result<(), String> {
+pub(crate) fn open_recent_gate(app: &PhotocraftApp, path: &str) -> Result<(), String> {
     let Some(authorize) = app.services.automation_command.as_ref() else { return Ok(()) };
     if !app.automation_input {
         return Ok(());

@@ -72,6 +72,7 @@ pub(super) fn home(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> bool {
     let area = ui.available_rect_before_wrap();
     paint_dots(ui, area, app.session.prefs().interface.show_canvas_dots);
     open_on_double_click(app, ui, area);
+    back_button(app, ui, area);
     // File › Open Recent, newest first (on the web there are no paths to reopen).
     let show_recent = app.session.prefs().interface.show_home_recent_files;
     let recent: Vec<String> = if cfg!(target_arch = "wasm32") || !show_recent {
@@ -160,6 +161,18 @@ fn header_ui(app: &mut PhotocraftApp, ui: &mut egui::Ui, new_label: &str, open_l
     });
 }
 
+/// Home hides the tab strip and the options bar, so this button, top left as the official Home
+/// rail's entry was, is the way back to the open documents. With none open there is nothing behind
+/// Home and it does nothing.
+fn back_button(app: &mut PhotocraftApp, ui: &mut egui::Ui, area: Rect) {
+    let at = Rect::from_min_size(area.min + egui::vec2(16.0, 16.0), egui::vec2(26.0, 26.0));
+    let open = !app.session.documents().is_empty();
+    let clicked = ui.scope_builder(egui::UiBuilder::new().max_rect(at), |ui| crate::icons::button(ui, "house", 26.0, true, tl!("Home"))).inner.clicked();
+    if clicked && open {
+        app.ui.chrome.home = None;
+    }
+}
+
 /// What a click on the grid asked for, applied after the grid is drawn.
 #[derive(Default)]
 struct GridAction {
@@ -204,8 +217,9 @@ fn recent_grid(app: &mut PhotocraftApp, ui: &mut egui::Ui, recent: &[String]) {
     } else if let Some(path) = action.remove {
         app.remove_recent(&path);
     }
+    // Synthetic input is judged as File › Open Recent's item, as the official Home rows are.
     if let Some(path) = action.open
-        && let Err(e) = app.open_path(&path)
+        && let Err(e) = crate::home_recent_ui::open_recent_gate(app, &path).and_then(|()| app.open_path(&path))
     {
         app.open_failed(&crate::file_open::display_name(&path), &e);
     }
