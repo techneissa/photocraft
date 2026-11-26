@@ -561,7 +561,7 @@ fn cross_document_paste_moves_both_masks_even_when_unlinked_and_converts_colour(
             // Validate the converted colour against the CMS transform, independent of paste.
             let source_doc = &s.documents()[0].doc;
             let dest_doc = &s.active().unwrap().doc;
-            let t = photocraft_cms::Transform::new(
+            let t = craft_cms::Transform::new(
                 &crate::color_cmds::document_profile(source_doc),
                 &crate::color_cmds::document_profile(dest_doc),
                 s.color.settings.intent(),
@@ -570,7 +570,7 @@ fn cross_document_paste_moves_both_masks_even_when_unlinked_and_converts_colour(
             .unwrap();
             let source_pixel = original.surface().unwrap().pixel(25, 12);
             let mut expected = vec![0.0; dest_doc.mode.color_channels()];
-            t.eval(&source_pixel[..3], &mut expected);
+            t.eval(&source_pixel[..3], &mut expected).unwrap();
             for (actual, expected) in pixel.iter().zip(expected) {
                 assert!((actual - expected).abs() < 0.015, "{source_depth} -> {mode}/{dest_depth}: {pixel:?}");
             }
@@ -585,7 +585,7 @@ fn cross_document_paste_moves_both_masks_even_when_unlinked_and_converts_colour(
 
 #[test]
 fn same_mode_profile_conversion_changes_colour_but_keeps_mask_coverage() {
-    use photocraft_cms::{Builtin, Transform};
+    use craft_cms::{Builtin, Transform};
     let (mut s, src) = masked(16);
     s.edit("source profile", |doc, _| {
         doc.icc_profile = Some(Builtin::AdobeRgbCompat.profile().to_bytes());
@@ -608,7 +608,7 @@ fn same_mode_profile_conversion_changes_colour_but_keeps_mask_coverage() {
     let t = Transform::new(Builtin::AdobeRgbCompat.profile(), Builtin::DisplayP3.profile(), s.color.settings.intent(), s.color.settings.bpc).unwrap();
     let source_pixel = original.surface().unwrap().pixel(25, 12);
     let mut expected = [0.0; 3];
-    t.eval(&source_pixel[..3], &mut expected);
+    t.eval(&source_pixel[..3], &mut expected).unwrap();
     let actual = layer(&s, id).surface().unwrap().pixel(25 + dx, 12 + dy);
     for (a, b) in actual.iter().zip(expected) {
         assert!((a - b).abs() < 0.001, "converted pixel {actual:?}, expected {expected:?}");

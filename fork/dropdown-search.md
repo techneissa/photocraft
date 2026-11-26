@@ -25,3 +25,5 @@ The field is as wide as the full list less its magnifier and spacing, and the li
 ```bash
 cargo test -p photocraft-ui-egui --lib -- open_as_layers double_exposure blend_wheel blend_dropdown options_bar_mode_wheel dropdown_search type_ahead hold_keys transform_tool:: transform_live puppet_ui perspective_ui transform_undo_tests guides_draw distort_ui vp_ui blend_preview
 ```
+
+**Official merge of 2026-11-27:** the official dropdown moved from `craft_ui::ComboBox` to its own `combo_list`, so the `Searchable` trait is gone: `dropdown_with` and `dropdown_with_tooltips` call `find.header(ui)` as the first row inside the list (it scrolls with the rows) and keep the official greyed-option rule (`enabled` rows are left out of the matches).

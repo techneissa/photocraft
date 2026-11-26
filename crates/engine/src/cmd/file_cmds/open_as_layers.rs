@@ -11,8 +11,8 @@
 
 use std::sync::Arc;
 
+use craft_cms::{Intent, Profile};
 use photocraft_algo::resample::translate_surface;
-use photocraft_cms::{Intent, Profile};
 use photocraft_doc::Size;
 
 use super::open::import_at_raw_ppi;

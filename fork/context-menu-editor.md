@@ -23,3 +23,5 @@ engine `prefs.rs` (`context_menus`); ui-egui `lib.rs`, `canvas/canvas_tool_menu.
 ```bash
 cargo test -p photocraft-ui-egui --lib -- close_keys start_screen layer_shortcut native_menu title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
 ```
+
+**Official merge of 2026-11-27:** the document tab menu has the official 8 rows with separators after Move to New Window and Open Document… (#11403). `menus.rs` `TAB_ROWS` lists them; `canvas/tabs.rs` keeps the official `tab_context_menu` (its tests call it) and the canvas calls `tab_context_menu_arranged`.

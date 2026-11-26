@@ -4,9 +4,7 @@ use super::layer_drag::{
 };
 use super::layer_row::{RowSel, layer_row};
 use super::options_bar::{LAYER_PCT_W, body_text_width, pct_action, scrub_pct_label};
-use super::{
-    BlendMode, Layer, LayerId, MaskKind, PhotocraftApp, Rect, Sense, Tokens, Value, empty, icons, json, label, pos2, theme, vec2, widgets,
-};
+use super::{BlendMode, Layer, LayerId, MaskKind, PhotocraftApp, Rect, Sense, Tokens, Value, empty, icons, json, label, pos2, theme, vec2, widgets};
 
 // ----------------------------------------------------------------------------- layers
 
@@ -263,6 +261,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             let held = ctx.data(|d| {
                 d.get_temp::<u64>(egui::Id::unique("layer-drag")).is_some()
                     || d.get_temp::<FxDrag>(fx_drag_key()).is_some()
+                    || d.get_temp::<MaskDrag>(mask_drag_key()).is_some()
                     || d.get_temp::<crate::smart_ui::FilterDrag>(crate::smart_ui::drag_key()).is_some()
             });
             let dragging = held && ctx.input(|i| i.pointer.primary_down());
@@ -315,8 +314,21 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 // A click on that empty space deselects every layer, as in Photoshop (#8100). It
                 // starts under the last layer's sub-rows, which take their own clicks.
                 let empty = Rect::from_min_max(pos2(below.left(), rows_bottom), below.max);
-                if empty.height() > 0.0 && ui.interact(empty, ui.scope_id().with("layers-empty-space"), Sense::click()).clicked() && !selection.is_empty() {
-                    actions.push(("select.deselectLayers".into(), json!({})));
+                if empty.height() > 0.0 {
+                    let response = ui.interact(empty, ui.scope_id().with("layers-empty-space"), Sense::click());
+                    if response.clicked() && !selection.is_empty() {
+                        actions.push(("select.deselectLayers".into(), json!({})));
+                    }
+                    // A right-click there opens the thumbnail size and clipping choices (#11404).
+                    response.context_menu(|ui| super::layers_empty_menu::show(app, ui));
+                }
+            } else {
+                // No row drawn (a filter that matches no layer): the whole list is empty space,
+                // and its right-click opens the same menu.
+                let empty = Rect::from_min_max(pos2(ui.max_rect().left(), rows_bottom), pos2(ui.max_rect().right(), ui.clip_rect().bottom()));
+                if empty.height() > 0.0 && empty.width() > 0.0 {
+                    let response = ui.interact(empty, ui.scope_id().with("layers-empty-space"), Sense::click());
+                    response.context_menu(|ui| super::layers_empty_menu::show(app, ui));
                 }
             }
             // Tab / ⇧Tab in a rename: rename the layer below / above next, as in Photoshop. The

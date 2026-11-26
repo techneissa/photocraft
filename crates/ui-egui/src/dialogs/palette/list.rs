@@ -4,7 +4,7 @@
 use egui::{Align2, Sense, vec2};
 
 use super::nav::{self, Hit, MAX_ROWS, PAGE, ROW_H};
-use super::{exact_bonus, fuzzy_score, menu_hits, recent_hits, scroll_id};
+use super::{bilingual_score, menu_hits, recent_hits, scroll_id};
 use crate::PhotocraftApp;
 use crate::theme::{self, Tokens};
 
@@ -50,8 +50,8 @@ pub(super) fn all_hits(app: &PhotocraftApp, q: &str, recents: &[String], lang: c
             h.0 += nav::word_start_bonus(q, &h.2);
         }
         for tool in crate::state::Tool::ALL {
-            if let Some(s) = fuzzy_score(q, &format!("{} {}", tl!(tool.label()), tool.label())) {
-                let s = s + exact_bonus(q, &[tl!(tool.label()).as_ref(), tool.label()]) + nav::word_start_bonus(q, tl!(tool.label()));
+            if let Some(s) = bilingual_score(lang, q, tl!(tool.label()).as_ref(), tool.label(), tl!(tool.label()).as_ref(), tool.label()) {
+                let s = s + nav::word_start_bonus(q, tl!(tool.label()));
                 // The tool's key as the user set it, not Photoshop's default.
                 let key = crate::tool_shortcuts::shortcut(app, tool).map(|k| format!("   {}", crate::shortcuts::pretty(&k))).unwrap_or_default();
                 hits.push((s + 2, format!("tool:{tool:?}"), tl!(tool.label()).into(), Some(format!("{}{key}", crate::i18n::tr(lang, "Tool"))), true));

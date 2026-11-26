@@ -1,0 +1,16 @@
+# techneissa's fork: interface text for fork features, added to craft-i18n's locales/pt-br/photocraft.tsv at build time (crates/ui-egui/fork_i18n.rs). Rows the official catalog already has are dropped.
+	Remove Subject	Remover objeto
+# Optional local AI model management
+	AI Models	Modelos de IA
+	Models are optional and run entirely on this computer. Downloading fetches the model file from Hugging Face; no images or documents are ever uploaded. Without a model, Select Subject, Remove Background and Remove Subject use the built-in (non-AI) methods.	Os modelos são opcionais e executados inteiramente neste computador. O download obtém o arquivo do modelo do Hugging Face; imagens e documentos nunca são enviados. Sem um modelo, Selecionar objeto, Remover fundo e Remover objeto usam os métodos integrados sem IA.
+	Model download worker failed.	O processo de download do modelo falhou.
+	Select Subject, Remove Background	Selecionar objeto, Remover fundo
+	Installed	Instalado
+	Not installed	Não instalado
+	{size} MB · {licence}	{size} MB · {licence}
+	Download	Baixar
+	{done} / {total} MB ({percent}%)	{done} / {total} MB ({percent}%)
+	Cancelling…	Cancelando…
+	Confirm remove	Confirmar remoção
+	subject segmentation (BiRefNet-lite)	segmentação de objetos (BiRefNet-lite)
+	inpainting (LaMa)	preenchimento de imagem (LaMa)

@@ -23,3 +23,5 @@ Blend mode lists as tall as the window allows (no fixed 14-row cap, upstream iss
 ```bash
 cargo test -p photocraft-ui-egui --lib -- open_as_layers double_exposure blend_wheel blend_dropdown options_bar_mode_wheel dropdown_search type_ahead hold_keys transform_tool:: transform_live puppet_ui perspective_ui transform_undo_tests guides_draw distort_ui vp_ui blend_preview
 ```
+
+**Official merge of 2026-11-27 (official code up to 2026-11-17):** the official dropdown (`widgets/dropdown.rs` `combo_list`, #5495) now sizes every list to the room above or below its box, which is what this feature's `list_height` did; `list_height` is gone and the official sizing is used. The wheel preference stays the fork's.

@@ -176,7 +176,7 @@ pub fn canvas_rows(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Row> {
 /// Does the open canvas menu close: the tool changed, or the arrangement left it no row (such a
 /// menu does not open)?
 pub fn closed(app: &PhotocraftApp, menu: &CanvasToolMenu) -> bool {
-    app.ui.tool != menu.tool || (canvas_key(menu).is_some() && canvas_rows(app, menu).is_empty())
+    app.ui.tool != menu.under.unwrap_or(menu.tool) || (canvas_key(menu).is_some() && canvas_rows(app, menu).is_empty())
 }
 
 /// Is `command` a row of the open canvas menu?
@@ -194,7 +194,14 @@ pub type TabItem = (&'static str, &'static str, Value, bool);
 
 /// Which of the tab menu's `items` show, in order (`None` is a separator).
 pub fn tab_rows(saved: &Value, items: &[TabItem]) -> Vec<Option<usize>> {
-    let built: Vec<Row> = items.iter().map(|(label, id, ..)| Some((*label, *id))).collect();
+    // The official order, with a separator after each row `TAB_MENU_SEPARATORS_AFTER` names.
+    let mut built: Vec<Row> = Vec::new();
+    for (row, (label, id, ..)) in items.iter().enumerate() {
+        built.push(Some((*label, *id)));
+        if crate::canvas::tabs::TAB_MENU_SEPARATORS_AFTER.contains(&row) {
+            built.push(None);
+        }
+    }
     arranged(saved, menus::TAB, built)
         .into_iter()
         .filter_map(|row| match row {

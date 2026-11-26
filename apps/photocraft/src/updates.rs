@@ -20,6 +20,19 @@ pub fn service() -> CheckFn {
     })
 }
 
+/// What the last self-update came to, once: `craft-update` removes its records as it reads them.
+pub fn last_update() -> Option<Result<String, String>> {
+    use craft_update::self_update::{Outcome, current_version, take_outcome};
+    let app = &photocraft_ui_egui::UPDATE_APP;
+    let paths = craft_update::Paths::for_app(app).ok()?;
+    let version = photocraft_engine::build_info::VERSION;
+    let running = current_version(app, version).map_or_else(|| version.to_string(), |v| v.to_string());
+    match take_outcome(&paths, &running)? {
+        Outcome::Installed(installed) => Some(Ok(installed.to_string())),
+        Outcome::Failed(reason) => Some(Err(reason)),
+    }
+}
+
 fn check() -> CheckResult {
     // This fork updates from its own builds (fork/fork-update-check.md): the official releases are never asked.
     if photocraft_ui_egui::fork_update::OFFICIAL_CHECK_OFF {

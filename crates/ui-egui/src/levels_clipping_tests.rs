@@ -226,12 +226,111 @@ fn view(zoom: f32) -> ViewXform {
     }
 }
 
+/// [`paint`] in a frame of its own (so its mesh doesn't spill into a later frame's shapes), then
+/// the colours of the blocks it shows.
 fn paint_view(app: &mut PhotocraftApp, ctx: &egui::Context, xf: &ViewXform) -> Option<Vec<Color32>> {
-    let painter = egui::Painter::new(ctx.clone(), egui::LayerId::background(), egui::Rect::EVERYTHING);
-    paint(app, ctx, &painter, xf, 0);
+    let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+        let painter = egui::Painter::new(ui.ctx().clone(), egui::LayerId::background(), egui::Rect::EVERYTHING);
+        paint(app, ui.ctx(), &painter, xf, 0);
+    });
+    out.textures_delta.clear();
     let c = app.levels_clipping.as_ref()?;
     let (end, thr) = c.drawn?;
     Some(image(&c.stats, &thr, end))
+}
+
+/// A view at one device pixel per document pixel whose visible document rect (with
+/// `visible_doc_rect`'s 2 px margin) is exactly `x0..x1` × `y0..y1`.
+fn xf_over(x0: i32, x1: i32, y0: i32, y1: i32) -> ViewXform {
+    let size = egui::vec2((x1 - x0 - 4) as f32, (y1 - y0 - 4) as f32);
+    ViewXform {
+        rect: egui::Rect::from_min_size(egui::Pos2::ZERO, size),
+        zoom: 1.0,
+        center: [(x0 + x1) as f32 / 2.0, (y0 + y1) as f32 / 2.0],
+        flip: false,
+        rotation: 0.0,
+        aspect: 1.0,
+    }
+}
+
+/// Snapping the area to the block grid can widen it by up to a block; the blocks grow until the
+/// snapped area still fits the texture limit (here a 2048 px device limit) on both sides.
+#[test]
+fn the_snapped_area_fits_the_texture_limit() {
+    let bounds = Rect::new(0, 0, 20000, 20000);
+    let (r, f) = view_area(&xf_over(1, 4097, 0, 100), bounds, 1.0, 2048).unwrap();
+    assert_eq!((r.x0, f), (0, 3), "4096 px from x 1: blocks of 2 would need 2049");
+    for (x0, y0) in [(0, 0), (1, 1), (2, 3), (5, 7), (1023, 2047)] {
+        for span in 4090..4100 {
+            let (x1, y1) = (x0 + span, y0 + span / 2);
+            let (r, f) = view_area(&xf_over(x0, x1, y0, y1), bounds, 1.0, 2048).unwrap();
+            let fi = f as i32;
+            assert!(r.width().div_ceil(f) <= 2048 && r.height().div_ceil(f) <= 2048, "{x0},{y0} span {span}: {r:?} / {f}");
+            assert!(r.x0 % fi == 0 && r.y0 % fi == 0, "snapped to the grid: {r:?} / {f}");
+            assert!(r.x0 <= x0 && r.y0 <= y0 && r.x1 >= x1 && r.y1 >= y1, "covers the view: {r:?}");
+        }
+    }
+}
+
+/// However big the display, the display builds at most `MAX_BLOCKS` blocks: an 8K canvas at
+/// 100 % gets bigger blocks instead of a 33M-texel texture, while 2560×1440 keeps one block per
+/// device pixel.
+#[test]
+fn a_huge_display_grows_the_blocks() {
+    let bounds = Rect::new(0, 0, 20000, 20000);
+    let (_, f) = view_area(&xf_over(0, 2564, 0, 1444), bounds, 1.0, 8192).unwrap();
+    assert_eq!(f, 1, "2560×1440: one block per device pixel");
+    for (w, h) in [(7680, 4320), (8192, 8192), (15360, 8640)] {
+        let (r, f) = view_area(&xf_over(0, w, 0, h), bounds, 1.0, 8192).unwrap();
+        let blocks = u64::from(r.width().div_ceil(f)) * u64::from(r.height().div_ceil(f));
+        assert!(blocks <= MAX_BLOCKS, "{w}×{h}: {blocks} blocks of {f}");
+        assert!(blocks > MAX_BLOCKS / 4, "{w}×{h}: no coarser than needed ({blocks} blocks of {f})");
+    }
+}
+
+/// The main canvas's view of the 16×8 document at 10 device pixels per pixel.
+fn main_view(app: &mut PhotocraftApp) -> crate::state::View {
+    app.sync_views();
+    crate::state::View { zoom: 10.0, center: [8.0, 4.0], fit_pending: false, fill_pending: false, ..app.ui.views[0].clone() }
+}
+
+/// The shapes of one 160×80 canvas frame of document 0 in `view`.
+fn canvas_frame(ctx: &egui::Context, app: &mut PhotocraftApp, view: &crate::state::View, primary: bool) -> Vec<egui::epaint::ClippedShape> {
+    let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+        crate::canvas::canvas_view(app, ui, 0, egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(160.0, 80.0)), view.clone(), primary);
+    });
+    out.textures_delta.clear();
+    out.shapes
+}
+
+/// How many meshes among `shapes` (shape lists included) draw texture `tex`.
+fn meshes_with(shapes: &[egui::epaint::ClippedShape], tex: egui::TextureId) -> usize {
+    fn count(s: &egui::Shape, tex: egui::TextureId) -> usize {
+        match s {
+            egui::Shape::Mesh(m) => usize::from(m.texture_id == tex),
+            egui::Shape::Vec(v) => v.iter().map(|s| count(s, tex)).sum(),
+            _ => 0,
+        }
+    }
+    shapes.iter().map(|c| count(&c.shape, tex)).sum()
+}
+
+/// The display keeps one cache, sized to the main canvas's view: an extra document window's
+/// canvas (not primary) neither draws it nor replaces that cache with its own view.
+#[test]
+fn only_the_main_canvas_draws_the_display() {
+    let ctx = egui::Context::default();
+    let mut app = ramp_app(ColorMode::Rgb, SampleType::U8);
+    open_levels(&mut app, json!({"inBlack": 100}), Some("shadows"));
+    let main = main_view(&mut app);
+    let other = crate::state::View { zoom: 0.25, ..main.clone() };
+    let shapes = canvas_frame(&ctx, &mut app, &main, true);
+    let cache = app.levels_clipping.as_ref().expect("the main canvas builds the display");
+    let (key, tex) = (cache.key, cache.tex.as_ref().map(egui::TextureHandle::id).expect("its texture"));
+    assert_eq!(meshes_with(&shapes, tex), 1, "the main canvas draws the display");
+    let shapes = canvas_frame(&ctx, &mut app, &other, false);
+    assert_eq!(meshes_with(&shapes, tex), 0, "an extra window doesn't draw it");
+    assert_eq!(app.levels_clipping.as_ref().map(|c| c.key), Some(key), "nor replaces the main canvas's cache");
 }
 
 /// The display covers the view at about one texel per screen pixel, in every depth and in Gray,
@@ -268,9 +367,17 @@ fn paint_shows_the_target_clipping_for_the_view() {
         paint_view(&mut app, &ctx, &view(0.25)).unwrap();
         assert_eq!(app.levels_clipping.as_ref().unwrap().stats.factor, 4);
         assert_eq!(app.levels_clipping.as_ref().unwrap().stats.size, [4, 2]);
-        // Off: nothing drawn; closed: the cache goes.
+        // Off with the dialog still open: the cached texture stays but no canvas frame draws it.
+        let main = main_view(&mut app);
+        let shapes = canvas_frame(&ctx, &mut app, &main, true);
+        let tex = app.levels_clipping.as_ref().and_then(|c| c.tex.as_ref()).map(egui::TextureHandle::id).unwrap();
+        assert_eq!(meshes_with(&shapes, tex), 1, "{mode:?} {depth:?}: on, it draws");
         app.ui.dialog_mut(id).unwrap().fields.insert(FIELD.into(), Value::Null);
         assert!(request(&app, 0).is_none());
+        let shapes = canvas_frame(&ctx, &mut app, &main, true);
+        assert_eq!(meshes_with(&shapes, tex), 0, "{mode:?} {depth:?}: off, it draws nothing");
+        assert!(app.levels_clipping.is_some(), "{mode:?} {depth:?}: the cache stays while the dialog is open");
+        // Closed: the cache goes.
         app.ui.close_dialog(id);
         paint_view(&mut app, &ctx, &view(10.0));
         assert!(app.levels_clipping.is_none(), "{mode:?} {depth:?}");
@@ -297,6 +404,71 @@ fn ineligible_documents_show_no_display() {
     app.run("layer.newFillLayer.solidColor", json!({"color": "#808080"})).unwrap();
     open_levels(&mut app, json!({}), Some("shadows"));
     assert!(request(&app, 0).is_none(), "fill layer");
+}
+
+/// While a background job runs the display draws nothing and neither scans nor builds its
+/// texture. It comes back once the job is done.
+#[test]
+fn a_running_job_holds_the_display() {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let ctx = egui::Context::default();
+    let mut app = ramp_app(ColorMode::Rgb, SampleType::U8);
+    open_levels(&mut app, json!({"inBlack": 100}), Some("shadows"));
+    let gate = Arc::new(AtomicBool::new(false));
+    let open = gate.clone();
+    let started = app
+        .session
+        .start_job(
+            "test.slow",
+            json!({}),
+            "Slow",
+            false,
+            move |job| {
+                while !open.load(Ordering::Relaxed) {
+                    job.check()?;
+                    std::thread::sleep(std::time::Duration::from_millis(1));
+                }
+                Ok(())
+            },
+            |_, ()| Ok(json!({})),
+        )
+        .unwrap();
+    let photocraft_engine::jobs::Started::Job(job) = started else { panic!("ran inline") };
+    assert!(app.session.has_jobs());
+    assert!(paint_view(&mut app, &ctx, &view(10.0)).is_none());
+    assert!(app.levels_clipping.is_none(), "no scan and no texture while the job runs");
+    gate.store(true, Ordering::Relaxed);
+    app.session.wait_job(job).unwrap();
+    assert!(!app.session.has_jobs());
+    assert!(paint_view(&mut app, &ctx, &view(10.0)).is_some(), "back once the job is done");
+}
+
+/// Closing the last document drops the display's cache: no canvas is left to paint it away.
+#[test]
+fn closing_the_last_document_drops_the_cache() {
+    let ctx = egui::Context::default();
+    let mut app = ramp_app(ColorMode::Rgb, SampleType::U8);
+    open_levels(&mut app, json!({"inBlack": 100}), Some("shadows"));
+    assert!(paint_view(&mut app, &ctx, &view(10.0)).is_some());
+    app.run("file.close", json!({})).unwrap();
+    assert!(app.session.documents().is_empty());
+    assert!(app.levels_clipping.is_none());
+}
+
+/// A Smart Filter's Levels dialog edits the filter, not the layer's pixels: no display, and its
+/// cache goes as if no Levels dialog were open, even over a pixel layer.
+#[test]
+fn smart_filter_levels_show_no_display() {
+    let ctx = egui::Context::default();
+    let mut app = ramp_app(ColorMode::Rgb, SampleType::U8);
+    let id = open_levels(&mut app, json!({"inBlack": 100}), Some("shadows"));
+    assert!(paint_view(&mut app, &ctx, &view(10.0)).is_some(), "a plain Levels dialog shows it");
+    let layer = app.session.active().and_then(|s| s.active_layer).unwrap();
+    app.ui.dialog_mut(id).unwrap().fields.insert("__smartFilter".into(), json!({"layer": layer.0}));
+    assert!(request(&app, 0).is_none());
+    assert!(paint_view(&mut app, &ctx, &view(10.0)).is_none());
+    assert!(app.levels_clipping.is_none(), "the cache goes");
 }
 
 fn dialog_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {

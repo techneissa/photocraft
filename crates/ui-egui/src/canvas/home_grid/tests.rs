@@ -183,7 +183,7 @@ fn a_file_taken_off_recent_loses_its_preview_and_a_saved_file_gets_a_new_one() {
 
 #[test]
 fn a_psd_preview_is_the_merged_image_not_an_import_of_its_layers() {
-    use photocraft_psd::{
+    use craft_psd::{
         PsdBuilder,
         builder::{LayerSpec, PixelData},
     };

@@ -59,7 +59,7 @@ fn paint_setup(app: &mut PhotocraftApp) {
     let tools = &mut app.session.tools;
     let kept = app.prefs_rt.double_exposure_brush.take().filter(|s| s.rev == tools.brush_rev);
     let stash = kept.unwrap_or_else(|| Stash { brush: tools.brush.clone(), preset: tools.current_preset.clone(), rev: tools.brush_rev });
-    let mut brush = crate::paint_mouse::fresh_brush(&tools.brush);
+    let mut brush = crate::paint_mouse::fresh_brush(Tool::Brush, &tools.brush);
     brush.size = size;
     brush.hardness = 0.0;
     brush.erase = false;

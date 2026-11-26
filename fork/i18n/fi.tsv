@@ -1,0 +1,5 @@
+# techneissa's fork: interface text for fork features, added to craft-i18n's locales/fi/photocraft.tsv at build time (crates/ui-egui/fork_i18n.rs). Rows the official catalog already has are dropped.
+# Optional local AI model management (fork: PR #8231, FORK.md): only the labels the AI Models test checks
+	AI Models	Tekoälymallit
+	subject segmentation (BiRefNet-lite)	kohteen segmentointi (BiRefNet-lite)
+	inpainting (LaMa)	täyttö (LaMa)

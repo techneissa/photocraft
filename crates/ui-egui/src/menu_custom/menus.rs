@@ -73,8 +73,19 @@ const LAYER_ROWS: &[(&str, &str, &str)] = &[
 ];
 
 /// The document tab menu's rows (its items hold their command's params and enablement).
-const TAB_ROWS: &[(&str, &str)] =
-    &[("file.close", "Close"), ("file.closeOthers", "Close Others"), ("file.closeAll", "Close All"), ("file.revealInFinder", "Reveal in Finder")];
+/// The official order and separators (`canvas::tabs::tab_context_items`, `TAB_MENU_SEPARATORS_AFTER`).
+const TAB_ROWS: &[(&str, &str)] = &[
+    ("window.arrange.consolidateAllToTabs", "Consolidate All to Here"),
+    ("file.close", "Close"),
+    ("file.closeAll", "Close All"),
+    ("file.closeOthers", "Close Others"),
+    ("window.arrange.floatInWindow", "Move to New Window"),
+    (SEPARATOR, ""),
+    ("file.new", "New Document…"),
+    ("file.open", "Open Document…"),
+    (SEPARATOR, ""),
+    ("file.revealInFinder", "Reveal in Finder"),
+];
 
 /// Every row menu `key` can build, a separator as `None`, in the order the menu has them when it
 /// builds them all: the arrangement a menu has until the user changes it.
@@ -83,7 +94,10 @@ pub fn rows(key: &str) -> Vec<Row> {
         CANVAS_SELECTION => SELECTION_MENU.to_vec(),
         CANVAS_NONE => NO_SELECTION_MENU.to_vec(),
         LAYERS_ROW => LAYER_ROWS.iter().map(|(id, label, _)| (*id != SEPARATOR).then_some((*label, *id))).collect(),
-        TAB => TAB_ROWS.iter().map(|(id, label)| Some((if *id == "file.revealInFinder" { crate::menus::reveal_label() } else { *label }, *id))).collect(),
+        TAB => TAB_ROWS
+            .iter()
+            .map(|(id, label)| (*id != SEPARATOR).then(|| (if *id == "file.revealInFinder" { crate::menus::reveal_label() } else { *label }, *id)))
+            .collect(),
         _ => Vec::new(),
     }
 }

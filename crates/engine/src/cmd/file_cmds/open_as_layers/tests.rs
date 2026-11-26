@@ -186,7 +186,7 @@ fn later_files_are_converted_to_the_top_files_profile() {
     let also_p3 = profiled(&dir, "also-p3.png", 16, 16, "#3366cc", "display-p3");
     let mut s = Session::new();
     s.execute("file.openAsLayers", json!({"paths": [top, srgb.clone(), also_p3.clone()]})).unwrap();
-    let p3 = photocraft_cms::Builtin::DisplayP3.profile().to_bytes();
+    let p3 = craft_cms::Builtin::DisplayP3.profile().to_bytes();
     assert_eq!(s.active().unwrap().doc.icc_profile.as_ref().map(|b| b.as_slice()), Some(p3.as_slice()));
     // The sRGB file's numbers are what Convert to Profile gives the same file.
     let mut oracle = Session::new();

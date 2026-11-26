@@ -46,9 +46,9 @@ skipped_steps="$(printf '%s\n' "$known" | sed -n 's/^step  *//p')"
 skipped_tests="$(printf '%s\n' "$known" | grep -v '^step ' || true)"
 
 # The steps this script knows. A step upstream adds to cmd_ci fails the run until it is added here.
-known_steps="fmt clippy layers scorecard test panic_hunt doctest wasm i18n"
+known_steps="fmt clippy layers panel-commands scorecard test panic_hunt doctest wasm i18n"
 upstream_steps="$(awk '/^fn cmd_ci\(\)/{f=1} f && /let mut done/{exit} f' xtask/src/main.rs |
-  sed -n 's/^[[:space:]]*(\{0,1\}"\([a-z_0-9]*\)",.*/\1/p')"
+  sed -n 's/^[[:space:]]*(\{0,1\}"\([a-z_0-9-]*\)",.*/\1/p')"
 for s in $upstream_steps; do
   case " $known_steps " in *" $s "*) ;; *)
     echo "::error::cargo xtask ci has a new step '$s': add it to fork/ci.sh"; exit 1 ;;
@@ -87,6 +87,7 @@ if [ "$ONEOFF" = 1 ]; then
   if [ "$RUST" = 1 ]; then
     step clippy cargo clippy --locked $CLIPPY_ARGS --all-targets --keep-going -- -D warnings
     step layers cargo xtask layers
+    step panel-commands cargo xtask panel-commands
     step scorecard cargo xtask scorecard --check
     step wasm cargo xtask wasm
   fi

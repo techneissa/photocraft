@@ -156,7 +156,7 @@ pub(crate) fn click(h: &mut Harness<'_, PhotocraftApp>, at: Pos2) {
 }
 
 /// The open list's frame: the popup area above the panels that holds the "Normal" entry.
-fn open_list(h: &Harness<'_, PhotocraftApp>) -> Rect {
+fn list_frame(h: &Harness<'_, PhotocraftApp>) -> Rect {
     let normal = entry(h, "Normal").center();
     let layer = h.ctx.layer_id_at(normal).expect("the open list is a popup area");
     h.ctx.memory(|m| m.area_rect(layer.id)).expect("the open list is a popup area")
@@ -185,19 +185,17 @@ fn wheel_steps_in_the_open_list_keep_the_chosen_mode_in_view() {
     let mut h = harness(pixel_layer);
     let at = dropdown(&h).center();
     click(&mut h, at);
-    // The list holds at most what fits below the box in the window: it scrolls, so the chosen mode
-    // must stay inside it.
-    let list = open_list(&h);
-    assert!(list.height() < 27.0 * 20.0, "a 900 pt window can't show every mode: {list:?}");
+    // The open list, unscrolled, shows its first entry at the top.
+    let list = h.ctx.memory(|m| m.layer_ids().filter(|l| l.order == egui::Order::Foreground).find_map(|l| m.area_rect(l.id))).unwrap();
     let darken = entry(&h, "Darken").center();
     for _ in 0..22 {
         wheel(&mut h, darken, -1.0);
     }
     h.run_steps(30);
     assert_eq!(blend(&h), BlendMode::Divide);
-    let in_view = |r: Rect| r.top() >= list.top() - 0.5 && r.bottom() <= list.bottom() + 0.5;
+    let in_view = |r: Rect| list.contains_rect(r);
     let chosen = entry(&h, "Divide");
-    assert!(in_view(chosen), "{chosen:?} in view of {list:?}");
+    assert!(in_view(chosen), "{chosen:?} in view in {list:?}");
     // The wheel over the button scrolls the open list along too.
     for _ in 0..21 {
         wheel(&mut h, at, 1.0);
@@ -205,7 +203,7 @@ fn wheel_steps_in_the_open_list_keep_the_chosen_mode_in_view() {
     h.run_steps(30);
     assert_eq!(blend(&h), BlendMode::Dissolve);
     let chosen = entry(&h, "Dissolve");
-    assert!(in_view(chosen), "{chosen:?} in view of {list:?}");
+    assert!(in_view(chosen), "{chosen:?} in view in {list:?}");
 }
 
 /// The mode the canvas previews on the active layer, if any (#970).
@@ -246,7 +244,7 @@ fn a_tall_window_shows_every_blend_mode_without_scrolling() {
     let mut h = harness_sized(vec2(1440.0, 1500.0), pixel_layer);
     let at = dropdown(&h).center();
     click(&mut h, at);
-    let (list, window) = (open_list(&h), Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 1500.0)));
+    let (list, window) = (list_frame(&h), Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 1500.0)));
     assert!(window.contains_rect(list), "the list {list:?} is inside the window");
     let modes = every_mode();
     assert_eq!(modes.len(), 27);
@@ -264,7 +262,7 @@ fn a_short_window_still_scrolls_the_blend_list_inside_the_window() {
     let mut h = harness_sized(vec2(1440.0, 500.0), pixel_layer);
     let at = dropdown(&h).center();
     click(&mut h, at);
-    let (list, window) = (open_list(&h), Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 500.0)));
+    let (list, window) = (list_frame(&h), Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 500.0)));
     assert!(window.contains_rect(list), "the list {list:?} stays inside the window");
     let last = entry(&h, "Luminosity");
     assert!(last.bottom() > list.bottom(), "the last mode {last:?} is below the list {list:?}: it scrolls");
@@ -276,4 +274,33 @@ fn a_short_window_still_scrolls_the_blend_list_inside_the_window() {
     h.run_steps(30);
     assert_eq!(blend(&h), BlendMode::Luminosity);
     assert!(list.contains_rect(entry(&h, "Luminosity")), "the last mode scrolled into the list");
+}
+
+/// The open list's rect (the one foreground area: no other popup is open).
+fn open_list(h: &Harness<'_, PhotocraftApp>) -> Option<Rect> {
+    h.ctx.memory(|m| m.layer_ids().filter(|l| l.order == egui::Order::Foreground).find_map(|l| m.area_rect(l.id)))
+}
+
+/// A plain click on the Layers panel's Blend Mode box, released where it was pressed (after one
+/// frame, or after a few as a person's click takes), opens the list beside the box and chooses
+/// nothing (#5495 review): the full-height list doesn't fit below the box low in the panel, and
+/// it must not open over the box, where the release would pick the row under the pointer.
+#[test]
+fn a_click_on_the_blend_mode_box_opens_the_list_beside_it_and_changes_nothing() {
+    for held in [6, 1] {
+        let mut h = harness(pixel_layer);
+        let undo = steps(&h);
+        let button = dropdown(&h);
+        let at = button.center();
+        h.hover_at(at);
+        h.run_steps(1);
+        for (pressed, frames) in [(true, held), (false, 4)] {
+            h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() });
+            h.run_steps(frames);
+        }
+        assert_eq!((blend(&h), steps(&h)), (BlendMode::Normal, undo), "held {held}: the click chose nothing");
+        let Some(list) = open_list(&h) else { panic!("held {held}: the list is open") };
+        assert!(!list.intersects(button.shrink(1.0)), "held {held}: the list {list:?} leaves the box {button:?} free");
+        assert!(list.top() >= 0.0 && list.bottom() <= 900.0, "held {held}: the list {list:?} is in the window");
+    }
 }

@@ -293,18 +293,6 @@ const FIELD_MIN: f32 = 48.0;
 /// The width of the magnifier before the field.
 const ICON: f32 = 16.0;
 
-/// A combo box with a search: [`Self::search`] is `show_ui` with the typed text in a field above the
-/// rows.
-pub trait Searchable {
-    fn search<R>(self, ui: &mut Ui, filter: &Filter, rows: impl FnOnce(&mut Ui) -> R) -> egui::InnerResponse<Option<R>>;
-}
-
-impl Searchable for craft_ui::ComboBox<'_> {
-    fn search<R>(self, ui: &mut Ui, filter: &Filter, rows: impl FnOnce(&mut Ui) -> R) -> egui::InnerResponse<Option<R>> {
-        self.show_ui_with_header(ui, |ui| filter.header(ui), |ui, ()| rows(ui))
-    }
-}
-
 /// Searches the open list of dropdown `salt`: takes the typing and the keys that belong to the search.
 /// Call it before the combo box is shown, because a focused combo box button takes ↩ to toggle its
 /// list before the list gets to see the key. `labels` makes the options as displayed, only when the

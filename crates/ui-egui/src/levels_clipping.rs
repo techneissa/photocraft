@@ -49,6 +49,7 @@ pub enum ClipEnd {
 }
 
 impl ClipEnd {
+    /// The [`FIELD`] value that asks for this end.
     fn name(self) -> &'static str {
         match self {
             ClipEnd::Shadows => "shadows",
@@ -285,7 +286,7 @@ pub fn image(stats: &Stats, thresholds: &Thresholds, end: ClipEnd) -> Vec<Color3
 }
 
 /// What the display needs from the app: the end shown and the Levels adjustment, for the active
-/// document `idx`'s target. None when no Levels dialog shows clipping or the document can't.
+/// document's target layer.
 pub(crate) struct Request {
     end: ClipEnd,
     adj: Adjustment,
@@ -294,11 +295,20 @@ pub(crate) struct Request {
     target: LayerId,
 }
 
-/// The open Levels or Curves dialog's fields, if any.
+/// The open Levels or Curves dialog's fields, if any. A Smart Filter's Levels (`__smartFilter`) edits the
+/// filter, not the layer's pixels, so it has no display (`adjust_preview` keeps it off the layer
+/// path too).
 fn dialog(app: &PhotocraftApp) -> Option<&Map<String, Value>> {
-    app.ui.dialogs.iter().map(|d| &d.fields).find(|f| matches!(f.get("__adjust").and_then(Value::as_str), Some("levels" | "curves")))
+    app.ui
+        .dialogs
+        .iter()
+        .map(|d| &d.fields)
+        .find(|f| matches!(f.get("__adjust").and_then(Value::as_str), Some("levels" | "curves")) && !f.contains_key("__smartFilter"))
 }
 
+/// The display the open Levels dialog asks for on document `idx`. None when no Levels dialog
+/// shows clipping, `idx` isn't the active document, or the document can't show it: CMYK and Lab,
+/// a channel, mask or Quick Mask target, or a target that isn't a pixel layer.
 pub(crate) fn request(app: &PhotocraftApp, idx: usize) -> Option<Request> {
     let fields = dialog(app)?;
     let end = ClipEnd::parse(fields.get(FIELD))?;
@@ -329,8 +339,13 @@ pub struct Cache {
     tex: Option<egui::TextureHandle>,
 }
 
+/// Most blocks the display builds (2048 × 2048). A 2560×1440 canvas still gets one block per
+/// device pixel, a bigger one bigger blocks: the block stats stay under 50 MB, the texture at
+/// 16 MB, and a slider move near the 2 ms `levels_clipping_bench` measures for 3.7M blocks.
+const MAX_BLOCKS: u64 = 2048 * 2048;
+
 /// The visible part of the document in `xf` and the block size giving about one texel per screen
-/// pixel (`ppp` physical pixels per point), within `max_side` texels a side.
+/// pixel (`ppp` physical pixels per point), within `max_side` texels a side and [`MAX_BLOCKS`].
 fn view_area(xf: &ViewXform, bounds: Rect, ppp: f32, max_side: u32) -> Option<(Rect, u32)> {
     let device_zoom = xf.zoom * ppp;
     if !(device_zoom.is_finite() && device_zoom > 0.0) {
@@ -341,18 +356,33 @@ fn view_area(xf: &ViewXform, bounds: Rect, ppp: f32, max_side: u32) -> Option<(R
         return None;
     }
     let max_side = max_side.max(1);
-    let factor = ((1.0 / device_zoom).floor().clamp(1.0, 65536.0) as u32).max(visible.width().div_ceil(max_side)).max(visible.height().div_ceil(max_side));
-    // Snap to the block grid so panning keeps the blocks where they were.
-    let f = factor as i32;
-    let r = Rect::new(visible.x0.div_euclid(f) * f, visible.y0.div_euclid(f) * f, visible.x1, visible.y1).intersect(&bounds);
-    Some((r, factor))
+    let (w, h) = (visible.width(), visible.height());
+    let budget = ((u64::from(w) * u64::from(h)) as f64 / MAX_BLOCKS as f64).sqrt().ceil() as u32;
+    let mut factor = ((1.0 / device_zoom).floor().clamp(1.0, 65536.0) as u32).max(w.div_ceil(max_side)).max(h.div_ceil(max_side)).max(budget);
+    // Snap to the block grid so panning keeps the blocks where they were. That can widen the area
+    // by up to a block, so grow the blocks until the snapped area fits.
+    loop {
+        let f = i32::try_from(factor).ok()?;
+        let r = Rect::new(visible.x0.div_euclid(f) * f, visible.y0.div_euclid(f) * f, visible.x1, visible.y1).intersect(&bounds);
+        let (bw, bh) = (r.width().div_ceil(factor), r.height().div_ceil(factor));
+        if bw <= max_side && bh <= max_side && u64::from(bw) * u64::from(bh) <= MAX_BLOCKS {
+            return Some((r, factor));
+        }
+        factor = factor.checked_add(1)?;
+    }
 }
 
 /// Draw the Levels clipping display over the image in canvas view `xf` of document `idx`, if one
-/// is asked for. Drops the cache once no Levels dialog is open.
+/// is asked for. Drops the cache once no Levels dialog is open. Only the main canvas calls it:
+/// the one cache follows that view.
 pub fn paint(app: &mut PhotocraftApp, ctx: &egui::Context, painter: &egui::Painter, xf: &ViewXform, idx: usize) {
     if dialog(app).is_none() {
         app.levels_clipping = None;
+        return;
+    }
+    // A background job holds the workers and may replace the document: no thresholds, scan or
+    // image until it ends.
+    if app.session.has_jobs() {
         return;
     }
     let Some(req) = request(app, idx) else { return };

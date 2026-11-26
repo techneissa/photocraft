@@ -91,7 +91,13 @@ pub fn plan_with<'a>(doc: &'a Document, live: Option<&'a LiveTransform>) -> Resu
     if let Some(r) = live_root {
         p.retain_checkpoints(|c| c.layer_end <= r);
     }
-    Ok(p.finish(root))
+    let plan = p.finish(root);
+    // Every slot becomes a chunk-sized texture before the first pass runs: a compact document
+    // of deeply nested isolated groups must not ask for hundreds of them.
+    if plan.slots > planner::MAX_PLAN_SLOTS {
+        return Err(Unsupported(format!("{} accumulator slots, more than the {} the GPU keeps (composited on the CPU)", plan.slots, planner::MAX_PLAN_SLOTS)));
+    }
+    Ok(plan)
 }
 
 /// Is `id` the layer `l` or inside it (at most 256 groups deep)?

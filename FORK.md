@@ -87,4 +87,4 @@ update are fixed by the update script (both sides kept).
 
 Every feature's tests, by hand only: `fork/tests.sh` (or `fork/tests.sh <slug>...`). No merge or batch runs it.
 
-More: [GitHub builds](fork/github-builds.md), [Open as Layers interface (for LightCraft)](fork/open-as-layers-interface.md), [Known failures](fork/known-failures.md).
+More: [GitHub builds](fork/github-builds.md), [Fork translations](fork/i18n.md), [Open as Layers interface (for LightCraft)](fork/open-as-layers-interface.md), [Known failures](fork/known-failures.md).

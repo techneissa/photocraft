@@ -28,3 +28,5 @@ Photoshop's look: the brush circle (it stays where the drag began) is filled wit
 ```bash
 cargo test -p photocraft-ui-egui --lib -- brush_resize
 ```
+
+**Official merge of 2026-11-27:** the official HUD shows Diameter, Hardness and Opacity in three rows (`brush_hud_rate_tests.rs`). The fork keeps Photoshop's label: that official test checks the fork's lines instead, and `readout_label` stays only for its own test. The hardness rate and the opacity rate (`OPACITY_TRAVEL`) are the official ones; `travel` takes the scaled vertical movement.

@@ -78,8 +78,8 @@ pub fn navigator_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
         return ensure_texture(app, ctx, idx, app.session.color.main_display).map(|(t, _)| t);
     }
     // Keyed by the document snapshot, not its revision: selecting a layer changes no pixels.
-    let (snapshot, id, revision, last_damage) =
-        app.session.documents().get(idx).map(|st| (std::sync::Arc::downgrade(&st.doc), st.doc.id, st.revision, st.last_damage))?;
+    let (snapshot, id, revision, damage_from, last_damage) =
+        app.session.documents().get(idx).map(|st| (std::sync::Arc::downgrade(&st.doc), st.doc.id, st.revision, st.damage_from(), st.last_damage))?;
     let (doc, raw_key) = display_doc(app, idx);
     // The display depends on the document's profile and mode, which a live transform keeps, so
     // the cache check below needs none of the transform's CPU work (the moving pixels are drawn
@@ -121,14 +121,14 @@ pub fn navigator_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
         }
         ctx.data_mut(|d| d.insert_temp(stamp, t0));
     }
-    // One edit since the cached image, with the area it changed: update just that part (nothing
+    // One edit (or command) since the cached image, with the area it changed: update just that part (nothing
     // for a rename, a selection or a new empty layer). A thumbnail composite of the whole
     // document on every edit cost a full-resolution CPU composite on the UI thread.
     let size = photocraft_compose::thumbnail_size(&doc, NAVIGATOR_SIDE);
     if let Some((_, p, rev, t)) = &cached
         && *p == preview_key
         && !crate::transform_live::is_live_key(raw_key)
-        && rev.checked_add(1) == Some(revision)
+        && (damage_from..revision).contains(rev)
         && let Some(d) = last_damage
         && t.size() == [size.0 as usize, size.1 as usize]
     {

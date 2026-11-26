@@ -67,7 +67,15 @@ pub struct Runtime {
     show_rulers: Option<bool>,
     /// Tool options as last remembered in the preferences (see `tool_memory`).
     pub(crate) tool_options: Option<crate::state::ToolOptions>,
+    /// MCP settings the agent connection was last set up for (`agents::sync_agent_link`).
+    agent_link: Option<prefs::Integrations>,
+    /// When to try again after the agent connection failed to start (a taken port), in seconds of
+    /// `gpu_canvas::now_ms`; `None` while it runs or is off.
+    agent_link_retry: Option<f64>,
     pub(crate) selected_tool: Option<crate::state::Tool>,
+    pub(crate) tool_colors: Option<[[[f32; 4]; 2]; 2]>,
+    pub(crate) tool_cmyk_picks: crate::tool_memory::CmykPicks,
+    pub(crate) group_tools: Option<Vec<crate::state::Tool>>,
     /// The tool owning the session brush and the other tools' brushes, as last remembered.
     pub(crate) tool_brushes: Option<crate::tool_memory::ToolBrushes>,
     /// The Brush's own brush while Double Exposure's soft one stands in for it.
@@ -78,6 +86,7 @@ pub struct Runtime {
 
 pub use crate::shortcuts::{default_shortcut, effective_shortcut};
 
+mod agents;
 mod appearance;
 mod close_keys;
 mod dialogs;
@@ -130,6 +139,7 @@ pub use settings_folder::{offer_newer_file as offer_newer_sync_file, save_on_exi
 pub use shortcut_target::open_shortcuts_for;
 #[cfg(test)]
 pub(crate) use shortcuts::capture_key_press;
+pub(crate) use shortcuts::capturing_shortcut;
 pub use shortcuts::{is_modifier_key, reserved_shortcut, shortcut_items, shortcut_text};
 pub use shortcuts_window::{MIN as SHORTCUTS_MIN, SIZE as SHORTCUTS_SIZE, is_window as is_shortcuts, size_id as shortcuts_size_id};
 pub use startup::load;
@@ -137,6 +147,8 @@ pub(crate) use startup::{on_recovery_event, remember_rulers};
 
 // Test modules stay after the production code: the prefs_usage test reads each file up to
 // its first `#[cfg(test)] mod`.
+#[cfg(test)]
+mod agents_tests;
 #[cfg(test)]
 mod close_keys_tests;
 #[cfg(test)]

@@ -149,6 +149,12 @@ jobs:
           git -C "$RUNNER_TEMP/craft-fonts" checkout --quiet --detach "$ref"
           echo "CRAFT_FONTS_DIR=$RUNNER_TEMP/craft-fonts" >> "$GITHUB_ENV"
 
+      # The translations at the commit in craft-i18n.rev, as the official release embeds them
+      # (sets CRAFT_I18N_DIR and CRAFT_I18N_REQUIRED=1); the fork's own rows come from fork/i18n.
+      - name: Check out craft-i18n
+        if: steps.built.outputs.skip != 'true'
+        uses: storytold/craft-common-actions/actions/checkout-craft-i18n@main
+
       - name: Build the app
         if: steps.built.outputs.skip != 'true'
         # Fast compile, not the fastest app (techneissa, 2026-11-03): 16 code units per crate and no

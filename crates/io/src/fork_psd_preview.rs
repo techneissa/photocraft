@@ -5,7 +5,7 @@
 //! preview in moments. `None` means the file has neither (or only one this does not read); the
 //! caller then imports it as usual.
 
-use photocraft_psd::{FileSource, PsdFile, ReadAt, Source, header::ColorMode, resources::ids};
+use craft_psd::{FileSource, PsdFile, ReadAt, Source, header::ColorMode, resources::ids};
 
 /// A preview image: 8-bit RGBA in the colours of `icc` (sRGB when `None`). `full` is the file's own
 /// size in pixels, from its header.
@@ -139,7 +139,7 @@ pub fn merged(source: Source, max_side: u32) -> Option<PsdPreview> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use photocraft_psd::{ImageResource, PsdBuilder, builder::PixelData};
+    use craft_psd::{ImageResource, PsdBuilder, builder::PixelData};
 
     fn jpeg(w: u32, h: u32, rgb: [u8; 3]) -> Vec<u8> {
         let data: Vec<u8> = (0..w * h).flat_map(|_| rgb).collect();

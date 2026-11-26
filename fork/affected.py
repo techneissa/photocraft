@@ -47,13 +47,11 @@ WEIGHT_OVERRIDES = {
     "photocraft-gpu": 170,
     "photocraft-compose": 90,
     "photocraft-format": 60,
-    "photocraft-codecs": 70,
     "photocraft": 300,
     "photocraft-cli": 150,
     "photocraft-web": 150,
     "photocraft-web-boot": 150,
     "photocraft-automation": 60,
-    "photocraft-psd": 40,
     "xtask": 90,
 }
 DEFAULT_WEIGHT = 30
