@@ -76,7 +76,10 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String>
     // Fork (transform-live-blend): the canvas composites the moving pixels in the layer's place,
     // with the layers above it on top (transform_live.rs).
     let rest = lifted.as_ref().and_then(|_| pd.layer(id)).and_then(|l| l.surface()).cloned();
-    let live = crate::transform_live::LiveSession::start(&doc, revision, id, lifted.as_ref(), rest.as_ref());
+    // A smart object with a stored warp keeps the official texels: Warp mode swaps them for its
+    // unwarped source (#9798, `preview_without_smart_warp`), which the live layer can't show.
+    let stored_warp = matches!(&layer.content, LayerContent::Smart(sm) if sm.warp.is_some());
+    let live = if stored_warp { None } else { crate::transform_live::LiveSession::start(&doc, revision, id, lifted.as_ref(), rest.as_ref()) };
     let live_preview = live.is_some();
     // Otherwise (an adjustment layer's mask) the layers covering the moving pixels draw over them
     // instead of under them.

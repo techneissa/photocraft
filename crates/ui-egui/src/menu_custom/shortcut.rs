@@ -21,6 +21,22 @@ pub fn show<'a>(app: &PhotocraftApp, id: &str, button: egui::Button<'a>) -> egui
     }
 }
 
+/// Add a menu row made by [`show`], named `label` alone: egui names a button by all its text, the
+/// shortcut too, so screen readers (and lookups by label) would read "Reselect ⇧⌘D".
+/// `selected` is the row's check state, for a selectable row.
+pub fn add(ui: &mut egui::Ui, enabled: bool, app: &PhotocraftApp, id: &str, label: &str, selected: Option<bool>, button: egui::Button<'_>) -> egui::Response {
+    let has = text(app, id).is_some();
+    let response = ui.add_enabled(enabled, show(app, id, button));
+    if has {
+        let on = response.enabled();
+        response.widget_info(|| match selected {
+            Some(s) => egui::WidgetInfo::selected(egui::Role::Button, on, s, label),
+            None => egui::WidgetInfo::labeled(egui::Role::Button, on, label),
+        });
+    }
+    response
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

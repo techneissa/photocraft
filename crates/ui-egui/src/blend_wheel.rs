@@ -23,15 +23,23 @@ fn enabled(ctx: &Context) -> bool {
     ctx.data(|d| d.get_temp::<bool>(flag())).unwrap_or(false)
 }
 
-/// A blend mode dropdown: [`widgets::dropdown_wheel_hovered`] when the preference is on, else the
-/// same dropdown that the wheel doesn't touch. Returns the options chosen this frame in order
-/// (a click or arrow key gives one; each wheel notch one more) and the option under the pointer.
-pub(crate) fn dropdown<T: PartialEq + Clone>(ui: &mut Ui, id: &str, name: &str, current: &mut T, options: &[(T, &str)], width: f32) -> (Vec<T>, Option<T>) {
+/// A blend mode dropdown: [`widgets::dropdown_wheel_grouped`] when the preference is on, else the
+/// same dropdown that the wheel doesn't touch; both draw a line above each option `starts_group`
+/// names (#5532). Returns the options chosen this frame in order (a click or arrow key gives one;
+/// each wheel notch one more) and the option under the pointer.
+pub(crate) fn dropdown<T: PartialEq + Clone>(
+    ui: &mut Ui,
+    id: &str,
+    name: &str,
+    current: &mut T,
+    options: &[(T, &str)],
+    width: f32,
+    starts_group: impl Fn(&T) -> bool,
+) -> (Vec<T>, Option<T>) {
     if enabled(ui.ctx()) {
-        return widgets::dropdown_wheel_hovered(ui, id, name, current, options, width);
+        return widgets::dropdown_wheel_grouped(ui, id, name, current, options, width, starts_group);
     }
-    let (changed, hovered) = widgets::dropdown_hovered(ui, id, name, current, options, width);
-    (if changed { vec![current.clone()] } else { Vec::new() }, hovered)
+    widgets::dropdown_grouped_hovered(ui, id, name, current, options, width, starts_group)
 }
 
 #[cfg(test)]

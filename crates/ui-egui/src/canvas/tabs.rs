@@ -423,8 +423,11 @@ fn tab_menu(app: Option<&crate::PhotocraftApp>, ui: &mut egui::Ui, index: usize,
                 continue;
             };
             let button = egui::Button::new(tl!(label));
-            let button = if let Some(app) = app { crate::menu_custom::shortcut::show(app, id, button) } else { button };
-            if ui.add_enabled(*enabled, button).clicked() {
+            let clicked = match app {
+                Some(app) => crate::menu_custom::shortcut::add(ui, *enabled, app, id, tl!(label), None, button).clicked(),
+                None => ui.add_enabled(*enabled, button).clicked(),
+            };
+            if clicked {
                 ui.close();
                 return Some((*id, params.clone()));
             }

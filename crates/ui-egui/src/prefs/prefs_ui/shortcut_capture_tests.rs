@@ -574,6 +574,9 @@ fn the_mac_menu_bar_hands_its_keys_to_a_waiting_shortcut_field() {
     h.run_steps(2);
     assert_eq!(field(&h, id, "overrides")["edit.search"], json!("Cmd+Alt+Z"));
     assert_eq!(document_state(&h), before, "⌘⌥Z didn't step the History");
+    // Fork (shortcuts-window): Enter accepts the recording, as in VS Code.
+    h.key_press(Key::Enter);
+    h.run_steps(2);
     assert_eq!(field(&h, id, "capture"), json!(false));
     assert_eq!(enabled("edit.undo"), Some(false), "the rows are disabled again once the key is recorded");
     // A click that raced the update still doesn't run under the dialog.

@@ -235,33 +235,33 @@ fn the_builder_adds_a_part_to_a_condition() {
 #[test]
 fn a_key_may_be_shared_when_the_conditions_exclude_each_other() {
     let (mut h, id) = dialog("edit.cut", "Cut");
-    // Copy has F9; Cut takes F9 too, and the two differ by When
-    set_field(&mut h, id, "overrides", json!({"edit.copy": "F9"}));
+    // Copy has F13; Cut takes F13 too, and the two differ by When
+    set_field(&mut h, id, "overrides", json!({"edit.copy": "F13"}));
     set_field(&mut h, id, "when", json!({"edit.copy": "tool == brush", "edit.cut": "tool != brush"}));
     h.run_steps(2);
     h.get_by_label(&crate::shortcuts::pretty("Cmd+X")).click();
     h.run_steps(2);
-    key(&mut h, Key::F9, true, Modifiers::NONE);
+    key(&mut h, Key::F13, true, Modifiers::NONE);
     h.run_steps(2);
     h.key_press(Key::Enter);
     h.run_steps(2);
-    assert_eq!(field(&h, id, "overrides")["edit.cut"], json!("F9"));
+    assert_eq!(field(&h, id, "overrides")["edit.cut"], json!("F13"));
     assert_eq!(field(&h, id, "conflict"), Value::Null, "no clash: they never hold together");
     crate::dialogs::confirm(h.state_mut(), id).unwrap();
     let p = h.state().session.prefs();
-    assert_eq!(p.shortcuts.get("edit.copy").map(String::as_str), Some("F9"), "Copy keeps F9");
-    assert_eq!(p.shortcuts.get("edit.cut").map(String::as_str), Some("F9"));
+    assert_eq!(p.shortcuts.get("edit.copy").map(String::as_str), Some("F13"), "Copy keeps F13");
+    assert_eq!(p.shortcuts.get("edit.cut").map(String::as_str), Some("F13"));
 }
 
 #[test]
 fn the_same_key_clashes_when_the_conditions_overlap() {
     let (mut h, id) = dialog("edit.cut", "Cut");
-    set_field(&mut h, id, "overrides", json!({"edit.copy": "F9"}));
+    set_field(&mut h, id, "overrides", json!({"edit.copy": "F13"}));
     set_field(&mut h, id, "when", json!({"edit.copy": "tool == brush", "edit.cut": "hasDocument"}));
     h.run_steps(2);
     h.get_by_label(&crate::shortcuts::pretty("Cmd+X")).click();
     h.run_steps(2);
-    key(&mut h, Key::F9, true, Modifiers::NONE);
+    key(&mut h, Key::F13, true, Modifiers::NONE);
     h.run_steps(2);
     h.key_press(Key::Enter);
     h.run_steps(2);
@@ -338,7 +338,7 @@ fn a_dialog_made_by_an_older_build_still_works() {
 fn a_clash_gets_a_warning_note_only_when_the_conditions_can_hold_together() {
     let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let items = crate::prefs_ui::shortcut_items(&app);
-    let overrides: std::collections::BTreeMap<String, String> = [("edit.copy", "F9"), ("edit.cut", "F9")].map(|(a, b)| (a.to_string(), b.to_string())).into();
+    let overrides: std::collections::BTreeMap<String, String> = [("edit.copy", "F13"), ("edit.cut", "F13")].map(|(a, b)| (a.to_string(), b.to_string())).into();
     let alts = Default::default();
     let notes = |chords: &std::collections::BTreeMap<String, String>, whens: &std::collections::BTreeMap<String, String>| {
         super::shortcuts_when::clash_notes(&items, (&overrides, &alts), chords, whens)
@@ -351,7 +351,7 @@ fn a_clash_gets_a_warning_note_only_when_the_conditions_can_hold_together() {
     whens.insert("edit.cut".into(), "tool != brush".into());
     assert!(notes(&none, &whens).is_empty(), "they never hold together");
     // a chord whose first key is another command's key
-    let chords: std::collections::BTreeMap<String, String> = [("edit.paste", "F9 V")].map(|(a, b)| (a.to_string(), b.to_string())).into();
+    let chords: std::collections::BTreeMap<String, String> = [("edit.paste", "F13 V")].map(|(a, b)| (a.to_string(), b.to_string())).into();
     let n = notes(&chords, &none);
     assert!(n["edit.paste"].contains("waits for the chord's second key"), "{n:?}");
 }

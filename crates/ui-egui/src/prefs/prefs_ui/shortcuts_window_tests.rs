@@ -393,7 +393,7 @@ fn the_open_recent_files_are_not_listed_but_clear_recent_files_is() {
         open(&mut h, command, &[]);
         assert!(h.query_by_label_contains("sample-1.png").is_none(), "{command}: no recent file");
         assert!(h.query_by_label_contains("sample-2.png").is_none());
-        assert!(h.query_all_by_label_contains("Clear Recent Files").count() >= 1, "{command}: Clear Recent Files stays");
+        assert!(h.query_all_by_label_contains("Clear Recent File List").count() >= 1, "{command}: Clear Recent File List stays");
     }
 }
 

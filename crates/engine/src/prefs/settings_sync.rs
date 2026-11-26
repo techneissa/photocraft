@@ -79,6 +79,8 @@ pub const NOT_IN_FILE: &[(&str, &str)] = &[
     ("lastBrush", "the brush in use"),
     ("toolBrushes", "the brush of each tool"),
     ("selectedTool", "the tool in use"),
+    ("groupTools", "the tool each toolbar slot was left on"),
+    ("toolColors", "the foreground and background colours in use"),
     ("scriptEvents", "script files of this Mac"),
     ("sync", "the sync folder and state of this Mac"),
 ];
@@ -512,14 +514,23 @@ fn read_menus(next: &mut Preferences, v: &Value, cx: &mut Cx) {
 
 fn read_toolbar(next: &mut Preferences, v: &Value, checks: &SettingsChecks, cx: &mut Cx) {
     if let Some(obj) = v.as_object() {
-        only_keys(obj, &["hidden", "order"], "toolbar", cx);
+        only_keys(obj, &["hidden", "order", "toolbar", "extras"], "toolbar", cx);
     }
     match serde_json::from_value::<ToolbarCustomization>(v.clone()) {
         Ok(mut toolbar) => {
-            let before = toolbar.hidden.len() + toolbar.order.len();
+            // The official layout (Edit › Toolbar): slots and Extra Tools, groups of tool names.
+            let count = |t: &ToolbarCustomization| {
+                let groups = |g: &Option<Vec<Vec<String>>>| g.iter().flatten().map(Vec::len).sum::<usize>();
+                t.hidden.len() + t.order.len() + groups(&t.toolbar) + groups(&t.extras)
+            };
+            let before = count(&toolbar);
             toolbar.hidden.retain(|t| (checks.tool_ok)(t));
             toolbar.order.retain(|t| (checks.tool_ok)(t));
-            if toolbar.hidden.len() + toolbar.order.len() < before {
+            for groups in [&mut toolbar.toolbar, &mut toolbar.extras].into_iter().flatten() {
+                groups.iter_mut().for_each(|g| g.retain(|t| (checks.tool_ok)(t)));
+                groups.retain(|g| !g.is_empty());
+            }
+            if count(&toolbar) < before {
                 cx.note("Toolbar: left out tools this PhotoCraft doesn't have");
             }
             next.toolbar = toolbar;

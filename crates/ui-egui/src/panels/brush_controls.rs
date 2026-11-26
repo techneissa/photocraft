@@ -16,9 +16,9 @@ pub(super) fn tool_mode_dropdown(
         _ => m.map_or("Clear", BlendMode::label),
     };
     let opts: Vec<(Option<BlendMode>, &str)> = modes.iter().map(|m| (*m, label(m))).collect();
-    let _grouped = BlendMode::LAYER_MODES.iter().all(|m| modes.contains(&Some(*m)));
+    let grouped = BlendMode::LAYER_MODES.iter().all(|m| modes.contains(&Some(*m)));
     let mut mode = current;
-    let chosen = crate::blend_wheel::dropdown(ui, id, tl!("Mode"), &mut mode, &opts, 96.0).0;
+    let chosen = crate::blend_wheel::dropdown(ui, id, tl!("Mode"), &mut mode, &opts, 96.0, |m| grouped && m.is_some_and(starts_blend_group)).0;
     chosen.last().copied()
 }
 
@@ -34,7 +34,7 @@ pub(super) fn paint_mode_dropdown(ui: &mut egui::Ui, id: &str, b: &mut photocraf
     } else {
         (Some(b.mode), false)
     };
-    if !crate::blend_wheel::dropdown(ui, id, tl!("Mode"), &mut mode, &opts, 96.0).0.is_empty() {
+    if !crate::blend_wheel::dropdown(ui, id, tl!("Mode"), &mut mode, &opts, 96.0, |m| m.0.is_some_and(starts_blend_group)).0.is_empty() {
         *clear = mode == (None, false);
         b.behind = mode.1;
         if mode.1 {

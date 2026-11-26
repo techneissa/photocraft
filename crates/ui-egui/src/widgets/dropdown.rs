@@ -38,6 +38,20 @@ pub fn dropdown_enabled<T: PartialEq + Clone>(
 }
 
 /// [`dropdown`], also returning the option under the pointer in its open list (live previews).
+/// Fork (blend-list): [`dropdown_hovered`] with [`dropdown_wheel_grouped`]'s group lines, for a blend
+/// mode list the wheel doesn't step (`blend_wheel`). Returns what was chosen, as the wheel variants do.
+pub fn dropdown_grouped_hovered<T: PartialEq + Clone>(
+    ui: &mut Ui,
+    id: &str,
+    name: &str,
+    current: &mut T,
+    options: &[(T, &str)],
+    width: f32,
+    starts_group: impl Fn(&T) -> bool,
+) -> (Vec<T>, Option<T>) {
+    dropdown_with(ui, id, name, current, options, width, false, true, &starts_group, &|_| true)
+}
+
 pub fn dropdown_hovered<T: PartialEq + Clone>(ui: &mut Ui, id: &str, name: &str, current: &mut T, options: &[(T, &str)], width: f32) -> (bool, Option<T>) {
     let (chosen, hovered) = dropdown_with(ui, id, name, current, options, width, false, true, &|_| false, &|_| true);
     (!chosen.is_empty(), hovered)

@@ -1854,10 +1854,10 @@ pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
                     if let Some(kind) = command.strip_prefix(CROP_OVERLAY).and_then(crate::crop_overlay::CropOverlay::from_id) {
                         atoms.push_right(crate::icons::image(kind.icon(), 14.0, t.icon));
                     }
-                    atoms.push_right(text);
-                    let item = egui::Button::selectable(mode_checked(app, &menu, &command), atoms).min_size(egui::vec2(200.0, 20.0));
-                    let item = crate::menu_custom::shortcut::show(app, &command, item);
-                    if ui.add_enabled(entry_enabled(app, &menu, &command), item).clicked() {
+                    atoms.push_right(text.clone());
+                    let checked = mode_checked(app, &menu, &command);
+                    let item = egui::Button::selectable(checked, atoms).min_size(egui::vec2(200.0, 20.0));
+                    if crate::menu_custom::shortcut::add(ui, entry_enabled(app, &menu, &command), app, &command, &text, Some(checked), item).clicked() {
                         selected = Some(command);
                     }
                 }
@@ -1879,9 +1879,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &Context) {
                         "Rasterize Vector Mask" => tl!("Rasterize Vector Mask"),
                         key => tl!(key),
                     };
-                    let item = egui::Button::selectable(mode_checked(app, &menu, command), text).min_size(egui::vec2(200.0, 20.0));
-                    let item = crate::menu_custom::shortcut::show(app, command, item);
-                    if ui.add_enabled(entry_enabled(app, &menu, command), item).clicked() {
+                    let checked = mode_checked(app, &menu, command);
+                    let item = egui::Button::selectable(checked, text).min_size(egui::vec2(200.0, 20.0));
+                    if crate::menu_custom::shortcut::add(ui, entry_enabled(app, &menu, command), app, command, text, Some(checked), item).clicked() {
                         selected = Some((*command).to_string());
                     }
                 }

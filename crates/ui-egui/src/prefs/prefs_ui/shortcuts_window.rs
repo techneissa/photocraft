@@ -7,7 +7,7 @@ use serde_json::{Map, Value};
 /// The size the window opens at: wide enough for the Toolbar tab's four columns, and tall enough
 /// for its 15 rows without scrolling (the tools in four columns). A smaller screen gets the
 /// largest the window may be.
-pub const SIZE: egui::Vec2 = egui::vec2(1000.0, 640.0);
+pub const SIZE: egui::Vec2 = egui::vec2(1000.0, 660.0);
 
 /// The smallest the window is dragged to: the command, key, further keys and When columns still fit.
 pub const MIN: egui::Vec2 = egui::vec2(820.0, 420.0);
