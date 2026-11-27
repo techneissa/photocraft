@@ -30,11 +30,10 @@ ui-egui `lib.rs` (two `mod` lines, the `levels_clipping` field), `app.rs` (its i
 
 ## Tests
 
-ui-egui `levels_clipping curves_clipping`; the speed numbers come from the two ignored benchmarks.
+ui-egui `levels_clipping curves_clipping curve_points`.
 
 ```bash
 cargo test -p photocraft-ui-egui --lib -- levels_clipping curves_clipping
-cargo test -p photocraft-ui-egui --lib -- clipping_bench --ignored --nocapture --test-threads=1
 ```
 
 ## When upstream merges
@@ -43,4 +42,13 @@ If #3693 merges (it is open and conflicts with `main`), take its version of the 
 
 ## After the craft UI merge (2026-11-27)
 
-Compiled out, awaiting rebuild: upstream merged PR #3693 (Levels clipping); the fork's Curves clipping is gone. Rebuild: rebuild Curves ⌥-drag clipping and point sliders (`curves_clipping.rs`, `dialogs/adjust_editors/curve_points.rs`).
+Levels: the official project took it (PR #3693): the craft Levels editor reports an ⌥-drag of the black or white Input thumb, `levels_clipping.rs` draws it. Nothing of the fork's Levels part is left.
+
+Curves: the craft Curves panel has no clipping and no black or white point sliders, so the fork's Curves part is rebuilt on top of the official display, with no craft-libs patch:
+- `curves_clipping.rs` (thresholds of a Curves adjustment, as before) is back; `levels_clipping.rs` now serves the Curves dialog too (`dialog`, `request`, `adjustment_thresholds`).
+- `dialogs/adjust_editors/curve_points.rs`: a row under the panel with the Show Clipping checkbox and a two-thumb row (Black Point, White Point) that moves the curve's first and last point along the input axis. ⌥-drag of a thumb, or any drag with Show Clipping on, sets the dialog's clipping end, as the Levels panel does. The thumbs span the dialog's width, not the graph's. Pencil mode has no points, so no row. Dialog only (not the Properties panel).
+- `adjust_editors.rs`: `mod curve_points`, the `report_clipping` helper (the Levels arm's code, moved), the call in the `curves` arm.
+
+Not rebuilt: the old speed benchmarks and the `__showClipping` automation field (Show Clipping is view state; automation sets the dialog's `clipping` field).
+
+Tests: `curves_clipping_tests.rs` (compositor and Camera Raw oracle, slider levels, hostile curves, synthetic image, the dialog asking for the display) and `curve_points.rs` (`with_ends`).

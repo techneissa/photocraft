@@ -207,7 +207,7 @@ pub fn image(stats: &Stats, thresholds: &Thresholds, end: LevelsClip) -> Vec<Col
 
 /// What the display needs from the app: the end shown and the Levels adjustment, for the active
 /// document's target layer.
-struct Request {
+pub(crate) struct Request {
     end: LevelsClip,
     adj: Adjustment,
     doc: std::sync::Arc<photocraft_doc::Document>,
@@ -215,20 +215,30 @@ struct Request {
     target: LayerId,
 }
 
-/// Whether a Levels dialog is open. A Smart Filter's Levels edits the filter, not the layer's pixels, so
-/// it has no display (`adjust_preview` keeps it off the layer path too).
+/// Whether a Levels or Curves dialog is open. A Smart Filter's Levels or Curves edits the filter, not the layer's
+/// pixels, so it has no display (`adjust_preview` keeps it off the layer path too).
 fn dialog(app: &PhotocraftApp) -> Option<&crate::adjust_dialog::OpenAdjust> {
-    crate::adjust_dialog::open_value(app).filter(|open| open.kind == "levels" && open.smart_filter.is_none())
+    // fork: the Curves dialog shows clipping too (fork/levels-curves-clipping.md).
+    crate::adjust_dialog::open_value(app).filter(|open| matches!(open.kind.as_str(), "levels" | "curves") && open.smart_filter.is_none())
+}
+
+/// The [`Thresholds`] of `adj`: Levels' or, fork, Curves' (`curves_clipping.rs`).
+pub fn adjustment_thresholds(adj: &Adjustment, depth: SampleType) -> Option<Thresholds> {
+    match adj {
+        Adjustment::Curves { .. } => crate::curves_clipping::thresholds(adj, depth),
+        _ => thresholds(adj, depth),
+    }
 }
 
 /// The display the open Levels dialog asks for on document `idx`. None when no Levels dialog
 /// shows clipping, `idx` isn't the active document, or the document can't show it: CMYK and Lab,
 /// a channel, mask or Quick Mask target, or a target that isn't a pixel layer.
-fn request(app: &PhotocraftApp, idx: usize) -> Option<Request> {
+pub(crate) fn request(app: &PhotocraftApp, idx: usize) -> Option<Request> {
     let open = dialog(app)?;
     let end = crate::adjust_dialog::hosted(app, open.id)?.clipping()?;
     let params = crate::adjust_dialog::open_params(app)?;
-    if app.session.active_index() != Some(idx) || crate::adjust_preview::targets_channel(app, idx, "levels", &params) {
+    let kind = open.kind.as_str();
+    if app.session.active_index() != Some(idx) || crate::adjust_preview::targets_channel(app, idx, kind, &params) {
         return None;
     }
     let st = app.session.documents().get(idx)?;
@@ -239,7 +249,7 @@ fn request(app: &PhotocraftApp, idx: usize) -> Option<Request> {
     if !matches!(st.doc.layer(target).map(|l| &l.content), Some(LayerContent::Raster(_))) {
         return None;
     }
-    let adj = photocraft_engine::adjust_params::from_params("levels", &params, None, st.doc.mode).ok()?;
+    let adj = photocraft_engine::adjust_params::from_params(kind, &params, None, st.doc.mode).ok()?;
     Some(Request { end, adj, doc: st.doc.clone(), revision: st.revision, target })
 }
 
@@ -301,7 +311,7 @@ pub fn shapes(app: &mut PhotocraftApp, ctx: &egui::Context, view: &CanvasView, i
         return Vec::new();
     }
     let Some(req) = request(app, idx) else { return Vec::new() };
-    let Some(thr) = thresholds(&req.adj, req.doc.pixel_format().sample) else { return Vec::new() };
+    let Some(thr) = adjustment_thresholds(&req.adj, req.doc.pixel_format().sample) else { return Vec::new() };
     let max_side = (ctx.input(|i| i.max_texture_side) as u32).clamp(256, 8192);
     let Some((rect, factor)) = view_area(view, req.doc.bounds(), ctx.pixels_per_point(), max_side) else { return Vec::new() };
     let key = (req.doc.id, req.revision, req.target, rect, factor);
