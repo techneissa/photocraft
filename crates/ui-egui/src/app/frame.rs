@@ -108,6 +108,7 @@ impl PhotocraftApp {
         // shortcuts see Esc).
         if !screen_picker::tick(self, ctx) {
             jobs_ui::tick(self, ctx);
+            crate::sam3_ui::tick(self, ctx);
             #[cfg(not(target_arch = "wasm32"))]
             crate::dialogs::filter_preview_worker::discard_closed(self);
             // `fired` and `delivered` come only from the runtime's last pass, so a hidden logic

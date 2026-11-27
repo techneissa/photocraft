@@ -39,6 +39,9 @@ use crate::canvas::display_image;
 use crate::dialogs::shared_picture::SharedPicture;
 use crate::outline::SurfaceMask;
 
+mod protect;
+pub(crate) use protect::ProtectUi;
+
 /// Longest side of the reduced copy the preview runs on (px), unless High Quality Preview.
 const PROXY_SIDE: usize = 1600;
 const CMD: &str = crate::select_mask_view::COMMAND;
@@ -156,6 +159,8 @@ pub(crate) struct PcSelectMaskSource {
     display: Option<Arc<photocraft_engine::display_color::CanvasDisplay>>,
     image: Arc<SharedPicture>,
     shared: Arc<Shared>,
+    /// SAM 3 for the edits that ask for Protect Subject (`protect::finders`).
+    protect: Mutex<protect::Finders>,
 }
 
 impl PcSelectMaskSource {
@@ -179,7 +184,7 @@ impl PcSelectMaskSource {
             error: Mutex::new(None),
             last_request: Mutex::new(None),
         });
-        PcSelectMaskSource { doc, revision, layer, target_mask, k, display, image, shared }
+        PcSelectMaskSource { doc, revision, layer, target_mask, k, display, image, shared, protect: Mutex::new(Vec::new()) }
     }
 
     /// The source over the active document as it is now.
@@ -206,6 +211,7 @@ impl PcSelectMaskSource {
             target_mask: self.target_mask,
             edits: request.session.edits.iter().filter_map(|e| serde_json::to_value(e).ok()).collect(),
             params,
+            protect: lock(&self.protect).clone(),
             recipe: request.recipe.clone(),
             cache: lock(&self.shared.cache).clone(),
         }
@@ -270,6 +276,8 @@ struct Job {
     edits: Vec<Value>,
     /// The refinement params with `refineStrokes`, without `edits`.
     params: Value,
+    /// SAM 3 for Refine Hair's Protect Subject (the Sample All Layers choice each finder is encoded for).
+    protect: protect::Finders,
     recipe: MaskViewRecipe,
     cache: Option<Cache>,
 }
@@ -299,6 +307,8 @@ pub(crate) fn describe(app: &PhotocraftApp) -> Option<Value> {
         "selectedProxyPixels": shared.selected.load(Ordering::Acquire),
         "previewReady": shared.view.is_ready(),
         "previewError": *lock(&shared.error),
+        "protectSubject": app.select_mask_protect.on && app.select_mask_protect.possible,
+        "refineHairWaiting": app.select_mask_protect.waiting(),
     }))
 }
 
@@ -334,7 +344,10 @@ pub fn open(app: &mut PhotocraftApp) -> Result<DialogId, String> {
     // PLAN: the navigation, transparency-grid and cursor preferences have no app accessor in this tree; the workspace
     // opens with the framework's defaults for them.
     let open = SelectMaskOpen::new(size, subject, limits).settings(settings).target_mask(target_mask).remember(REMEMBERED);
-    let hosted = HostedWorkspace::new(SelectMaskWorkspace::new(open), Arc::clone(&source) as Arc<dyn SelectMaskSource>).held_ok();
+    protect::load(app);
+    let mut workspace = SelectMaskWorkspace::new(open);
+    workspace.refine_hair(Some(protect::control(app)));
+    let hosted = HostedWorkspace::new(workspace, Arc::clone(&source) as Arc<dyn SelectMaskSource>).held_ok();
     let dialog = app.framework.dialogs.open(hosted);
     app.select_mask_target = Some((dialog, document, layer, source));
     Ok(dialog)
@@ -360,21 +373,38 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
         // Finished: OK ran its command when it was held, so the result carries nothing more to do.
         let _ = app.framework.dialogs.take::<Hosted>();
         app.select_mask_target = None;
+        protect::closed(app);
         return;
     }
     if let Some(why) = stale(app) {
         app.framework.dialogs.cancel_by_id(ctx, id);
         let _ = app.framework.dialogs.take::<Hosted>();
         app.select_mask_target = None;
+        protect::closed(app);
         app.ui.status = why.into();
         app.ui.status_error = true;
         return;
     }
     let events = app.framework.dialogs.get_mut_by_id::<Hosted>(id).map(Hosted::take_events).unwrap_or_default();
     for event in events {
-        if let SelectMaskEvent::PickColor(request) = event {
-            crate::color_picker_ui::open_for_request(app, id, request);
+        match event {
+            SelectMaskEvent::PickColor(request) => {
+                crate::color_picker_ui::open_for_request(app, id, request);
+            }
+            SelectMaskEvent::RefineHair(hair) => protect::on_event(app, ctx, id, hair),
+            _ => {}
         }
+    }
+    protect::tick(app, ctx, id);
+    protect::refresh(app);
+    let control = protect::control(app);
+    let edits = app.framework.dialogs.get_by_id::<Hosted>(id).map(|h| h.workspace().session().edits.clone()).unwrap_or_default();
+    let finders = protect::finders(app, &edits);
+    if let Some(source) = source(app) {
+        *lock(&source.protect) = finders;
+    }
+    if let Some(hosted) = app.framework.dialogs.get_mut_by_id::<Hosted>(id) {
+        hosted.workspace_mut().refine_hair(Some(control));
     }
     if let Some((key, color)) = crate::color_picker_ui::answer_for(app, id)
         && let Some(hosted) = app.framework.dialogs.get_mut_by_id::<Hosted>(id)
@@ -406,6 +436,13 @@ fn follow_revision(app: &mut PhotocraftApp, id: DialogId) {
 /// is lost.
 fn run_held_ok(app: &mut PhotocraftApp, id: DialogId) {
     let Some(done) = app.framework.dialogs.get_mut_by_id::<Hosted>(id).and_then(Hosted::take_ok) else { return };
+    if app.select_mask_protect.waiting() {
+        let why = tl!("Refine Hair is waiting for SAM 3 (Stop Refine Hair first)");
+        if let Some(hosted) = app.framework.dialogs.get_mut_by_id::<Hosted>(id) {
+            hosted.answer_ok(Err(why.into()));
+        }
+        return;
+    }
     let target_mask = source(app).is_some_and(|s| s.target_mask);
     let answer = app.run(CMD, command_params(&done.command, target_mask));
     if let Err(e) = &answer {
@@ -440,6 +477,10 @@ fn scale_edit(e: &Value, k: u32) -> Value {
     }
     if let Some(size) = o.get("size").and_then(Value::as_f64) {
         o.insert("size".into(), json!((size / k).max(1.0)));
+    }
+    // Refine Hair's band: 0 stays the default radius, which is then taken on the reduced copy too.
+    if let Some(radius) = o.get("radius").and_then(Value::as_f64).filter(|r| *r > 0.0) {
+        o.insert("radius".into(), json!((radius / k).max(1.0)));
     }
     e
 }
@@ -514,7 +555,11 @@ fn compute(job: Job, cancel: &Cancel) -> Result<Computed, String> {
     };
     let scaled = |list: &[Value]| -> Result<Vec<select_mask_edits::SelectionEdit>, String> {
         let list: Vec<Value> = list.iter().map(|e| scale_edit(e, k)).collect();
-        select_mask_edits::parse(&json!({ "edits": list })).map_err(|e| e.to_string())
+        let mut edits = select_mask_edits::parse(&json!({ "edits": list })).map_err(|e| e.to_string())?;
+        for (all, finder) in &job.protect {
+            select_mask_edits::attach(&mut edits, k, &mut |a| (a == *all).then(|| finder.clone()));
+        }
+        Ok(edits)
     };
     // With no edits yet, the selection Select and Mask starts from is where the first one starts.
     let mut base_cache = BaseCache { k, revision: job.revision, edits: Vec::new(), base: start() };

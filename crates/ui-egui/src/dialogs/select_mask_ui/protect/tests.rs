@@ -1,5 +1,5 @@
-//! Protect Subject in the workspace against a fake SAM 3 (no model): the box, its remembered
-//! state, the wait for the encoding, Esc, and a failed encoding.
+//! Refine Hair and Protect Subject in the workspace against a fake SAM 3 (no model): the box, its remembered
+//! state, the wait for the encoding, Stop, and a failed encoding.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -58,13 +58,12 @@ impl Sam3Backend for Fake {
 
 /// A 160 × 100 document with the top-left 20 × 20 selected, Select and Mask open, and `fake` (when
 /// there is one) as SAM 3.
-fn workspace(fake: Option<&Arc<Fake>>) -> PhotocraftApp {
+fn workspace(fake: Option<&Arc<Fake>>) -> Box<PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.session.execute("file.new", json!({"width": 160, "height": 100, "depth": 8})).unwrap();
     app.session.execute("select.rect", json!({"x": 0, "y": 0, "width": 20, "height": 20})).unwrap();
     app.session.prefs.edit(|p| {
         p.dialogs.remove(super::REMEMBERED);
-        p.dialogs.remove(super::super::REMEMBERED);
     });
     if let Some(fake) = fake {
         app.session.set_sam3_backend(fake.clone());
@@ -73,20 +72,42 @@ fn workspace(fake: Option<&Arc<Fake>>) -> PhotocraftApp {
     app
 }
 
-fn hair() -> Value {
-    json!({"tool": "refineHair", "radius": 0.0, "sampleAllLayers": false})
+fn id(app: &PhotocraftApp) -> DialogId {
+    app.select_mask_target.as_ref().expect("Select and Mask is open").0
 }
 
-fn edits(app: &PhotocraftApp) -> Vec<Value> {
-    app.distort.select_mask.as_ref().unwrap().edits.clone()
+/// The Refine Hair button pressed (Edge Detection radius 0, the active layer only).
+fn press(app: &mut PhotocraftApp) {
+    let (ctx, id) = (app.ctx().clone(), id(app));
+    on_event(app, &ctx, id, RefineHairEvent::Run { radius: 0.0, sample_all_layers: false });
 }
 
-/// Ticks until the waiting run was added (or dropped).
+fn send(app: &mut PhotocraftApp, event: RefineHairEvent) {
+    let (ctx, id) = (app.ctx().clone(), id(app));
+    on_event(app, &ctx, id, event);
+}
+
+fn edits(app: &PhotocraftApp) -> Vec<SelectMaskEdit> {
+    app.framework.dialogs.get_by_id::<Hosted>(id(app)).expect("the workspace is on the dialog host").workspace().session().edits.clone()
+}
+
+/// Cancel, as Esc or the button does, and the app's pass that follows.
+fn cancel(app: &mut PhotocraftApp) {
+    let (ctx, id) = (app.ctx().clone(), id(app));
+    app.framework.dialogs.cancel_by_id(&ctx, id);
+    take(app, &ctx);
+}
+
+fn hair(protect: bool) -> SelectMaskEdit {
+    SelectMaskEdit::refine_hair(0.0, false, protect)
+}
+
+/// Ticks until the waiting run was recorded (or dropped).
 fn settle(app: &mut PhotocraftApp) {
-    let ctx = egui::Context::default();
+    let (ctx, id) = (egui::Context::default(), id(app));
     for _ in 0..600 {
-        tick(app, &ctx);
-        if !app.distort.select_mask.as_ref().unwrap().protect.waiting() {
+        tick(app, &ctx, id);
+        if !app.select_mask_protect.waiting() {
             return;
         }
         std::thread::sleep(std::time::Duration::from_millis(5));
@@ -97,98 +118,93 @@ fn settle(app: &mut PhotocraftApp) {
 #[test]
 fn without_sam_3_the_box_is_off_and_refine_hair_is_as_before() {
     let mut app = workspace(None);
-    let w = app.distort.select_mask.as_ref().unwrap();
-    assert!(!w.protect.possible && w.protect.on, "ticked by default, but greyed out");
-    assert_eq!(w.describe()["protectSubject"], false);
-    assert_eq!(route(&mut app, hair()), Some(hair()), "no protectSubject, no wait");
-    let j = job(&mut app).unwrap();
-    assert!(j.protect.is_none());
+    assert!(!app.select_mask_protect.possible && app.select_mask_protect.on, "ticked by default, but greyed out");
+    assert_eq!(describe(&app).unwrap()["protectSubject"], false);
+    press(&mut app);
+    assert_eq!(edits(&app), [hair(false)], "no protection, no wait");
+    let list = edits(&app);
+    assert!(finders(&mut app, &list).is_empty());
 }
 
 #[test]
 fn the_box_is_ticked_by_default_with_sam_3_and_its_state_is_remembered() {
     let fake = Fake::new();
     let mut app = workspace(Some(&fake));
-    assert!(app.distort.select_mask.as_ref().unwrap().protect.possible);
-    assert_eq!(app.distort.select_mask.as_ref().unwrap().describe()["protectSubject"], true);
+    assert!(app.select_mask_protect.possible);
+    assert_eq!(describe(&app).unwrap()["protectSubject"], true);
     // Unticked: Refine Hair goes out as it is, and the choice is kept for the next time.
-    {
-        let w = app.distort.select_mask.as_mut().unwrap();
-        w.protect.on = false;
-        w.protect.changed = true;
-    }
-    persist(&mut app);
-    assert_eq!(route(&mut app, hair()), Some(hair()));
+    send(&mut app, RefineHairEvent::Protect(false));
+    press(&mut app);
+    assert_eq!(edits(&app), [hair(false)]);
     cancel(&mut app);
     open(&mut app).unwrap();
-    assert!(!app.distort.select_mask.as_ref().unwrap().protect.on, "remembered");
-    assert_eq!(route(&mut app, hair()), Some(hair()));
+    assert!(!app.select_mask_protect.on, "remembered");
     // Ticked again.
-    {
-        let w = app.distort.select_mask.as_mut().unwrap();
-        w.protect.on = true;
-        w.protect.changed = true;
-    }
-    persist(&mut app);
+    send(&mut app, RefineHairEvent::Protect(true));
     cancel(&mut app);
     open(&mut app).unwrap();
-    assert!(app.distort.select_mask.as_ref().unwrap().protect.on);
+    assert!(app.select_mask_protect.on);
 }
 
 #[test]
-fn refine_hair_waits_for_the_encoding_and_goes_out_protected() {
+fn refine_hair_waits_for_the_encoding_and_is_recorded_protected() {
     let fake = Fake::new();
     fake.gate_open.store(false, Ordering::SeqCst);
     let mut app = workspace(Some(&fake));
-    assert_eq!(route(&mut app, hair()), None, "held back while SAM 3 prepares");
-    assert_eq!(app.ui.status, "Preparing SAM 3 for this image… (Esc stops it)");
+    press(&mut app);
+    assert!(app.select_mask_protect.waiting(), "held back while SAM 3 prepares");
+    assert_eq!(app.ui.status, "Preparing SAM 3 for this image… (Esc closes Select and Mask)");
     assert!(edits(&app).is_empty());
-    // OK refuses meanwhile, and nothing else is held back.
-    assert!(commit(&mut app).is_err());
-    assert_eq!(route(&mut app, json!({"tool": "invert"})), Some(json!({"tool": "invert"})));
+    // OK refuses meanwhile.
+    let answer = ui_commit(&mut app);
+    assert!(answer.is_err(), "{answer:?}");
     fake.gate_open.store(true, Ordering::SeqCst);
     settle(&mut app);
-    let list = edits(&app);
-    assert_eq!(list.len(), 1);
-    assert_eq!((list[0]["tool"].as_str(), list[0]["protectSubject"].as_bool()), (Some("refineHair"), Some(true)));
+    assert_eq!(edits(&app), [hair(true)]);
     // The preview now has SAM 3 to ask.
-    assert!(job(&mut app).unwrap().protect.is_some());
-    // Ready already: the edit goes straight out.
-    let again = route(&mut app, hair()).expect("ready");
-    assert_eq!(again["protectSubject"], true);
+    let list = edits(&app);
+    assert_eq!(finders(&mut app, &list).len(), 1);
+    // Ready already: the edit goes straight in.
+    press(&mut app);
+    assert_eq!(edits(&app), [hair(true), hair(true)]);
+}
+
+/// OK as the control channel sends it.
+fn ui_commit(app: &mut PhotocraftApp) -> Result<Value, String> {
+    let ctx = app.ctx().clone();
+    crate::control::dialogs::workspace_ui(app, &ctx, "select.selectAndMask", &json!({"commit": true}))
 }
 
 #[test]
-fn esc_stops_the_wait_and_adds_nothing() {
+fn stop_ends_the_wait_and_adds_nothing() {
     let fake = Fake::new();
     fake.gate_open.store(false, Ordering::SeqCst);
     let mut app = workspace(Some(&fake));
-    assert_eq!(route(&mut app, hair()), None);
-    escape(&mut app);
-    assert!(app.distort.select_mask.is_some(), "Esc stopped the run, it did not close Select and Mask");
-    assert!(edits(&app).is_empty() && !app.distort.select_mask.as_ref().unwrap().protect.waiting());
+    press(&mut app);
+    send(&mut app, RefineHairEvent::Stop);
+    assert!(edits(&app).is_empty() && !app.select_mask_protect.waiting());
     assert_eq!(app.ui.status, "Refine Hair stopped");
     assert_eq!(app.session.sam3_status(false), photocraft_engine::sam3_select::Sam3Status::Cancelled);
-    // Esc again closes, as before.
-    escape(&mut app);
-    assert!(app.distort.select_mask.is_none());
 }
 
 #[test]
-fn an_encoding_that_fails_adds_refine_hair_without_protection_and_says_so() {
+fn closing_select_and_mask_stops_a_waiting_run() {
+    let fake = Fake::new();
+    fake.gate_open.store(false, Ordering::SeqCst);
+    let mut app = workspace(Some(&fake));
+    press(&mut app);
+    cancel(&mut app);
+    assert!(!app.select_mask_protect.waiting());
+    assert_eq!(app.session.sam3_status(false), photocraft_engine::sam3_select::Sam3Status::Cancelled);
+}
+
+#[test]
+fn an_encoding_that_fails_records_refine_hair_without_protection_and_says_so() {
     let fake = Fake::new();
     fake.fail.store(true, Ordering::SeqCst);
     let mut app = workspace(Some(&fake));
-    let held = route(&mut app, hair());
-    if held.is_none() {
-        settle(&mut app);
-    } else {
-        assert_eq!(held, Some(hair()));
-    }
-    let list = edits(&app);
-    if held.is_none() {
-        assert_eq!(list.len(), 1);
-        assert!(list[0].get("protectSubject").is_none(), "{list:?}");
-    }
+    press(&mut app);
+    settle(&mut app);
+    assert_eq!(edits(&app), [hair(false)]);
     assert!(app.ui.status.starts_with("Refine Hair ran without Protect Subject"), "{}", app.ui.status);
 }

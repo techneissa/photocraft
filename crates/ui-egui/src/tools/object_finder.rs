@@ -18,6 +18,7 @@
 //! a tool switch and selection-only changes; it analyses nothing until Refresh is clicked
 //! ([`refresh`]): not on the first hover, on another document, or after a pixel edit.
 
+use photocraft_engine::sam3_select::{HoverSource, Prepare, Sam3Status};
 use photocraft_engine::smartselect_cmds::SmartSelectExt;
 use std::sync::Arc;
 
@@ -41,6 +42,8 @@ type Found = Option<Arc<Region>>;
 
 /// A lookup running off the UI thread.
 struct Job {
+    /// SAM 3's lookup (the other is Classic's).
+    sam3: bool,
     at: [i32; 2],
     doc: Arc<Document>,
     rx: std::sync::mpsc::Receiver<Found>,
@@ -56,6 +59,8 @@ pub(crate) struct Finder {
     at: [i32; 2],
     since: f64,
     job: Option<Job>,
+    /// The pixel SAM 3 was last asked about.
+    looked: Option<[i32; 2]>,
     /// Points already looked up that found nothing (the background).
     misses: Vec<[i32; 2]>,
     shown: Option<Arc<Region>>,
@@ -148,6 +153,17 @@ pub(crate) fn update(app: &mut PhotocraftApp, at: Option<[f64; 2]>, pressed: boo
         f.at = px;
         f.since = now;
     }
+    // SAM 3, once it has encoded this picture; a model it freed while idle comes back with the pointer.
+    if let Some(source) = app.session.sam3_hover_source(all_layers) {
+        return update_sam3(app, source, px, at, now, ctx);
+    }
+    if app.session.sam3_status(all_layers) == Sam3Status::Unloaded {
+        let _ = app.session.sam3_prepare(all_layers, Prepare::Force);
+    }
+    let Some(f) = app.object_finder.as_mut() else { return Update::default() };
+    if f.job.as_ref().is_some_and(|j| j.sam3) {
+        f.job = None;
+    }
     // A finished lookup: remember it (only for the pixels it was computed from).
     if let Some(job) = &f.job {
         match job.rx.try_recv() {
@@ -197,6 +213,64 @@ pub(crate) fn update(app: &mut PhotocraftApp, at: Option<[f64; 2]>, pressed: boo
     }
 }
 
+/// [`update`] with SAM 3: the object it finds at the pixel the pointer rests on, looked up again for every new resting
+/// place. The old highlight stays until the new answer is in.
+fn update_sam3(app: &mut PhotocraftApp, source: HoverSource, px: [i32; 2], at: [f64; 2], now: f64, ctx: &egui::Context) -> Update {
+    let Some(f) = app.object_finder.as_mut() else { return Update::default() };
+    if f.job.as_ref().is_some_and(|j| !j.sam3) {
+        f.job = None;
+    }
+    if let Some(job) = &f.job {
+        match job.rx.try_recv() {
+            Ok(found) => {
+                f.shown = found;
+                f.mask = f.shown.as_ref().map(|r| (Arc::clone(r), mask_of(&mut app.texture_serials, r)));
+                f.job = None;
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => {}
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => f.job = None,
+        }
+    }
+    let settled = now - f.since >= DEBOUNCE;
+    let new_place = f.looked != Some(px);
+    if f.job.is_none() && settled && new_place && app.session.active().is_some_and(|st| st.doc.bounds().contains(px[0], px[1])) {
+        let doc = app.session.active().map(|st| Arc::clone(&st.doc));
+        if let (Some(doc), Some(f)) = (doc, app.object_finder.as_mut()) {
+            f.looked = Some(px);
+            f.job = Some(spawn_sam3(source, doc, px, at, ctx.clone()));
+        }
+    }
+    let Some(f) = app.object_finder.as_ref() else { return Update::default() };
+    let waiting = f.looked != Some(px) && !settled;
+    if waiting {
+        ctx.request_repaint_after(std::time::Duration::from_secs_f64(DEBOUNCE - (now - f.since)));
+    }
+    Update {
+        shown: f.shown.clone(),
+        #[cfg(test)]
+        busy: f.job.is_some() || waiting,
+        hint: None,
+    }
+}
+
+fn spawn_sam3(source: HoverSource, doc: Arc<Document>, px: [i32; 2], at: [f64; 2], ctx: egui::Context) -> Job {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let work = move || {
+        let _ = tx.send(source.find(at[0] as f32, at[1] as f32).ok().flatten().map(Arc::new));
+        ctx.request_repaint();
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let spawned = std::thread::Builder::new().name("object-finder-sam3".into()).spawn(work);
+        if spawned.is_err() {
+            // No thread: the receiver reports Disconnected and the next rest retries.
+        }
+    }
+    #[cfg(target_arch = "wasm32")]
+    work();
+    Job { sam3: true, at: px, doc, rx }
+}
+
 /// Starts the lookup at `at`; the job asks `ctx` for a repaint when it has sent its result.
 fn spawn(doc: Arc<Document>, layer: Option<LayerId>, all_layers: bool, px: [i32; 2], at: [f64; 2], ctx: egui::Context) -> Job {
     let (tx, rx) = std::sync::mpsc::channel();
@@ -217,7 +291,7 @@ fn spawn(doc: Arc<Document>, layer: Option<LayerId>, all_layers: bool, px: [i32;
     }
     #[cfg(target_arch = "wasm32")]
     work();
-    Job { at: px, doc, rx }
+    Job { sam3: false, at: px, doc, rx }
 }
 
 /// Drops the preview. Auto Refresh forgets the finder; Manual Refresh keeps the analysed
@@ -259,6 +333,7 @@ fn start(app: &PhotocraftApp) -> Option<Finder> {
         at: [i32::MIN, i32::MIN],
         since: 0.0,
         job: None,
+        looked: None,
         misses: Vec::new(),
         shown: None,
         mask: None,
