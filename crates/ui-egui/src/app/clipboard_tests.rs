@@ -156,7 +156,8 @@ fn newer_internal_copies_survive_an_unchanged_external_svg() {
         let mut pixels = vec![[0; 4]; b.size().area() as usize];
         clip.surface.read_rgba8_into(b, &mut pixels);
         let bytes: Vec<_> = pixels.into_iter().flatten().collect();
-        let signature = bytes.iter().step_by(997).fold((u64::from(b.width()) << 32) | u64::from(b.height()), |sig, byte| sig.rotate_left(5) ^ u64::from(*byte));
+        // fork: the signature hashes every byte (fork/upstream-select-mask.md), so take it from the app's own function.
+        let signature = super::clipboard::clip_signature(b.width(), b.height(), &bytes);
         assert_eq!(app.os_clip_sig, Some(signature), "match the image signature across all four RGBA components");
         *image.lock().unwrap() = Some((b.width(), b.height(), bytes));
         app.session.edit_prefs(|prefs| prefs.general.export_clipboard = false);

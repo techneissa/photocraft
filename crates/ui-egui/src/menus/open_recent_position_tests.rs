@@ -34,7 +34,17 @@ fn open_recent_follows_open_as_smart_object() {
     }
     assert_eq!(
         flat,
-        vec!["file.new", "file.newFromClipboard", "file.open", "file.openAs", "file.openAsSmartObject", "Open Recent", "file.openExrParts", "---"]
+        // fork: File ▸ Open as Layers… follows Open Recent (fork/open-as-layers.md).
+        vec![
+            "file.new",
+            "file.newFromClipboard",
+            "file.open",
+            "file.openAs",
+            "file.openAsSmartObject",
+            "Open Recent",
+            "file.openAsLayers",
+            "file.openExrParts"
+        ]
     );
 }
 
