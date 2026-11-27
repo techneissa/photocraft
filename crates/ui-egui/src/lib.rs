@@ -67,6 +67,8 @@ pub mod updates_ui;
 // fork: techneissa's own update check; the official one never runs (fork/fork-update-check.md).
 #[cfg(not(target_arch = "wasm32"))]
 pub mod fork_update;
+// fork: chords and When conditions in front of craft's keymap (fork/shortcut-upgrade.md).
+pub mod keybinds;
 
 // fork: awaiting rebuild on craft UI (official merge of 2026-11-27). These fork interface modules stay in
 // the tree, compiled out; each rebuild lane brings its own back, see fork/<slug>.md. The `mod` lines, by the
@@ -76,7 +78,6 @@ pub mod fork_update;
 //   mod blend_wheel;                   // fork/blend-list.md
 //   pub mod curves_clipping;           // fork/levels-curves-clipping.md
 //   mod double_exposure;               // fork/double-exposure.md
-//   pub mod keybinds;                  // fork/shortcut-upgrade.md
 //   pub mod menu_custom;               // fork/context-menu-editor.md, fork/context-menu-shortcuts.md
 //   mod open_as_layers;                // fork/open-as-layers.md
 //   mod place_photos;                  // fork/place-photos.md
@@ -365,6 +366,8 @@ pub struct PhotocraftApp {
     info_samplers: Option<panels::SamplerReadouts>,
     /// Display profile readings (#569).
     monitors: monitor_status::State,
+    /// Chords waiting for their second key (`keybinds`).
+    keybinds: keybinds::State,
     pub(crate) thumbnail_cache: std::sync::Arc<std::sync::Mutex<crate::home_recent_ui::ThumbnailCache>>,
     /// The canvas tools' own state: every tool family's gesture, hover and option state
     /// (`canvas::tools`).

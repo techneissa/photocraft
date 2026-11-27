@@ -258,6 +258,8 @@ impl PhotocraftApp {
         updates_ui::show(self, &ctx);
         // The Keyboard Shortcuts dialog draws while its session is open.
         prefs_ui::show_shortcuts(self, ui);
+        // The hint that follows the first key of a chord.
+        crate::keybinds::overlay::show(self, &ctx);
         crate::dialogs::run(self, ui);
         canvas::extra_windows(self, ui);
         screen_picker::show(self, ui);

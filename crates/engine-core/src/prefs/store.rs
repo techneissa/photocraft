@@ -18,12 +18,13 @@ impl PrefsStore {
     }
     /// Change preferences; bumps the revision.
     pub fn edit<R>(&mut self, f: impl FnOnce(&mut Preferences) -> R) -> R {
-        let before = (&self.values.shortcuts, &self.values.alternate_shortcuts, &self.values.toolbar);
-        let before = (before.0.clone(), before.1.clone(), before.2.clone());
+        // fork: a When condition moves a command's keys to the fork's key layer, so it is a catalog change.
+        let before = (&self.values.shortcuts, &self.values.alternate_shortcuts, &self.values.toolbar, &self.values.shortcut_when);
+        let before = (before.0.clone(), before.1.clone(), before.2.clone(), before.3.clone());
         let sections = self.values.sections.clone();
         self.rev += 1;
         let result = f(&mut self.values);
-        if (&before.0, &before.1, &before.2) != (&self.values.shortcuts, &self.values.alternate_shortcuts, &self.values.toolbar) {
+        if (&before.0, &before.1, &before.2, &before.3) != (&self.values.shortcuts, &self.values.alternate_shortcuts, &self.values.toolbar, &self.values.shortcut_when) {
             self.catalog_rev = self.catalog_rev.wrapping_add(1);
         }
         for key in sections.keys().chain(self.values.sections.keys()).collect::<std::collections::BTreeSet<_>>() {

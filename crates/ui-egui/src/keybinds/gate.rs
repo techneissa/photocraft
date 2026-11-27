@@ -20,7 +20,7 @@ pub fn chords_in(app: &PhotocraftApp, cx: &Context) -> Vec<(String, [KeyboardSho
 
 /// Whether tool `t` answers its own letter key now: it still has the default key and its When
 /// condition (if any) holds. A tool with a key of its own is a binding like any command
-/// ([`crate::shortcut_dispatch::bindings_in`]).
+/// ([`runtime`](super::runtime)).
 pub fn tool_on(app: &PhotocraftApp, ctx: &egui::Context, t: crate::state::Tool) -> bool {
     if !crate::tool_shortcuts::uses_default(app, t) {
         return false;
@@ -30,5 +30,5 @@ pub fn tool_on(app: &PhotocraftApp, ctx: &egui::Context, t: crate::state::Tool) 
         return true;
     }
     let id = crate::tool_shortcuts::id(t);
-    !when.contains_key(&id) || holds(app, &super::context::read(app, crate::shortcut_dispatch::Focus::of(ctx)), &id)
+    !when.contains_key(&id) || holds(app, &super::context::read(app, super::focus::Focus::of(ctx)), &id)
 }
