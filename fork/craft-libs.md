@@ -16,8 +16,7 @@ PhotoCraft takes the craft interface framework from [storytold/craft-libs](https
 | 2 | the wheel over a blend mode select steps the mode only when the app allows it | `ui-contract` `entry.rs` (`Entry::wheel_by_setting`), `ui-patterns` `blend_keys.rs` (`blend_entries` marks its entries), `ui-widgets` `pickers/select.rs` (`set_wheel_steps_blend_modes`, `wheel_steps_blend_modes`; a `Select` over marked entries leaves the wheel alone while the setting is off; default on, so upstream behaviour is unchanged) | [blend-list.md](blend-list.md): "Scroll Wheel Changes Blend Mode" |
 | 3 | the command palette reports the typed text of a pick and puts a learned command first | `ui-patterns` `panels/palette.rs`: `PaletteOutput::query`, `CommandPalette::learned` (a command that goes first among the matches) | [palette-frecency.md](palette-frecency.md): the command picked for a typed text |
 | 4 | tone histograms scale to the tallest level between the two ends and draw one column per level | `imaging` `ui/histogram/paint.rs`: `tone_top` takes the interior peak (edge peak only when nothing is between), `tone_mesh` draws a column per bin | [levels-histogram.md](levels-histogram.md) |
-
-The Refine Hair button adds its patch to the same branch when they are rebuilt; add a row here for each.
+| 5 | Select and Mask: Refine Hair button, Protect Subject box and a Refine Hair edit the app can turn on | `imaging` `ui/select_mask`: `SelectMaskEdit::RefineHair`, `RefineHairControl` and `RefineHairEvent`, `SelectMaskBar::hair` (the button, its Stop while a run waits, the box), `SelectMaskWorkspace::refine_hair`, `SelectMaskEvent::RefineHair`, three words in `words.rs`; without `refine_hair(Some(..))` the bar keeps the official disabled button | [refine-hair.md](refine-hair.md) |
 
 ## Move to a new upstream rev
 
@@ -30,4 +29,4 @@ The Refine Hair button adds its patch to the same branch when they are rebuilt; 
 
 ## Tests
 
-None of its own: the patches are used by [blend-list.md](blend-list.md), [palette-frecency.md](palette-frecency.md) and [levels-histogram.md](levels-histogram.md), whose tests cover them.
+None of its own: the patches are used by [blend-list.md](blend-list.md), [palette-frecency.md](palette-frecency.md), [levels-histogram.md](levels-histogram.md) and [refine-hair.md](refine-hair.md), whose tests cover them.

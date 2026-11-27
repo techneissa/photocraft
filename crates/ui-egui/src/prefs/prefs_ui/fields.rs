@@ -236,6 +236,8 @@ fn label_override(key: &str) -> Option<&'static str> {
         "lowLatencyDrawing" => "Low-Latency Drawing (vsync off, applies at next launch)",
         "sizeLimitMb" => "Scratch Size Limit (MB, 0 = No Limit)",
         "gpuMemoryMb" => "GPU Memory (MB, 0 = Automatic)",
+        // fork: what Object Selection and Quick Selection select with (fork/sam3-click-select.md).
+        "objectSelectionEngine" => "Object Selection Engine",
         _ => return None,
     })
 }
@@ -260,6 +262,8 @@ pub(super) fn choice_label(v: &str) -> String {
         "ahd" => "AHD (adaptive homogeneity)".into(),
         "mhc" => "Malvar–He–Cutler".into(),
         "cpu" => "CPU (no GPU acceleration)".into(),
+        // fork: the engine choices (fork/sam3-click-select.md).
+        "sam3" => "SAM 3 (model in Preferences › AI Models)".into(),
         v => spelled(v),
     }
 }
