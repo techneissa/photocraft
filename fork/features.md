@@ -46,3 +46,4 @@ lines. Add a line at the end; never reorder or rewrap the others.
 - [Context menu shortcuts](context-menu-shortcuts.md): the Layers, canvas, document tab and Paths right-click menus show each command's current shortcut at the right, as the menu bar does. Branch `feat/context-menu-shortcuts`.
 - [Big PSD open](big-psd-open.md): the Home grid previews a PSD from its own thumbnail or merged image, without importing the layers. Branch `fix/big-psd-open`.
 - [Brush resize drag](brush-resize-drag.md): Control+Option+drag starts on the press and moves the size and hardness by the pointer's travel (no dead stretch at a limit), with Photoshop's red tip preview and a Diameter / Hardness label. Branch `fix/brush-resize-drag`.
+- [Command palette learns](palette-frecency.md): the command palette lists the commands you run most and most recently first, and the one you picked for a typed text first when you type it again; kept across restarts. Branch `feat/palette-frecency`.

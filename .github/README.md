@@ -101,7 +101,7 @@
 - **Centred windows:** Settings and dialogs open centred, and each window remembers where you put it.
 - **Keyboard Shortcuts:** chords, conditions, clash warnings, export and import, resizable window.
 - **Assign Shortcut…:** right-click any command to give it a key.
-- **Command palette:** also on ⌘P.
+- **Command palette:** also on ⌘P; it learns what you run and lists it first.
 - **Context menu editor:** hide, reorder and add right-click menu items, with presets.
 - **Top bar items:** show or hide each item in the top bar.
 - **Searchable dropdowns:** type to filter an open list, like the blend modes.
