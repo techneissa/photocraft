@@ -701,6 +701,7 @@ impl LiquifyApp {
 
 /// Opens the workspace on the active layer.
 pub fn open(app: &mut PhotocraftApp, _ctx: &egui::Context) -> Result<DialogId, String> {
+    crate::distort_ui::dialog_can_open(app, photocraft_engine::distort_cmds::LIQUIFY)?;
     let (layer, mut surf, _) = crate::distort_ui::active_filter_target(app)?;
     let doc = &app.session.active().ok_or("no document")?.doc;
     let canvas = doc.bounds();

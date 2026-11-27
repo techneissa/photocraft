@@ -64,6 +64,8 @@ pub mod render_path;
 pub(crate) mod scratch_reads;
 // fork: the wheel preference for blend mode boxes (fork/blend-list.md).
 mod blend_wheel;
+// fork: a long dropdown list narrows as you type (fork/dropdown-search.md).
+mod dropdown_search;
 pub mod state;
 pub mod texel_guard;
 pub mod theme;
@@ -925,6 +927,8 @@ mod tool_shift_cycle_order_tests;
 #[cfg(test)]
 mod tool_shortcut_tests;
 #[cfg(test)]
+mod toolbar_assign_shortcut_tests;
+#[cfg(test)]
 mod toolbar_custom_group_layout_tests;
 #[cfg(test)]
 mod toolbar_group_order_tests;
@@ -1147,6 +1151,8 @@ mod view_guides_submenu_tests;
 
 #[cfg(test)]
 mod lasso_click_tests;
+#[cfg(test)]
+mod mask_clipboard_tests;
 #[cfg(test)]
 mod reset_tip_tests;
 #[cfg(test)]

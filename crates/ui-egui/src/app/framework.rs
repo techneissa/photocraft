@@ -389,6 +389,10 @@ impl Framework {
         self.sections.sync(session);
         // fork: the wheel over a blend mode box steps the mode only when the preference is on (fork/blend-list.md).
         crate::blend_wheel::sync(session, ctx);
+        // fork: a long dropdown list narrows as you type (fork/dropdown-search.md).
+        crate::dropdown_search::sync(ctx);
+        // fork: Assign Shortcut… on a right click of rail tools, footer buttons and Paths rows (fork/assign-shortcut-palette.md).
+        crate::menu_custom::shortcut::sync(ctx);
         let lang = i18n::current().code();
         if lang != self.lang {
             self.lang = lang;

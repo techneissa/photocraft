@@ -1919,3 +1919,23 @@ fn lens_blur_refuses_a_depth_channel_after_the_document_changed() {
     assert_eq!(app.session.documents()[0].history.past_len(), steps[0] + 1, "Lens Blur ran on the first document");
     assert_eq!(app.session.documents()[1].history.past_len(), steps[1], "the second document is untouched");
 }
+
+/// #8414: Select › Modify previews its selection (the canvas outlines the preview's), with
+/// lengths scaled to the reduced proxy.
+#[test]
+fn select_modify_previews_the_modified_selection() {
+    let mut s = photocraft_engine::Session::new();
+    s.execute("file.new", json!({"width": 400, "height": 300})).unwrap();
+    s.execute("select.rect", json!({"x": 100, "y": 80, "width": 200, "height": 140})).unwrap();
+    let doc = s.active().unwrap().doc.clone();
+    for c in ["select.modify.border", "select.modify.smooth", "select.modify.expand", "select.modify.contract", "select.modify.feather"] {
+        assert!(has_dialog(c) && PREVIEWED.contains(&c), "{c}");
+    }
+    let bounds = |d: &Document| d.selection.as_ref().unwrap().content_bounds();
+    let full = preview_document(&doc, None, "select.modify.expand", &json!({"radius": 20}), 1).unwrap();
+    assert_eq!(bounds(&full), photocraft_geom::Rect::new(80, 60, 320, 240));
+    // On a half-size proxy the 20 px grow is 10 proxy pixels.
+    let half = preview_document(&doc, None, "select.modify.expand", &json!({"radius": 20}), 2).unwrap();
+    assert_eq!(bounds(&half), photocraft_geom::Rect::new(40, 30, 160, 120));
+    assert_eq!(doc.selection.as_ref().unwrap().content_bounds(), photocraft_geom::Rect::new(100, 80, 300, 220), "the document keeps its selection");
+}
