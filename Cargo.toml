@@ -12,21 +12,21 @@ rust-version = "1.95"
 [workspace.dependencies]
 # The craft framework through its facade (`craft::ui::…`). The egui `[patch]` below must match
 # `craft::egui_fork::REV` (checked by `cargo xtask ci`).
-craft = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc", default-features = false }
-craft-tracked = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-ui-macros = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
+craft = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b", default-features = false }
+craft-tracked = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-ui-macros = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
 # internal
 photocraft-geom = { path = "crates/geom" }
 photocraft-color = { path = "crates/color" }
 photocraft-raster = { path = "crates/raster" }
 photocraft-doc = { path = "crates/doc" }
 photocraft-ops = { path = "crates/ops" }
-craft-plist = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-psd = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-photocraft-codecs = { package = "craft-image-codecs", git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-photocraft-formats = { package = "craft-file-formats", git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc", features = ["raster-codecs", "pdf", "svg", "ora", "kra", "xcf", "pdn", "raw", "psd", "affinity", "pcraft"] }
+craft-plist = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-psd = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+photocraft-codecs = { package = "craft-image-codecs", git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+photocraft-formats = { package = "craft-file-formats", git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b", features = ["raster-codecs", "pdf", "svg", "ora", "kra", "xcf", "pdn", "raw", "psd", "affinity", "pcraft"] }
 photocraft-raw = { path = "crates/raw" }
-craft-affinity = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
+craft-affinity = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
 photocraft-compose = { path = "crates/compose" }
 photocraft-gpu = { path = "crates/gpu" }
 photocraft-paint = { path = "crates/paint" }
@@ -53,36 +53,36 @@ photocraft-ipp = { path = "crates/ipp" }
 
 # external
 # ICC colour management: the shared crate (replaces crates/cms; craft-libs#779).
-craft-cms = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-print = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
+craft-cms = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-print = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
 # HEIC/HEIF: the shared decoder (replaces crates/heif; craft-libs#784).
-craft-heif = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-pdf = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc", features = ["raster", "write-raster"] }
-craft-xml = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-docpath = { version = "0.1.0", git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-jpeg = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-pcraft-format = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-pcraft-bundle = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-zip = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-ora = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-kra = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-xcf = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-pdn = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
+craft-heif = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-pdf = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b", features = ["raster", "write-raster"] }
+craft-xml = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-docpath = { version = "0.1.0", git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-jpeg = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-pcraft-format = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-pcraft-bundle = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-zip = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-ora = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-kra = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-xcf = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-pdn = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
 # Keep the shared embedded-image validation API until the framework revision includes it.
-craft-svg = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc", features = ["tree-render", "tree-render-system-fonts"] }
-craft-raw = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-tiff = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
+craft-svg = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b", features = ["tree-render", "tree-render-system-fonts"] }
+craft-raw = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-tiff = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
 # Camera-field EXIF reader/writer, shared prerequisite craft-libs#1563.
-craft-metadata = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-crs = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-develop = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-craft-develop-model = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
+craft-metadata = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-crs = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-develop = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+craft-develop-model = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
 # Interface translations: lookup, fallback, CLDR plurals and language names over the craft-i18n
 # catalogs that `crates/ui-egui/build.rs` embeds from `CRAFT_I18N_DIR` (storytold/craft-i18n, at
 # the commit in `craft-i18n.rev`). Already in the tree through craft.
-craft-i18n = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
+craft-i18n = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
 # craft-update: app-specific pretend versions apply to startup and manual checks.
-craft-update = { git = "https://github.com/techneissa/craft-libs", version = "=0.1.0", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc", features = ["ui"] }
+craft-update = { git = "https://github.com/techneissa/craft-libs", version = "=0.1.0", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b", features = ["ui"] }
 thiserror = "2"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
@@ -355,16 +355,16 @@ opt-level = 3
 # Keep the complete egui family and native event bridge on reviewed fork commits.
 
 [patch.crates-io]
-krilla = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-hayro = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-hayro-interpret = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-hayro-syntax = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-hayro-jbig2 = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-hayro-cmap = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-hayro-postscript = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-linesweeper = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-vello_common = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
-vello_cpu = { git = "https://github.com/techneissa/craft-libs", rev = "6872b6eecda1c97eea77c846c8e8d5174f7055dc" }
+krilla = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+hayro = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+hayro-interpret = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+hayro-syntax = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+hayro-jbig2 = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+hayro-cmap = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+hayro-postscript = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+linesweeper = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+vello_common = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
+vello_cpu = { git = "https://github.com/techneissa/craft-libs", rev = "e1a31943d21b660d4f4bbe336c6c2fc4fdde4d9b" }
 ecolor = { git = "https://github.com/storytold/egui.git", rev = "b9770908e0f304896f9658d239a7b29cf8af1564" }
 emath = { git = "https://github.com/storytold/egui.git", rev = "b9770908e0f304896f9658d239a7b29cf8af1564" }
 epaint = { git = "https://github.com/storytold/egui.git", rev = "b9770908e0f304896f9658d239a7b29cf8af1564" }

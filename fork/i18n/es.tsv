@@ -20,3 +20,13 @@
 	{n} min ago	hace {n} min
 	{n} h ago	hace {n} h
 	Yesterday	Ayer
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Asignar atajo…
+@id	settingsPage.contextMenus	Menús contextuales
+	Context Menus	Menús contextuales
+	Take out of the menu	Quitar del menú
+	Add to the menu	Añadir al menú
+	Add Separator	Añadir separador
+	Move up	Subir
+	Move down	Bajar
+	Search commands	Buscar comandos

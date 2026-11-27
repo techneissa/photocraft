@@ -33,6 +33,15 @@ pub(super) struct PrefPages {
     enhanced_controls: prefs::EnhancedControls,
     raw_defaults: prefs::RawDefaults,
     integrations: prefs::Integrations,
+    // fork: the Context Menus page (fork/context-menu-editor.md), drawn whole by `menu_custom::editor`.
+    context_menus: ContextMenusPage,
+}
+
+/// The Context Menus page's one value: the arrangement as JSON text ([`crate::menu_custom::KEY`]).
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+struct ContextMenusPage {
+    arrangement: String,
 }
 
 impl PrefPages {
@@ -57,6 +66,7 @@ impl PrefPages {
             enhanced_controls: prefs.enhanced_controls.clone(),
             raw_defaults: prefs.raw_defaults.clone(),
             integrations: prefs.integrations.clone(),
+            context_menus: ContextMenusPage { arrangement: crate::menu_custom::to_text(&prefs.context_menus) },
         }
     }
 
@@ -247,6 +257,8 @@ fn label_override(key: &str) -> Option<&'static str> {
         "lowLatencyDrawing" => "Low-Latency Drawing (vsync off, applies at next launch)",
         "sizeLimitMb" => "Scratch Size Limit (MB, 0 = No Limit)",
         "gpuMemoryMb" => "GPU Memory (MB, 0 = Automatic)",
+        // fork: what Object Selection and Quick Selection select with (fork/sam3-click-select.md).
+        "objectSelectionEngine" => "Object Selection Engine",
         _ => return None,
     })
 }

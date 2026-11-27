@@ -489,6 +489,8 @@ pub(crate) const TAKERS: &[fn(&mut PhotocraftApp, &egui::Context)] = &[
 /// after every host pass and at once after [`confirm`], [`cancel`] and an automation edit, so an answer acts inside the
 /// request that caused it.
 pub(crate) fn take_results(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    // fork: the Assign Shortcut… item of a right-click menu row (fork/assign-shortcut-palette.md).
+    crate::menu_custom::shortcut::assign(app, ctx);
     params::take(app, ctx);
     prompts_take(app, ctx);
     for taker in TAKERS {

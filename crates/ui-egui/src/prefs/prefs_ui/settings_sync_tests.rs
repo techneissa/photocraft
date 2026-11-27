@@ -187,3 +187,17 @@ fn the_menus_list_the_settings_sync_items_and_remove_subject() {
         assert_eq!(path_of(id).as_deref(), Some("Edit > Preferences"), "{id}");
     }
 }
+
+#[test]
+fn context_menus_in_a_file_are_checked_and_the_open_windows_arrangement_is_exported() {
+    let c = settings_sync::checks();
+    assert_eq!((c.context_menus)(&Value::Null).unwrap().0, Value::Null);
+    assert!((c.context_menus)(&json!(5)).is_err(), "a context menus value must be an object");
+    let mut app = plain_app();
+    super::tests::open_prefs(&mut app, "general");
+    let arrangement = json!({"menus": {"layers.row": {"hidden": ["layer.delete"]}}});
+    assert!(super::dialogs::set_context_menus_draft(&mut app, &arrangement));
+    let (prefs, _) = settings_sync::settings_now(&app);
+    assert_eq!(prefs.context_menus, crate::menu_custom::Custom::from_value(&arrangement).to_value(), "the export takes the window's arrangement");
+    assert!(app.session.prefs().context_menus.is_null());
+}

@@ -96,8 +96,25 @@ pub fn checks() -> SettingsChecks {
     SettingsChecks {
         key_ok: |k| crate::shortcuts::parse(k).is_some(),
         tool_ok: |name| crate::state::Tool::ALL.iter().any(|t| format!("{t:?}") == name),
-        ..SettingsChecks::default()
+        context_menus: context_menus_check,
     }
+}
+
+/// The context menus value as [`crate::menu_custom`] keeps it, with the menus and items it can't show named.
+fn context_menus_check(v: &Value) -> Result<(Value, Vec<String>), String> {
+    use crate::menu_custom::{Custom, backup};
+    if v.is_null() {
+        return Ok((Value::Null, Vec::new()));
+    }
+    if !v.is_object() {
+        return Err("it must be an object or null".into());
+    }
+    let mut file = json!({"kind": backup::KIND, "version": backup::VERSION, "menus": v.get("menus").cloned().unwrap_or_else(|| json!({}))});
+    if let Some(presets) = v.get("presets") {
+        file["presets"] = presets.clone();
+    }
+    let parsed = backup::parse(&file.to_string())?;
+    Ok((Custom { menus: parsed.menus, presets: parsed.presets.unwrap_or_default() }.to_value(), parsed.skipped))
 }
 
 /// Make the session use the shell's checks (once; a session starts without).
@@ -149,12 +166,16 @@ pub(super) fn settings_now(app: &PhotocraftApp) -> (Preferences, photocraft_engi
     if let Some(Value::Object(shown)) = super::dialogs::draft_values(app) {
         let mut root = prefs.to_json();
         if let Some(obj) = root.as_object_mut() {
-            for (section, v) in shown {
+            // The Context Menus page holds its arrangement as text: the preferences keep it as a value, below.
+            for (section, v) in shown.into_iter().filter(|(section, _)| section != crate::menu_custom::PAGE) {
                 obj.insert(section, v);
             }
         }
         if let Ok(shown) = serde_json::from_value::<Preferences>(root) {
             prefs = shown;
+        }
+        if let Some(draft) = super::dialogs::context_menus_draft(app) {
+            prefs.context_menus = crate::menu_custom::Custom::from_value(&draft).to_value();
         }
     }
     (prefs, app.session.color().settings.clone())

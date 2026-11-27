@@ -3,3 +3,13 @@
 	AI Models	Modele AI
 	subject segmentation (BiRefNet-lite)	segmentarea subiectului (BiRefNet-lite)
 	inpainting (LaMa)	completare (LaMa)
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Atribuie o scurtătură…
+@id	settingsPage.contextMenus	Meniuri contextuale
+	Context Menus	Meniuri contextuale
+	Take out of the menu	Elimină din meniu
+	Add to the menu	Adaugă în meniu
+	Add Separator	Adaugă separator
+	Move up	Mută în sus
+	Move down	Mută în jos
+	Search commands	Caută comenzi

@@ -62,11 +62,10 @@ web-time = { workspace = true }
 # `FilePanels::pump_with`: rfd's folder picker and file paths exist on native only. Agents in the
 # open window (`craft::automation::agents`: the link, the launcher's switch, the Agents page) too.
 craft = { workspace = true, features = ["dialogs", "update", "automation-agents"] }
+photocraft-ml = { workspace = true }
 rayon = { workspace = true }
 # Safe native UI-language APIs (Windows/macOS); no subprocess or web dependency.
 sys-locale = "=0.3.2"
-# fork: Settings › AI Models (fork/select-subject-ai.md): the models' state, download and removal.
-photocraft-ml = { workspace = true }
 
 # fork: the macOS Vision row of Settings › AI Models.
 [target.'cfg(target_os = "macos")'.dependencies]

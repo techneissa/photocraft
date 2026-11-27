@@ -35,6 +35,8 @@ const LAYER_ROWS: &[(&str, &str, &str)] = &[
     ("layer.quickExportAsPng", "Quick Export As PNG", ""),
     ("layer.exportAs", "Export As…", ""),
     (SEPARATOR, "", ""),
+    ("layer.new.artboard", "New Artboard", "Group"),
+    ("layer.new.artboardFromGroup", "Artboard from Group", "Group"),
     ("layer.new.artboardFromLayers", "Artboard from Layers…", ""),
     ("layer.new.frameFromLayers", "Frame from Layers…", ""),
     ("layer.frame.convert", "Convert to Frame…", "Shape or type layer"),

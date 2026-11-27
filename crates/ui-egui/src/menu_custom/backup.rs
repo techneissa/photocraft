@@ -20,7 +20,6 @@ use serde_json::{Value, json};
 use super::presets::{COUNT, Presets, Set};
 use super::{Arrangement, Custom, MAX_ITEMS, Slot, catalog, menus};
 use crate::PhotocraftApp;
-use crate::file_dialog::{FileDialogAnswer, FileDialogRequest, last_used_dir};
 
 /// The file's `kind`.
 pub const KIND: &str = "photocraft-context-menus";
@@ -180,24 +179,6 @@ pub fn import_bytes(app: &mut PhotocraftApp, bytes: Vec<u8>) -> Result<Value, St
     Ok(json!({"skipped": skipped}))
 }
 
-/// The name and bytes of the file an open dialog answered with, refusing one over [`MAX_BYTES`]
-/// before it is read.
-fn read_capped(answer: FileDialogAnswer) -> Result<Vec<u8>, String> {
-    match answer {
-        FileDialogAnswer::Paths(paths) => {
-            let path = paths.into_iter().next().ok_or_else(|| "cancelled".to_string())?;
-            let size = std::fs::metadata(&path).map_err(|e| format!("{path}: {e}"))?.len();
-            if size > MAX_BYTES as u64 {
-                return Err(too_big());
-            }
-            photocraft_format::read_file(std::path::Path::new(&path)).map_err(|e| format!("{path}: {e}"))
-        }
-        FileDialogAnswer::Contents(_, bytes) => Ok(bytes),
-        FileDialogAnswer::ContentsMany(files) => files.into_iter().next().map(|(_, bytes)| bytes).ok_or_else(|| "cancelled".to_string()),
-        _ => Err(tl!("no file was chosen").to_string()),
-    }
-}
-
 /// Export icon: ask where, then write.
 pub fn export(app: &mut PhotocraftApp) {
     if let Err(e) = app.pick_save(FILE_NAME, |app, path| export_to(app, &path)) {
@@ -207,8 +188,7 @@ pub fn export(app: &mut PhotocraftApp) {
 
 /// Import icon: ask which file, then read it.
 pub fn import(app: &mut PhotocraftApp) {
-    let request = FileDialogRequest::Open { multiple: false, initial_dir: last_used_dir(&app.ui.recent_files), extensions: Some(vec!["json".to_string()]) };
-    if let Err(e) = app.ask_file(request, |app, answer| import_bytes(app, read_capped(answer)?)) {
+    if let Err(e) = app.pick_file_bytes_filtered(&["json"], |app, _name, bytes| import_bytes(app, bytes)) {
         error(app, e);
     }
 }

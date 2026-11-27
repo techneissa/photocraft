@@ -20,3 +20,13 @@
 	{n} min ago	{n} 分鐘前
 	{n} h ago	{n} 小時前
 	Yesterday	昨天
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	指定快速鍵…
+@id	settingsPage.contextMenus	快顯選單
+	Context Menus	快顯選單
+	Take out of the menu	從選單移除
+	Add to the menu	加入選單
+	Add Separator	加入分隔線
+	Move up	上移
+	Move down	下移
+	Search commands	搜尋指令

@@ -78,3 +78,21 @@
 	Double Exposure button	Dubbelexponering-knapp
 	Double Exposure	Dubbelexponering
 	Context Menus	Snabbmenyer
+# Refine Hair and Protect Subject in Select and Mask (fork/refine-hair.md)
+	Stop Refine Hair	Stoppa Förfina hår
+	Protect Subject	Skydda motivet
+	Needs SAM 3 (Preferences › AI Models)	Kräver SAM 3 (Inställningar › AI-modeller)
+	Preparing SAM 3 for this image… (Esc closes Select and Mask)	Förbereder SAM 3 för den här bilden… (Esc stänger Markera och maskera)
+	Refine Hair is waiting for SAM 3 (Stop Refine Hair first)	Förfina hår väntar på SAM 3 (stoppa Förfina hår först)
+	Refine Hair stopped	Förfina hår stoppades
+	Refine Hair ran without Protect Subject	Förfina hår kördes utan Skydda motivet
+	SAM 3 isn't ready, Refine Hair ran without Protect Subject	SAM 3 är inte redo, Förfina hår kördes utan Skydda motivet
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Tilldela kortkommando…
+@id	settingsPage.contextMenus	Snabbmenyer
+	Take out of the menu	Ta bort från menyn
+	Add to the menu	Lägg till i menyn
+	Add Separator	Lägg till avgränsare
+	Move up	Flytta upp
+	Move down	Flytta ned
+	Search commands	Sök kommandon

@@ -649,7 +649,8 @@ pub(crate) fn row_menu(app: &PhotocraftApp, tree: &PhotoLayers, target: &MenuTar
                         continue;
                     }
                     let enabled = !(on_set && crate::layer_menu_ui::single_layer_only(id)) && crate::menus::is_enabled(app, id);
-                    out.push(Entry::new(id.to_string(), tl!(label).to_string()).enabled(enabled));
+                    // fork: shortcut and Assign Shortcut… on the row (fork/context-menu-shortcuts.md).
+                    out.push(crate::menu_custom::shortcut::entry(app, Entry::new(id.to_string(), tl!(label).to_string()).enabled(enabled), id));
                 }
             }
         }
@@ -705,7 +706,9 @@ pub(crate) fn row_menu(app: &PhotocraftApp, tree: &PhotoLayers, target: &MenuTar
         MenuKind::Effects => commands(crate::layer_menu_ui::effects_entries(), false),
         MenuKind::Layer(id) => {
             let Some(l) = tree.layer(&id) else { return Vec::new() };
-            let mut out = commands(crate::layer_menu_ui::entries(l, target.on_selection, has_selection), target.on_selection);
+            // fork: the arranged Layers menu (fork/context-menu-editor.md).
+            let rows = crate::menu_custom::layer_rows(app, crate::layer_menu_ui::entries(l, target.on_selection, has_selection));
+            let mut out = commands(rows, target.on_selection);
             out.push(Entry::separator());
             out.push(Entry::new(RENAME.to_string(), tl!("Rename Layer…").to_string()));
             out
