@@ -18,14 +18,14 @@ none (the change is inside `widgets/tone.rs`)
 
 ## Hooks in official files
 
-ui-egui `widgets/tone.rs`: `histogram_scale_top` (the scale), new `histogram_columns`, `draw_histogram` (columns instead of strips joining bin centres); the tests of both.
+none in this repo: craft-libs `photocraft-fork`, `ui/histogram/paint.rs` (`tone_top`, `tone_mesh`).
 
 ## Tests
 
-ui-egui `tone` (scale and column tests).
+ui-egui `levels_histogram_tests.rs`.
 
 ```bash
-cargo test -p photocraft-ui-egui --lib -- tone histogram
+cargo test -p photocraft-ui-egui --lib -- levels_histogram
 ```
 
 ## When upstream merges
@@ -34,4 +34,6 @@ If upstream changes `histogram_scale_top` or `draw_histogram`, keep the interior
 
 ## After the craft UI merge (2026-11-27)
 
-Compiled out, awaiting rebuild: nothing. Rebuild: check craft's Levels and Curves histograms; redo the per-level columns if missing.
+Rebuilt. The craft histograms did not do it: `tone_top` scaled to the tallest level, edges included, so a mostly black photo showed an empty box, and `tone_mesh` joined bin centres. The fix is a craft-libs patch on `photocraft-fork` ([craft-libs.md](craft-libs.md), patch 4): `tone_top` ignores the two end bins unless nothing lies between them, and `tone_mesh` draws one column per bin. It covers the Levels and Curves histograms, Threshold and the Histogram panel's single-channel graph (all `HistogramData::tone`). The RGB ribbons already scaled to the interior.
+
+Hooks here: none in official code. Test: `levels_histogram_tests.rs` (a mostly black histogram's middle levels get height; an end-only histogram fills the box; columns sit on whole slots).

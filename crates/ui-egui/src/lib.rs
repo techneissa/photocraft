@@ -45,6 +45,10 @@ pub mod icons;
 pub mod jobs_ui;
 pub(crate) mod last_brush;
 pub mod levels_clipping;
+// fork: Curves clipping thresholds (fork/levels-curves-clipping.md).
+pub mod curves_clipping;
+#[cfg(test)]
+mod levels_histogram_tests; // fork/levels-histogram.md
 pub mod links;
 pub mod memory_warning;
 pub mod menu_catalog;
@@ -75,7 +79,6 @@ pub mod fork_update;
 // file that held them:
 // lib.rs:
 //   mod assign_shortcut;               // fork/assign-shortcut-palette.md
-//   pub mod curves_clipping;           // fork/levels-curves-clipping.md
 //   mod double_exposure;               // fork/double-exposure.md
 //   pub mod keybinds;                  // fork/shortcut-upgrade.md
 //   pub mod menu_custom;               // fork/context-menu-editor.md, fork/context-menu-shortcuts.md
@@ -84,7 +87,6 @@ pub mod fork_update;
 //   #[cfg(test)] mod mask_clipboard_tests; // fork/upstream-select-mask.md
 // canvas.rs:         mod home_grid;                  // fork/home-recent-grid.md, fork/big-psd-open.md
 // dialogs.rs:        mod placement;                  // fork/windows-open-centred.md
-// dialogs/adjust_editors.rs: mod curve_points;       // fork/levels-curves-clipping.md
 // dialogs/palette.rs: mod list; mod nav;           // fork/assign-shortcut-palette.md (frecency is back: fork/palette-frecency.md)
 // dialogs/select_mask_ui.rs: mod protect;            // fork/refine-hair.md
 // panels.rs:         pub(crate) mod title_bar_items; // fork/topbar-items.md
