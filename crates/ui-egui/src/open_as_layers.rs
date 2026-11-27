@@ -84,6 +84,13 @@ pub(crate) fn open_path(app: &mut PhotocraftApp, path: &str) -> Option<Result<Ve
     Some(read(path).and_then(|bytes| parse_manifest(&bytes)).and_then(|m| start(app, &m)).map(|()| Vec::new()))
 }
 
+/// File › Open as Layers…: ask for the photos (several, top layer first in the order the picker returns them), then open
+/// them as the layers of one new document.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn pick(app: &mut PhotocraftApp) -> Result<Value, String> {
+    app.ask_open_paths(|app, files| start(app, &Manifest { name: None, files }).map(|()| Value::Null))
+}
+
 /// The manifest's bytes, at most [`MAX_MANIFEST_BYTES`].
 #[cfg(not(target_arch = "wasm32"))]
 fn read(path: &str) -> Result<Vec<u8>, String> {
@@ -95,6 +102,12 @@ fn read(path: &str) -> Result<Vec<u8>, String> {
         return Err(tl!("not an Open as Layers file").to_string());
     }
     Ok(bytes)
+}
+
+/// The web has no paths to open.
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn pick(_: &mut PhotocraftApp) -> Result<Value, String> {
+    Err(tl!("Open as Layers needs files on disk").to_string())
 }
 
 /// Run `file.openAsLayers` for `m`: in the background when background jobs are on (then
@@ -140,7 +153,7 @@ pub(crate) fn finished(app: &mut PhotocraftApp, v: &Value) {
     if skipped.len() > LISTED {
         lines.push(crate::i18n::fmt(tl!("and {n} more"), &[("n", &(skipped.len() - LISTED).to_string())]));
     }
-    crate::notices::post(app, title, lines, false, None);
+    crate::notices::post(app, title, lines, craft::theme::variant::Tone::Warn, None);
 }
 
 #[cfg(test)]

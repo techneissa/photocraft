@@ -27,4 +27,4 @@ cargo test -p photocraft-engine-core --lib lock_background_layer_setting
 
 ## After the craft UI merge (2026-11-27)
 
-Partly works: photos open unlocked (the default); the Settings checkbox is gone. Rebuild: add the checkbox to craft's Settings › General.
+Works: Settings › General › Lock the Background Layer (off by default; label in `fields.rs`). Rebuild: nothing.

@@ -56,3 +56,7 @@
 	Move up	Μετακίνηση πάνω
 	Move down	Μετακίνηση κάτω
 	Search commands	Αναζήτηση εντολών
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Άνοιγμα ως επίπεδα…
+	Place Photo	Τοποθέτηση φωτογραφίας
+	Duplicated to {document}	Έγινε αντιγραφή στο {document}

@@ -38,4 +38,4 @@ cargo test -p photocraft-ui-egui --lib -- duplicate_layer_ui
 
 ## After the craft UI merge (2026-11-27)
 
-Partly works: the engine checks (busy destination, PRs #9715 #9684 #10008) work; the "Duplicated to …" note is gone. Rebuild: bring the note back in craft's Duplicate Layer dialog.
+Works again (`feat/step2-layers-transform`): the engine checks (busy destination, PRs #9715 #9684 #10008) and the "Duplicated to …" note, now in `duplicate_layer_ui.rs` `duplicate` (OK of craft's Duplicate Layer dialog; 12 lines). Test `ok_says_which_document_received_the_copy` (current document, another document, a new document).

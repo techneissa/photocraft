@@ -119,6 +119,10 @@ fn frame_convert_dialog(app: &mut PhotocraftApp, id: &str) -> Result<Value, Stri
 
 /// [`invoke`] without the unsaved-changes prompt, for once the user has already answered it.
 fn invoke_early_commands(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &Value) -> Option<Result<Value, String>> {
+    // fork: Layer › Double Exposure also sets up the brush when a person asks (fork/double-exposure.md).
+    if id == crate::double_exposure::COMMAND {
+        return Some(crate::double_exposure::invoke(app, params.clone()));
+    }
     if let Some(tool) = crate::tool_shortcuts::tool(id) {
         crate::tool_memory::select(app, tool);
         // The tool's own brush now, not at the next frame, so a paint command right after uses

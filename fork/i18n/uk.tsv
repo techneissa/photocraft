@@ -56,3 +56,7 @@
 	Move up	Вгору
 	Move down	Вниз
 	Search commands	Пошук команд
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Відкрити як шари…
+	Place Photo	Розмістити фото
+	Duplicated to {document}	Скопійовано до {document}

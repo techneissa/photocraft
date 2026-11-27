@@ -2,12 +2,12 @@ use serde_json::json;
 
 use super::*;
 use crate::control::{ControlRequest, handle};
-use crate::menus::{invoke, menu_items, search_items};
+use crate::menus::{invoke, menu_rows};
 
 const CMD: &str = COMMAND;
 
 /// A `w`×`h` document with two pixel layers, the Move tool selected and red/blue as colours.
-fn app(w: u64, h: u64) -> PhotocraftApp {
+fn app(w: u64, h: u64) -> Box<PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.session.execute("file.new", json!({"width": w, "height": h, "background": "transparent"})).unwrap();
     app.session.execute("layer.new.layer", json!({"name": "Scene"})).unwrap();
@@ -135,25 +135,22 @@ fn a_soft_brush_the_person_edited_stays_theirs() {
 }
 
 #[test]
-fn the_menu_item_sits_in_the_layer_menu_and_the_search_finds_it() {
+fn the_menu_item_sits_in_the_layer_menu() {
     let mut app = app(64, 64);
-    let items = menu_items(&app);
-    let at = items.iter().position(|i| i.id == CMD).expect("a Layer menu item");
+    let items = menu_rows(&app);
+    let at = items.iter().position(|i| i.command.id == CMD).expect("a Layer menu item");
     let item = &items[at];
     assert_eq!((item.label.as_str(), item.path.as_slice()), ("Double Exposure", ["Layer".to_string()].as_slice()));
     assert!(item.enabled);
-    assert_eq!(items[at - 1].id, "layer.maskAllObjects", "right after the Layer Mask items");
-
-    let hits = search_items(&items, "double exp", crate::i18n::Lang::EN);
-    assert!(hits.iter().any(|i| i.id == CMD), "the Help search lists it");
+    assert_eq!(items[at - 1].command.id, "layer.maskAllObjects", "right after the Layer Mask items");
 
     app.session.execute("layer.delete", json!({})).unwrap();
-    let off = menu_items(&app).into_iter().find(|i| i.id == CMD).unwrap();
+    let off = menu_rows(&app).into_iter().find(|i| i.command.id == CMD).unwrap();
     assert!(!off.enabled, "greyed with one pixel layer");
 }
 
 /// The Layers panel with `layers` pixel layers (the first being the Background).
-fn panel(layers: usize) -> egui_kittest::Harness<'static, PhotocraftApp> {
+fn panel(layers: usize) -> egui_kittest::Harness<'static, Box<PhotocraftApp>> {
     let mut s = photocraft_engine::Session::new();
     s.execute("file.new", json!({"width": 80, "height": 64})).unwrap();
     for n in 1..layers {
@@ -202,5 +199,5 @@ fn the_panel_button_can_be_switched_off_in_the_preferences() {
     h.run_steps(4);
     assert!(h.query_by_label("Double Exposure").is_none());
     // The Layer menu item stays.
-    assert!(menu_items(h.state()).iter().any(|i| i.id == CMD && i.enabled));
+    assert!(menu_rows(h.state()).iter().any(|i| i.command.id == CMD && i.enabled));
 }

@@ -45,3 +45,7 @@
 	Move up	เลื่อนขึ้น
 	Move down	เลื่อนลง
 	Search commands	ค้นหาคำสั่ง
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	เปิดเป็นเลเยอร์…
+	Place Photo	วางรูปภาพ
+	Duplicated to {document}	ทำสำเนาไปยัง {document} แล้ว

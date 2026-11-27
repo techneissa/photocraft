@@ -276,6 +276,10 @@ impl PhotocraftApp {
     /// and order survive an inline memory/profile prompt and the document's final placement.
     #[cfg(not(target_arch = "wasm32"))]
     fn open_path_placed(&mut self, path: &str, slot: Option<usize>, order: Option<crate::jobs_ui::OpenOrder>) -> Result<Vec<String>, String> {
+        // fork: a `.pcstack` manifest opens its photos as layers (fork/open-as-layers.md).
+        if let Some(opened) = crate::open_as_layers::open_path(self, path) {
+            return opened;
+        }
         if self.show_if_open(path) {
             return Ok(Vec::new());
         }

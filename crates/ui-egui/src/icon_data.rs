@@ -10,6 +10,7 @@ pub static PHOTOCRAFT_ICONS: AppIcons = AppIcons::new("photocraft", Some(2.0), I
 pub static ICONS: &[(&str, &[u8])] = &[
     ("arrow-left-right", include_bytes!("../../../assets/icons/arrow-left-right.svg")),
     ("circle-dashed", include_bytes!("../../../assets/icons/circle-dashed.svg")),
+    ("double-exposure", include_bytes!("../../../assets/icons/double-exposure.svg")),
     ("ellipsis", include_bytes!("../../../assets/icons/ellipsis.svg")),
     ("file-plus", include_bytes!("../../../assets/icons/file-plus.svg")),
     ("folder-plus", include_bytes!("../../../assets/icons/folder-plus.svg")),
@@ -26,6 +27,7 @@ pub static ICONS: &[(&str, &[u8])] = &[
     ("path-op-new-layer", include_bytes!("../../../assets/icons/path-op-new-layer.svg")),
     ("path-op-subtract", include_bytes!("../../../assets/icons/path-op-subtract.svg")),
     ("pipette", include_bytes!("../../../assets/icons/pipette.svg")),
+    ("place-photo", include_bytes!("../../../assets/icons/place-photo.svg")),
     ("rectangle-horizontal", include_bytes!("../../../assets/icons/rectangle-horizontal.svg")),
     ("rectangle-vertical", include_bytes!("../../../assets/icons/rectangle-vertical.svg")),
     ("redo-2", include_bytes!("../../../assets/icons/redo-2.svg")),

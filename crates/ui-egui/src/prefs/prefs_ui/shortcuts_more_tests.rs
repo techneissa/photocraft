@@ -67,7 +67,7 @@ fn a_clash_mark_names_the_clashing_command() {
 }
 
 /// Search finds a binding by its modifier word, as the fork's old window did: File › New has only ⌘N, so "cmd" lists
-/// it and "shift", "opt" and "ctrl" do not.
+/// it and "shift" and "opt" do not; nor does "ctrl" on a Mac (elsewhere ⌘ is Control, so "ctrl" lists it too).
 #[test]
 fn search_finds_bindings_by_modifier_words() {
     let lists = |word: &str, row: &str| {
@@ -76,5 +76,6 @@ fn search_finds_bindings_by_modifier_words() {
         h.query_by_label_contains(&format!("Add a shortcut to {row}")).is_some()
     };
     assert!(lists("cmd", "New…"));
-    assert!(!lists("shift", "New…") && !lists("opt", "New…") && !lists("ctrl", "New…"));
+    assert!(!lists("shift", "New…") && !lists("opt", "New…"));
+    assert_eq!(lists("ctrl", "New…"), !cfg!(target_os = "macos"), "\"ctrl\" lists ⌘N only where ⌘ is Control");
 }

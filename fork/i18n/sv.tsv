@@ -46,6 +46,38 @@
 	{n} min ago	{n} min sedan
 	{n} h ago	{n} tim sedan
 	Yesterday	Igår
+# Settings pages rebuilt on the craft UI: AI Models, Settings sync, close keys, Double Exposure (fork/settings-sync.md and others)
+	 ({n} skipped)	 ({n} hoppades över)
+	Could not write {path}: {e}	Kunde inte skriva {path}: {e}
+	Export Settings…	Exportera inställningar…
+	Exported settings to {path}	Inställningar exporterade till {path}
+	Import Settings…	Importera inställningar…
+	Imported settings from {file}	Inställningar importerade från {file}
+	Imported settings, but could not save them: {e}	Inställningarna importerades men kunde inte sparas: {e}
+	Keep in Sync	Håll synkroniserad
+	Load from Folder	Läs in från mapp
+	None chosen	Ingen vald
+	Not available on this computer	Finns inte på den här datorn
+	Not in this PhotoCraft, skipped: {names}	Finns inte i den här PhotoCraft, hoppades över: {names}
+	Not in this PhotoCraft, skipped: {names} and {n} more	Finns inte i den här PhotoCraft, hoppades över: {names} och {n} till
+	Remove for Every ArtCraft App?	Ta bort för alla ArtCraft-appar?
+	Replace these settings with those in {file}?	Ersätta de här inställningarna med dem i {file}?
+	Save to Folder	Spara i mapp
+	Save your changes to Preferences before closing?	Spara ändringarna i inställningarna innan du stänger?
+	Saved on {computer}, {when}	Sparades på {computer}, {when}
+	Saved settings to {path}	Inställningar sparade i {path}
+	Spelling Dictionary	Stavningsordlista
+	Sync Folder	Synkmapp
+	This isn't a PhotoCraft settings file: it is too big	Det här är ingen PhotoCraft-inställningsfil: den är för stor
+	This isn't a PhotoCraft settings file: it isn't text	Det här är ingen PhotoCraft-inställningsfil: den är inte text
+	Tool Options and View Settings	Verktygsalternativ och visningsinställningar
+	Use This Folder	Använd den här mappen
+	Workspaces and Panels	Arbetsytor och paneler
+	{n} skipped: {first}	{n} hoppades över: {first}
+	Lock the Background Layer	Lås bakgrundslagret
+	Double Exposure button	Dubbelexponering-knapp
+	Double Exposure	Dubbelexponering
+	Context Menus	Snabbmenyer
 # Refine Hair and Protect Subject in Select and Mask (fork/refine-hair.md)
 	Stop Refine Hair	Stoppa Förfina hår
 	Protect Subject	Skydda motivet
@@ -90,10 +122,13 @@
 # Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
 	Assign Shortcut…	Tilldela kortkommando…
 @id	settingsPage.contextMenus	Snabbmenyer
-	Context Menus	Snabbmenyer
 	Take out of the menu	Ta bort från menyn
 	Add to the menu	Lägg till i menyn
 	Add Separator	Lägg till avgränsare
 	Move up	Flytta upp
 	Move down	Flytta ned
 	Search commands	Sök kommandon
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Öppna som lager…
+	Place Photo	Placera foto
+	Duplicated to {document}	Duplicerad till {document}

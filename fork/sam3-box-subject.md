@@ -31,4 +31,4 @@ cargo test -p photocraft-ui-egui --lib -- ai_models
 
 ## After the craft UI merge (2026-11-27)
 
-Partly works: `select.subject` with engine `sam3` and the box prompt work in the engine; tool and Settings parts are gone. Rebuild: comes back with `sam3_ui.rs` and the AI Models page.
+Works: `select.subject` with engine `sam3` and the box prompt (engine), the tool part (`sam3_ui.rs`, back with [sam3-click-select.md](sam3-click-select.md)) and the SAM 3 row on Settings › AI Models (see [select-subject-ai.md](select-subject-ai.md)). Rebuild: nothing.

@@ -45,3 +45,7 @@
 	Move up	Yuxarı apar
 	Move down	Aşağı apar
 	Search commands	Əmrləri axtar
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Qatlar kimi aç…
+	Place Photo	Foto yerləşdir
+	Duplicated to {document}	{document} sənədinə köçürüldü
