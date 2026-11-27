@@ -216,6 +216,7 @@ fn tweak(rules: &mut BTreeMap<String, SettingRule>, key: &str, change: impl FnOn
 fn label_override(key: &str) -> Option<&'static str> {
     Some(match key {
         "appearanceMode" => "Appearance Mode",
+        "homeRecentCount" => "Recent files on Home",
         "exrAcesCg" => "Open color-less EXR as ACEScg",
         "darkTheme" => "Dark Theme",
         "lightTheme" => "Light Theme",

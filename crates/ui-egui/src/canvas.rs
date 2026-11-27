@@ -38,6 +38,8 @@ pub(crate) mod filter_preview;
 pub mod gpu_canvas;
 mod gpu_picture;
 pub mod guide_select;
+// Fork: the Home screen's recent-files list (fork/home-recent-grid.md).
+pub(crate) mod home_grid;
 pub mod layer_pick_ui;
 pub mod move_ui;
 mod navigator;

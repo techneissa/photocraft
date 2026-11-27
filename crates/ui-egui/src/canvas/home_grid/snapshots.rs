@@ -32,7 +32,8 @@ fn take(out: &std::path::Path, phase: &str, samples: &std::path::Path) {
         .collect();
     files.sort();
     files.push(samples.join("old-project.psd").to_string_lossy().into_owned());
-    for (state, size) in [("wide", egui::vec2(1440.0, 900.0)), ("narrow", egui::vec2(1000.0, 760.0))] {
+    for (state, view) in [("grid", craft::ui::shell::RecentView::Grid), ("list", craft::ui::shell::RecentView::List)] {
+        let size = egui::vec2(1440.0, 900.0);
         let recent = files.clone();
         let mut h = Harness::builder().with_size(size).with_pixels_per_point(2.0).with_max_steps(64).wgpu().build_eframe(move |cc| {
             PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
@@ -45,7 +46,8 @@ fn take(out: &std::path::Path, phase: &str, samples: &std::path::Path) {
                 p.file_handling.recent_files = recent.clone();
                 p.file_handling.recent_opened = opened.clone();
             });
-            app.ui.recent_files = recent;
+            app.ui.chrome.home_recent_view = view;
+            *app.ui.recent_files = recent;
             app
         });
         // The previews decode on a thread: give them time.
@@ -54,9 +56,9 @@ fn take(out: &std::path::Path, phase: &str, samples: &std::path::Path) {
             h.run_steps(1);
         }
         h.render().expect("render the window").save(out.join(format!("{phase}-{state}.png"))).unwrap();
-        if state == "wide" {
-            // The pointer on the newest file: its × (and the row or tile highlight).
-            h.get_by_label("earthrise-crop.jpg").hover();
+        if state == "grid" {
+            // The pointer on the newest file: its × (and the tile highlight).
+            h.get_by_label_contains("earthrise-crop.jpg").hover();
             h.run_steps(3);
             h.render().expect("render the window").save(out.join(format!("{phase}-hover.png"))).unwrap();
         }

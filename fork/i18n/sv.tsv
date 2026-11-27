@@ -40,3 +40,9 @@
 	Preparing SAM 3 for this image… (Esc stops it)	Förbereder SAM 3 för den här bilden… (Esc avbryter)
 	SAM 3 is ready	SAM 3 är redo
 	SAM 3 stopped, Classic selects for now	SAM 3 stoppades, Klassisk markerar tills vidare
+# Home recent files (fork/home-recent-grid.md)
+	Recent files on Home	Senaste filer på Hem
+	Just now	Nyss
+	{n} min ago	{n} min sedan
+	{n} h ago	{n} tim sedan
+	Yesterday	Igår
