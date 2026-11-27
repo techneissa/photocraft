@@ -1638,6 +1638,10 @@ pub struct Preferences {
     /// until something is arranged, which leaves every menu as it is. JSON owned by the shell
     /// (`ui-egui::menu_custom`), which reads it leniently.
     pub context_menus: Value,
+    /// Fork (palette-frecency, #28): what the command palette learned from the commands run
+    /// through it (use counts, last uses, the command picked for each typed text). Null until
+    /// something is run. JSON owned by the shell (`ui-egui` `dialogs/palette/frecency.rs`).
+    pub palette_history: Value,
     /// Settings sync: this Mac's sync folder and state (`settings_folder`).
     pub sync: settings_folder::SyncPrefs,
 }

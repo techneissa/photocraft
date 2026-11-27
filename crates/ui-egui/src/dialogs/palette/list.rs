@@ -3,6 +3,7 @@
 
 use egui::{Align2, Sense, vec2};
 
+use super::frecency::History;
 use super::nav::{self, Hit, MAX_ROWS, PAGE, ROW_H};
 use super::{bilingual_score, menu_hits, recent_hits, scroll_id};
 use crate::PhotocraftApp;
@@ -37,13 +38,14 @@ pub(super) fn enter_esc(ctx: &egui::Context) -> (bool, bool) {
     ctx.input(|i| (i.key_pressed(egui::Key::Enter) && !open, i.key_pressed(egui::Key::Escape) && !open))
 }
 
-/// Every row for the query `q`, best first. An empty query lists the recently run commands
-/// (UI-217-7); with none (or a fresh session) it falls back to the full fuzzy list.
-pub(super) fn all_hits(app: &PhotocraftApp, q: &str, recents: &[String], lang: crate::i18n::Lang) -> Vec<Hit> {
+/// Every row for the query `q`, best first, ordered by what the palette learned (`history` at
+/// `now`, fork #28). An empty query lists the commands run most often and most recently, then
+/// this session's recently run ones (UI-217-7), then the rest.
+pub(super) fn all_hits(app: &PhotocraftApp, q: &str, recents: &[String], history: &History, now: i64, lang: crate::i18n::Lang) -> Vec<Hit> {
     let menus = crate::menus::menu_items(app);
     let empty = q.trim().is_empty();
     let mut hits: Vec<Hit> = if empty { recent_hits(recents, &menus, lang) } else { Vec::new() };
-    if !empty || hits.is_empty() {
+    {
         let from = hits.len();
         hits.extend(menu_hits(menus, q, lang));
         for h in &mut hits[from..] {
@@ -58,6 +60,12 @@ pub(super) fn all_hits(app: &PhotocraftApp, q: &str, recents: &[String], lang: c
             }
         }
     }
+    if empty {
+        // A recent command is listed once, as the recent row.
+        let mut seen = std::collections::HashSet::new();
+        hits.retain(|h| seen.insert(h.1.clone()));
+    }
+    history.apply(q, now, &mut hits);
     nav::rank(&mut hits);
     hits
 }

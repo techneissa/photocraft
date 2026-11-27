@@ -5,6 +5,7 @@ use egui::{Align2, Color32, CornerRadius, RichText, Sense, Stroke, vec2};
 use crate::theme::Tokens;
 use crate::{PhotocraftApp, icons};
 
+mod frecency;
 mod list;
 mod nav;
 
@@ -194,7 +195,8 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
                     ui.add_space(6.0);
                     let lang = crate::i18n::Lang::from_pref(&app.session.prefs().interface.language);
                     let recents: Vec<String> = ui.data(|d| d.get_temp(recent_id()).unwrap_or_default());
-                    let hits = list::all_hits(app, &q, &recents, lang);
+                    let history = frecency::History::of(app);
+                    let hits = list::all_hits(app, &q, &recents, &history, frecency::now(), lang);
                     let sel_id = egui::Id::unique("palette-sel");
                     let mut sel: usize = ui.data_mut(|d| d.get_temp(sel_id).unwrap_or(0));
                     let (enter, esc) = list::enter_esc(ctx);
@@ -226,6 +228,9 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
         });
     if let Some(id) = run {
         app.ui.palette_open = false;
+        // Fork (#28): what was typed, for the pick it makes; the palette learns the command.
+        let typed: String = ctx.data(|d| d.get_temp(egui::Id::unique("palette-query")).unwrap_or_default());
+        frecency::note(app, &id, &typed);
         ctx.data_mut(|d| d.insert_temp(egui::Id::unique("palette-query"), String::new()));
         if let Some(tool) = id.strip_prefix("tool:") {
             if let Some(t) = crate::state::Tool::from_name(tool) {

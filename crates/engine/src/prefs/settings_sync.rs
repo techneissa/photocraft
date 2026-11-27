@@ -81,6 +81,7 @@ pub const NOT_IN_FILE: &[(&str, &str)] = &[
     ("selectedTool", "the tool in use"),
     ("groupTools", "the tool each toolbar slot was left on"),
     ("toolColors", "the foreground and background colours in use"),
+    ("paletteHistory", "what the command palette learned on this Mac"),
     ("scriptEvents", "script files of this Mac"),
     ("sync", "the sync folder and state of this Mac"),
 ];
