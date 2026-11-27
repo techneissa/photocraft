@@ -87,17 +87,13 @@ class Groups(unittest.TestCase):
         seen = [c for t in r["tests"] for c in t["crates"] if c not in affected.SHARDS]
         self.assertEqual(sorted(seen), sorted(set(PKGS) - set(affected.SHARDS)))
 
-    def test_only_group_one_runs_the_one_off_steps(self):
-        self.assertEqual([t["group"] for t in plan()["tests"] if t["oneoff"]], [1])
+    def test_group_one_alone_runs_the_one_off_steps_and_no_package(self):
+        tests = plan()["tests"]
+        self.assertEqual([t["group"] for t in tests if t["oneoff"]], [1])
+        self.assertEqual(tests[0]["crates"], [])
 
-    def test_groups_are_balanced(self):
-        r = plan()
-        plain = [t["weight"] for t in r["tests"] if not t["shard"]]
-        self.assertLessEqual(max(plain) - min(plain), max(max(WEIGHTS.values()), affected.ONEOFF_WEIGHT))
-
-    def test_the_seed_starts_group_one(self):
-        groups = affected.balance({"a": 10, "b": 10}, 3, ("+oneoff", 50))
-        self.assertEqual(groups[0], (50, ["+oneoff"]))
+    def test_the_packages_above_a_sharded_one_share_group_two(self):
+        self.assertEqual(plan()["tests"][1]["crates"], ["photocraft"])
 
     def test_the_heaviest_package_is_alone_when_the_others_are_light(self):
         self.assertIn((100, ["big"]), affected.balance({"big": 100, "a": 10, "b": 10, "c": 10}, 3))
@@ -110,7 +106,7 @@ class Groups(unittest.TestCase):
         docs = [n for t in plan()["tests"] for n in t["doc_packages"]]
         self.assertEqual(docs, ["photocraft-io"])
 
-    def test_a_single_package_still_fills_group_one_with_the_one_off_steps(self):
+    def test_a_single_package_is_tested_beside_the_one_off_steps(self):
         pkgs = {"only": pkg("crates/only")}
         r = affected.plan(["only"], pkgs, "full", weights={"only": 5})
         self.assertEqual(r["tests"][0]["oneoff"], True)
@@ -189,20 +185,6 @@ class Features(unittest.TestCase):
 
     def test_a_package_with_the_feature_gets_its_own(self):
         self.assertIn("photocraft/heif", affected.features_for(["photocraft"], PKGS))
-
-    def test_doc_tests_name_only_their_packages_and_direct_dependencies(self):
-        # cargo refuses `pkg/heif` for a package neither selected nor a direct dependency (Fork CI, 2026-11-05)
-        self.assertEqual(affected.doc_features_for(["photocraft-engine"], PKGS), ["photocraft-io/heif"])
-        self.assertEqual(affected.doc_features_for(["photocraft-geom"], PKGS), [])
-        self.assertEqual(affected.doc_features_for([], PKGS), [])
-
-    def test_the_doc_step_names_no_feature_cargo_would_refuse(self):
-        r = plan()
-        for t in r["tests"]:
-            near = set(t["doc_packages"]).union(*(PKGS[n]["deps"] for n in t["doc_packages"]))
-            v = dict(line.split("=", 1) for line in affected.shell_vars(r, t["group"], PKGS).splitlines())
-            named = set(re.findall(r"([a-z0-9-]+)/heif", v["DOC_FEATURES"]))
-            self.assertLessEqual(named, near, t["group"])
 
     def test_clippy_runs_the_whole_workspace_on_a_push(self):
         self.assertEqual(affected.clippy_args(plan(), PKGS), "--workspace --features heif")

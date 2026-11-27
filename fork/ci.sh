@@ -7,10 +7,10 @@
 # the whole workspace; a pull request tests only the packages it can affect (the changed packages and every package
 # that depends on them). Compiling is most of a machine's time, so each machine builds and tests only its own
 # packages (`-p`), and the slow packages are cut into shards, one machine per shard (`cargo nextest --partition
-# count:i/n`). Machine 1 also runs the one-off steps (format, clippy, layers, wasm); the engine's first shard also
+# count:i/n`). Machine 1 runs only the one-off steps (format, clippy, layers, wasm); the engine's first shard also
 # runs panic_hunt.
 #
-#   fork/ci.sh --part 1/10          machine 1 of ten: the one-off steps and its share of the tests (the default)
+#   fork/ci.sh --part 1/10          machine 1 of ten: the one-off steps (the default)
 #   fork/ci.sh --part 2/10          the second machine
 #   fork/ci.sh --part 7/10 --print  print the commands without running them
 #   FORK_CI_FULL=1 fork/ci.sh --part 1/10    the whole workspace on a pull request too
@@ -109,7 +109,9 @@ if [ -n "$PACKAGES" ]; then
 fi
 # shellcheck disable=SC2086
 if [ -n "$DOC_PACKAGES" ]; then
-  step doctest cargo test --locked $DOC_PACKAGES $DOC_FEATURES --doc
+  # The build's own packages and features: naming only the packages with doc tests made cargo resolve other features
+  # and compile dependencies again (292 s on one machine, 2026-11-05). cargo skips a package without doc tests.
+  step doctest cargo test --locked $PACKAGES $FEATURES --doc
 fi
 if [ "$ONEOFF" = 1 ] && [ "$RUST" = 1 ]; then
   # i18n only lists missing translations for the log; it never fails CI.
