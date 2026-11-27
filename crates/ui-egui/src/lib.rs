@@ -58,6 +58,8 @@ pub mod preset_files_ui;
 pub mod proxy;
 pub mod render_path;
 pub(crate) mod scratch_reads;
+// fork: the wheel preference for blend mode boxes (fork/blend-list.md).
+mod blend_wheel;
 pub mod state;
 pub mod texel_guard;
 pub mod theme;
@@ -73,7 +75,6 @@ pub mod fork_update;
 // file that held them:
 // lib.rs:
 //   mod assign_shortcut;               // fork/assign-shortcut-palette.md
-//   mod blend_wheel;                   // fork/blend-list.md
 //   pub mod curves_clipping;           // fork/levels-curves-clipping.md
 //   mod double_exposure;               // fork/double-exposure.md
 //   pub mod keybinds;                  // fork/shortcut-upgrade.md
@@ -84,7 +85,7 @@ pub mod fork_update;
 // canvas.rs:         mod home_grid;                  // fork/home-recent-grid.md, fork/big-psd-open.md
 // dialogs.rs:        mod placement;                  // fork/windows-open-centred.md
 // dialogs/adjust_editors.rs: mod curve_points;       // fork/levels-curves-clipping.md
-// dialogs/palette.rs: mod frecency; mod list; mod nav; // fork/palette-frecency.md, fork/assign-shortcut-palette.md
+// dialogs/palette.rs: mod list; mod nav;           // fork/assign-shortcut-palette.md (frecency is back: fork/palette-frecency.md)
 // dialogs/select_mask_ui.rs: mod protect;            // fork/refine-hair.md
 // panels.rs:         pub(crate) mod title_bar_items; // fork/topbar-items.md
 //                    #[cfg(test)] mod brush_size_label_tests; // fork/settings-sync.md
