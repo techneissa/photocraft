@@ -82,7 +82,6 @@ pub mod fork_update;
 //   mod open_as_layers;                // fork/open-as-layers.md
 //   mod place_photos;                  // fork/place-photos.md
 //   #[cfg(test)] mod mask_clipboard_tests; // fork/upstream-select-mask.md
-// canvas.rs:         mod home_grid;                  // fork/home-recent-grid.md, fork/big-psd-open.md
 // dialogs.rs:        mod placement;                  // fork/windows-open-centred.md
 // dialogs/adjust_editors.rs: mod curve_points;       // fork/levels-curves-clipping.md
 // dialogs/palette.rs: mod list; mod nav;           // fork/assign-shortcut-palette.md (frecency is back: fork/palette-frecency.md)
