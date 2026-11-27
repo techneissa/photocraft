@@ -273,16 +273,6 @@ fn filterable(s: &Session) -> std::result::Result<(), String> {
     }
 }
 
-/// Lens Correction and Adaptive Wide Angle: a filterable layer, and not a targeted mask or channel,
-/// where Photoshop greys them out (#10457).
-fn lens_enabled(s: &Session) -> std::result::Result<(), String> {
-    filterable(s)?;
-    if crate::channel_cmds::filters_target_a_channel(s) {
-        return Err("not available while a mask or channel is targeted".into());
-    }
-    Ok(())
-}
-
 fn raw_enabled(s: &Session) -> std::result::Result<(), String> {
     // A targeted alpha channel or Quick Mask is filtered instead of the layer (#10457).
     if !crate::channel_cmds::edits_channel(s) {
@@ -511,7 +501,7 @@ pub fn specs() -> Vec<CommandSpec> {
             menu: &["Filter"],
             shortcut: Some("Cmd+Shift+R"),
             params: LENS_DOC,
-            enabled: lens_enabled,
+            enabled: filterable,
             run: lens_correction,
             journal: true,
         },
@@ -521,7 +511,7 @@ pub fn specs() -> Vec<CommandSpec> {
             menu: &["Filter"],
             shortcut: Some("Cmd+Alt+Shift+A"),
             params: r##"{"model":"auto|fisheye|perspective|fullSpherical","focalLength":0..200=0,"cropFactor":0.1..10=1,"scale":50..150=100,"constraints":[{"a":[x,y],"b":[x,y],"orientation":"free|horizontal|vertical"}]}"##,
-            enabled: lens_enabled,
+            enabled: filterable,
             run: adaptive_wide_angle,
             journal: true,
         },

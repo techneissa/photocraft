@@ -31,4 +31,4 @@ cargo test -p photocraft-ui-egui --lib -- liquify_ui rasterize_prompt distort_ui
 
 ## After the craft UI merge (2026-11-27)
 
-Partly works: the engine side of PR #10469 works (#6734 is upstream now); the interface parts of #10469 and #9304/#10375 are gone with the old screens. Rebuild: check the craft UI's Liquify, Camera Raw and mask copy and paste against the four PRs; redo what upstream still lacks.
+Partly works: the engine side of PR #10469 works (#6734 is upstream now); the interface parts of #10469 and #9304/#10375 are gone with the old screens. Rebuild: check the craft UI's Liquify, Camera Raw and mask copy and paste against the four PRs; redo what upstream still lacks. Two changes so the official interface works: Lens Correction and Adaptive Wide Angle no longer refuse in their own `enabled` (the target check in `channel_cmds/targeting.rs` still greys them, and Vanishing Point, on a targeted mask or channel), and a Liquify or Puppet Warp call that names a pixel layer (`"layer"`, as the official Liquify workspace sends) edits that layer, not the targeted mask or channel.

@@ -296,14 +296,24 @@ type LayerFn<'a> = &'a dyn Fn(&Surface, Option<&Surface>, Rect) -> Result<Surfac
 /// Liquify a layer mask, alpha channel or the Quick Mask (#10457), Puppet Warp a layer mask (Adobe
 /// documents it on layer masks). Perspective Warp and the smart-object warps ignore a target, and
 /// a smart object's filter mask takes none of them: Liquify adds a smart filter there, as from the
-/// menu (`follows_filter_mask`).
-fn follows_target(cmd: &str, p: &Value) -> bool {
+/// menu (`follows_filter_mask`). A call that names its `"layer"`, a layer with pixels
+/// (`named_pixels`), edits those pixels: the official Liquify workspace shows and commits the layer
+/// (fork: since the craft UI merge, 2026-11-27, fork/upstream-select-mask.md).
+fn follows_target(cmd: &str, p: &Value, named_pixels: bool) -> bool {
     use crate::channel_cmds::Target;
+    if named_pixels {
+        return false;
+    }
     match crate::channel_cmds::target_of(p) {
         Target::Pixels | Target::FilterMask => false,
         Target::Mask => cmd == LIQUIFY || cmd == PUPPET,
         _ => cmd == LIQUIFY,
     }
+}
+
+/// Whether `p` names its `"layer"` and that layer, `id`, has pixels ([`follows_target`]).
+fn names_pixel_layer(s: &Session, id: LayerId, p: &Value) -> bool {
+    p.get("layer").is_some_and(|l| !l.is_null()) && s.active().and_then(|d| d.doc.layer(id)).is_some_and(|l| l.surface().is_some())
 }
 
 /// `out`, a deformed mask or channel, in the format of `like`, the surface it was made from. A
@@ -339,7 +349,7 @@ fn run_on_layer(s: &mut Session, cmd: &str, label: &str, p: &Value, moves: bool,
     if let Value::Object(m) = &mut params {
         m.remove("layer");
     }
-    let on_channel = follows_target(cmd, p);
+    let on_channel = follows_target(cmd, p, names_pixel_layer(s, id, p));
     s.edit(label, |doc: &mut Document, _| {
         let canvas = doc.bounds();
         let selection = doc.selection.clone();
@@ -444,8 +454,12 @@ fn puppet(s: &mut Session, p: &Value, cmd: &str) -> Result<Value> {
     // A linked layer mask moves with the pixels on the same mesh (#4910): the layer's warp
     // solves the mesh once and leaves the moved mask here for the mask step. A targeted mask is
     // warped by itself.
-    let linked =
-        s.active().and_then(|d| d.doc.layer(id)).and_then(|l| l.mask.as_ref()).filter(|m| m.linked && !follows_target(cmd, p)).map(|m| m.surface.clone());
+    let linked = s
+        .active()
+        .and_then(|d| d.doc.layer(id))
+        .and_then(|l| l.mask.as_ref())
+        .filter(|m| m.linked && !follows_target(cmd, p, names_pixel_layer(s, id, p)))
+        .map(|m| m.surface.clone());
     let moved_mask: RefCell<Option<Surface>> = RefCell::new(None);
     let layer_fn = |surf: &Surface, sel: Option<&Surface>, _: Rect| {
         deform_selected(surf, sel, &|x| {

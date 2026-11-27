@@ -27,4 +27,4 @@ cargo test -p photocraft-ui-egui --lib -- open_as_layers double_exposure blend_w
 
 ## After the craft UI merge (2026-11-27)
 
-Partly works: the command `layer.doubleExposure` runs; no Layer menu item, no Layers panel button. Rebuild: add Layer ▸ Double Exposure and the panel button (`double_exposure.rs`) on the craft UI.
+Partly works: the command `layer.doubleExposure` runs; no Layer menu item, no Layers panel button. Rebuild: add Layer ▸ Double Exposure and the panel button (`double_exposure.rs`) on the craft UI. The preference `interface.showDoubleExposureButton` is in `HIDDEN_UNTIL_IMPLEMENTED` meanwhile (`crates/engine-core/src/prefs/validate.rs`); the rebuild takes it out.

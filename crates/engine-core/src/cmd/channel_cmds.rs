@@ -142,11 +142,11 @@ pub use targeting::target_of;
 pub use targeting::target_surface;
 pub use targeting::{FILL_KEY_IDS, follows_filter_mask, follows_target, follows_vector_mask_target, gray_target, read_target_surface};
 use targeting::{SLOT_KEY, target_cmd, target_slot};
-// fork: `target` for Double Exposure, `filters_target_a_channel` for the lens filters (upstream PR #10469 taken early).
+// fork: `target` for Double Exposure (fork/double-exposure.md).
 pub(crate) use targeting::target;
 pub(crate) use targeting::{
-    channel_surface_for_filter, clear_channel, clear_color_channel, filter_mask_layer, filters_target_a_channel, invert_region, is_spot_target,
-    mask_target_enabled, routed, targeted_channel,
+    channel_surface_for_filter, clear_channel, clear_color_channel, filter_mask_layer, invert_region, is_spot_target, mask_target_enabled, routed,
+    targeted_channel,
 };
 pub use tone_target::{ToneTarget, resolve_tone_target};
 pub(crate) use view::fix_view;
