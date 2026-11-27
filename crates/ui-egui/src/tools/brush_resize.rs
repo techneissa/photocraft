@@ -11,7 +11,6 @@
 use craft::behavior::{GesturePhase, PointerButton};
 use craft::keymap::Mods;
 use craft::ui::canvas::{ToolContext, ToolPointer};
-use craft::ui::canvas_controls::CanvasControlWords;
 use craft::ui::canvas_controls::brush::{BrushDimensions, BrushLevel, BrushResize, BrushResizeOptions, ResizeStep, TipFalloff};
 use craft::ui::contract::Show as _;
 use craft::ui::style::DataColor;
@@ -26,8 +25,6 @@ const HARDNESS_TRAVEL: f32 = 385.0;
 /// Screen points of vertical drag that take the opacity from 0 % to 100 % when "Vary Round Brush
 /// Hardness on HUD" is off.
 const OPACITY_TRAVEL: f32 = 200.0;
-/// The overlay alpha of the preview tint.
-const TINT_ALPHA: u8 = 110;
 
 /// The brush resize drag of the painting tools, kept in `PhotocraftApp::brush_resize`. The painting tool takes it
 /// out of the app for each call, so its methods get the app as an argument.
@@ -36,6 +33,8 @@ pub(crate) struct PaintResize {
     resize: BrushResize,
     /// Numbers the drags: the `coalesce` key of one drag's `tools.setBrush` calls.
     key: u64,
+    /// The stand-in pointer that holds the drag at its limits (`press.rs`).
+    held: Option<press::Held>,
 }
 
 /// Tools the gesture resizes: every painting tool, and Quick Selection (it has a brush too).
@@ -59,7 +58,7 @@ fn options(app: &PhotocraftApp) -> BrushResizeOptions {
     // Preferences ▸ Cursors ▸ Brush Preview colour; red, as in Photoshop, when it is unreadable.
     let [r, g, b] =
         crate::color_picker_ui::parse_hex(&app.session.prefs().cursors.brush_preview_color).map_or([255, 0, 0], |c| c.map(|v| (v * 255.0).round() as u8));
-    options.tint(DataColor::new(egui::Color32::from_rgba_unmultiplied(r, g, b, TINT_ALPHA)))
+    options.tint(DataColor::new(egui::Color32::from_rgba_unmultiplied(r, g, b, look::OVERLAY_ALPHA)))
 }
 
 impl PaintResize {
@@ -94,7 +93,8 @@ impl PaintResize {
             return false;
         }
         self.key += 1;
-        self.hud(cx);
+        self.held = Some(press::Held::new(pointer.pos, start, &options(app), space.view.zoom));
+        self.hud(&app.session.tools.brush, cx);
         true
     }
 
@@ -102,33 +102,35 @@ impl PaintResize {
     /// does not call it, so a second pass in a frame sets nothing again.
     pub(crate) fn drag(&mut self, app: &mut PhotocraftApp, pointer: &ToolPointer, cx: &mut ToolContext<'_>) {
         let Some(space) = cx.space() else { return };
-        let step = self.resize.track(&space.view, pointer.pos);
+        let at = self.held.as_mut().map_or(pointer.pos, |h| h.follow(pointer.pos));
+        let step = self.resize.track(&space.view, at);
         self.apply(app, step);
-        self.hud(cx);
+        self.hud(&app.session.tools.brush, cx);
     }
 
     /// The button came up: the last values stay.
     pub(crate) fn release(&mut self, app: &mut PhotocraftApp, pointer: &ToolPointer, cx: &mut ToolContext<'_>) {
         let Some(space) = cx.space() else { return };
-        let step = self.resize.finish(&space.view, pointer.pos);
+        let at = self.held.take().map_or(pointer.pos, |mut h| h.follow(pointer.pos));
+        let step = self.resize.finish(&space.view, at);
         self.apply(app, step);
     }
 
     /// Escape or a lost pointer: the values the resize started from go back.
     pub(crate) fn cancel(&mut self, app: &mut PhotocraftApp, _cx: &mut ToolContext<'_>) {
+        self.held = None;
         let step = self.resize.cancel();
         self.apply(app, step);
     }
 
     /// Asks for the diameter and level readout beside the pointer while a resize runs. `hud`, not `readout`: Show
     /// Transformation Values never hides it. The request lasts one pass, so the tool repeats it every pass.
-    pub(crate) fn hud(&self, cx: &mut ToolContext<'_>) {
+    pub(crate) fn hud(&self, brush: &photocraft_paint::BrushSettings, cx: &mut ToolContext<'_>) {
         if !self.resize.active() {
             return;
         }
-
-        let words = cx.words::<CanvasControlWords>();
-        let rows = self.resize.readout_rows(&cx.units(), &words);
+        // Diameter, Hardness and Opacity together (fork/brush-resize-drag.md), the brush holding the current values.
+        let rows = look::rows(cx, brush);
         cx.hud(rows);
     }
 
@@ -168,5 +170,10 @@ impl PaintResize {
     }
 }
 
+mod look;
+mod press;
+
+#[cfg(test)]
+mod drag_tests;
 #[cfg(test)]
 mod tests;

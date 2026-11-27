@@ -323,7 +323,7 @@ impl CanvasTool for PaintTool<'_> {
         scope.with_app(|app| {
             crate::brush_cursor::sync_tip(app);
             // The readout request lasts one pass: a pass without pointer input repeats it.
-            app.brush_resize.hud(cx);
+            app.brush_resize.hud(&app.session.tools.brush, cx);
             let Some(stroke) = state.stroke.as_ref() else { return };
             let stale_mixer =
                 stroke.tool == Tool::MixerBrush && app.live_stroke.is_some() && app.session.active_index().is_none_or(|idx| live_stroke(app, idx).is_none());
