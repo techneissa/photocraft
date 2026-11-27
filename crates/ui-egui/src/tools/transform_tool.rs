@@ -95,6 +95,10 @@ pub(crate) fn damage(
     last_damage: Option<photocraft_geom::Rect>,
 ) -> Option<photocraft_geom::Rect> {
     let o = app.transform_area.filter(|o| o.doc == doc)?;
+    // A layer's box shows the moving pixels in the document (`transform_live`), under keys of its own; the area the
+    // box has covered is `o.area`, so opening, canceling and committing are as for the preview document's key.
+    let live = |(revision, key): (u64, u64)| (revision, if crate::transform_live::is_live_key(key) { o.key } else { key });
+    let (seen, now) = (live(seen), live(now));
     let opening = seen.1 == 0 && now.1 == o.key && seen.0 == o.revision && now.0 == o.revision;
     let canceled = seen.1 == o.key && now.1 == 0 && seen.0 == o.revision && now.0 == o.revision;
     if opening || canceled {
@@ -143,6 +147,9 @@ pub struct OpenPreview {
     other_texels: Option<OtherTexels>,
     /// A box over several layers (#6501): their composite, which `textures` holds.
     several: Option<Several>,
+    /// A layer's box: the moving pixels composited in the layer's own place in the stack, with its blend mode, opacity and
+    /// mask (`transform_live`). The canvas shows that instead of `doc` and the preview's mesh.
+    pub(crate) live: Option<crate::transform_live::LiveSession>,
 }
 
 impl OpenPreview {
@@ -164,6 +171,7 @@ impl OpenPreview {
             content_aware: None,
             other_texels: None,
             several: None,
+            live: None,
         }
     }
 }

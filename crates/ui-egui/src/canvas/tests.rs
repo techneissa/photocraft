@@ -711,8 +711,8 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     let near = |r: Rect| (r.min - layer.min).length() < 1.0 && (r.max - layer.max).length() < 1.0;
     let shapes = flattened_paint_shapes(&out);
     let position = |pred: &dyn Fn(&egui::Shape) -> bool| shapes.iter().position(|s| pred(s));
-    // The moving pixels: the mesh that spans the layer's box.
-    let preview = position(&|s| matches!(s, egui::Shape::Mesh(m) if near(m.calc_bounds())));
+    // The moving pixels are composited into the canvas image (`transform_live`): the mesh that covers the layer's box.
+    let preview = position(&|s| matches!(s, egui::Shape::Mesh(m) if m.calc_bounds().contains_rect(layer)));
     // The guide: a vertical line at x = 150, which the framework's rule puts on a pixel centre (within a pixel).
     let guide = position(&|s| matches!(s, egui::Shape::LineSegment { points, .. } if points.iter().all(|p| (p.x - 150.0).abs() <= 0.5)));
     // The box: the closed four-point outline round the layer.
@@ -1144,7 +1144,7 @@ fn free_transform_redraws_only_the_moving_layer_when_the_box_opens_and_closes() 
     let app_ctx = app.ctx().clone();
     crate::transform_tool::begin(&mut app, &app_ctx).expect("the box opens");
     let (_, key) = display_doc(&mut app, 0);
-    assert_eq!(key, crate::transform_tool::preview_key(app.transform_preview.as_ref().unwrap().session));
+    assert!(crate::transform_live::is_live_key(key), "the box shows the layer in place, under a key of the live preview");
     let dk = canvas_display(&app, &app.session.documents()[0].doc, None).1;
     let opened = damage_since(&app, 0, (rev, dk), (rev, key), dk, (rev, None)).expect("opening the box has a damage area");
     assert!(opened.contains(20, 20) && opened.contains(59, 49), "{opened:?}");

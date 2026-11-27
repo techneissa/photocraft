@@ -138,6 +138,13 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String>
     let source = doc.clone();
     let doc_id = doc.id;
     let selected = selected_now(app);
+    // The moving pixels composite in the layer's place (blend mode, opacity, mask), but type keeps its own preview: its
+    // pixels are the text with its Warp Text.
+    let live = (!matches!(layer.content, LayerContent::Text(_)))
+        .then(|| {
+            crate::transform_live::LiveSession::start(&doc, revision, id, lifted.as_ref(), pd.layer(id).filter(|_| lifted.is_some()).and_then(|l| l.surface()))
+        })
+        .flatten();
     let finish = move |app: &mut PhotocraftApp, prepared: Prepared| -> Result<(), String> {
         // The document is locked while preparing; still, never open a box on another state (or
         // in another tab). The revision is read again: the job itself may have moved it on.
@@ -156,6 +163,7 @@ pub fn begin(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<(), String>
         app.transform_preview = Some(OpenPreview {
             opacity,
             above: (!frame_only).then_some(above),
+            live: live.filter(|_| !frame_only),
             styled: (styled && !frame_only).then(|| StyledPreview::new(format!("transform-{session}-styled"))),
             follow: Some(Follow { revision, hidden: if whole && !frame_only { vec![id] } else { Vec::new() }, selected: selected_now(app) }),
             ..OpenPreview::new(session, shown, textures, app.ui.tool)
