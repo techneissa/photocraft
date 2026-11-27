@@ -45,6 +45,10 @@ pub mod icons;
 pub mod jobs_ui;
 pub(crate) mod last_brush;
 pub mod levels_clipping;
+// fork: Curves clipping thresholds (fork/levels-curves-clipping.md).
+pub mod curves_clipping;
+#[cfg(test)]
+mod levels_histogram_tests; // fork/levels-histogram.md
 pub mod links;
 pub mod memory_warning;
 pub mod menu_catalog;
@@ -69,21 +73,20 @@ pub mod updates_ui;
 // fork: techneissa's own update check; the official one never runs (fork/fork-update-check.md).
 #[cfg(not(target_arch = "wasm32"))]
 pub mod fork_update;
+// fork: chords and When conditions in front of craft's keymap (fork/shortcut-upgrade.md).
+pub mod keybinds;
 
 // fork: awaiting rebuild on craft UI (official merge of 2026-11-27). These fork interface modules stay in
 // the tree, compiled out; each rebuild lane brings its own back, see fork/<slug>.md. The `mod` lines, by the
 // file that held them:
 // lib.rs:
 //   mod assign_shortcut;               // fork/assign-shortcut-palette.md
-//   pub mod curves_clipping;           // fork/levels-curves-clipping.md
 //   mod double_exposure;               // fork/double-exposure.md
-//   pub mod keybinds;                  // fork/shortcut-upgrade.md
 //   pub mod menu_custom;               // fork/context-menu-editor.md, fork/context-menu-shortcuts.md
 //   mod open_as_layers;                // fork/open-as-layers.md
 //   mod place_photos;                  // fork/place-photos.md
 //   #[cfg(test)] mod mask_clipboard_tests; // fork/upstream-select-mask.md
 // dialogs.rs:        mod placement;                  // fork/windows-open-centred.md
-// dialogs/adjust_editors.rs: mod curve_points;       // fork/levels-curves-clipping.md
 // dialogs/palette.rs: mod list; mod nav;           // fork/assign-shortcut-palette.md (frecency is back: fork/palette-frecency.md)
 // panels.rs:         pub(crate) mod title_bar_items; // fork/topbar-items.md
 //                    #[cfg(test)] mod brush_size_label_tests; // fork/settings-sync.md
@@ -364,6 +367,8 @@ pub struct PhotocraftApp {
     info_samplers: Option<panels::SamplerReadouts>,
     /// Display profile readings (#569).
     monitors: monitor_status::State,
+    /// Chords waiting for their second key (`keybinds`).
+    keybinds: keybinds::State,
     pub(crate) thumbnail_cache: std::sync::Arc<std::sync::Mutex<crate::home_recent_ui::ThumbnailCache>>,
     /// The canvas tools' own state: every tool family's gesture, hover and option state
     /// (`canvas::tools`).

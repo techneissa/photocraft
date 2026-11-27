@@ -16,10 +16,9 @@ use craft::keymap::{Builtins, CommandRef, ImportOptions, Keymap, NoneDefined, Ov
 use craft::menu::Row;
 use craft::menu::shortcuts::{Area, ConflictMode, DialogState, DialogTab, Format, Options, Outcome, ShortcutWords, ShortcutsDialog, kys_error_text};
 use craft::ui::choice::Checkbox;
-use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _};
+use craft::ui::contract::{Bind, Props as _, Show as _, ShowContainer as _};
 use craft::ui::display::Text;
 use craft::ui::layout_components::Row as LayoutRow;
-use craft::ui::pickers::Select;
 use craft::ui::runtime::env::{Env, with_env};
 use craft::ui::runtime::windows;
 use photocraft_engine::keymap_defs;
@@ -32,9 +31,6 @@ use crate::PhotocraftApp;
 /// The id of the `.kys` format in the dialog's import and export lists.
 const KYS_FORMAT: &str = "kys";
 
-/// The colours Edit › Menus gives an item; `none` is no colour.
-const COLORS: [&str; 8] = ["none", "red", "orange", "yellow", "green", "blue", "violet", "gray"];
-
 /// The open Keyboard Shortcuts and Menus dialog, at `app.prefs_rt.shortcuts`.
 pub(crate) struct ShortcutsSession {
     /// The dialog's state between passes.
@@ -46,6 +42,8 @@ pub(crate) struct ShortcutsSession {
     pub(crate) keymap: Keymap,
     /// The Menus tab's draft.
     pub(crate) menus: MenusDraft,
+    /// The Chords and Conditions tab's draft (fork/shortcut-upgrade.md).
+    pub(crate) chords: super::shortcuts_chords::ChordDraft,
     /// The text of a set to review on the next pass, taken by that pass alone: a second pass of
     /// the same frame finds nothing to review.
     pub(crate) pending_import: Option<String>,
@@ -128,10 +126,24 @@ pub fn open(app: &mut PhotocraftApp, tab: u64) {
         profiles: profiles_of(prefs),
         keymap: draft_keymap(app),
         menus: MenusDraft::of(&prefs.menus),
+        chords: super::shortcuts_chords::ChordDraft::of(app),
         pending_import: None,
         remembered: ImportAnswers::default(),
     };
     app.prefs_rt.shortcuts = Some(session);
+}
+
+/// Opens the dialog (or uses the open one) on the Keyboard Shortcuts tab with command `id` selected and scrolled into
+/// view: the entry point of Assign Shortcut… (fork/assign-shortcut-palette.md). False when the dialog does not list `id`.
+pub fn open_shortcuts_for(app: &mut PhotocraftApp, id: &str) -> bool {
+    open(app, 0);
+    let Some(session) = app.prefs_rt.shortcuts.as_mut() else { return false };
+    let command = CommandRef::new(id);
+    let known = session.keymap.bindable(&command).is_some();
+    if known {
+        session.state.select(&command);
+    }
+    known
 }
 
 /// Whether the dialog is open: the runtime's keys step aside for its modal.
@@ -205,19 +217,19 @@ fn pass(app: &mut PhotocraftApp, ui: &mut egui::Ui, press_ok: bool) {
     let rows = crate::menus::base_rows(app);
     let options = options();
     let builtins = builtins();
-    let ShortcutsSession { state, profiles, keymap, menus, pending_import, remembered } = &mut session;
+    let ShortcutsSession { state, profiles, keymap, menus, chords, pending_import, remembered } = &mut session;
     if let Some(text) = pending_import.take() {
         review(ui, state, dialog(keymap, profiles, &builtins, &options), &text, remembered);
     }
     if press_ok {
         dialog(keymap, profiles, &builtins, &options).ok(ui, state);
     }
-    let mut tabs = [menus_tab(&rows, menus)];
+    let mut tabs = [super::shortcuts_chords::tab(chords), menus_tab(&rows, menus)];
     let output = dialog(keymap, profiles, &builtins, &options).tabs(&mut tabs).show(ui, state);
     drop(tabs);
     match output.outcome {
         Some(Outcome::Ok) => {
-            if let Err(e) = save_keys(app, keymap, profiles).and_then(|_| save_menus(app, menus)) {
+            if let Err(e) = save_keys_with(app, keymap, profiles, (&chords.chords, &chords.whens)).and_then(|_| save_menus(app, menus)) {
                 app.ui.status = crate::i18n::fmt(tl!("The keyboard shortcuts were not saved: {error}"), &[("error", &e)]);
                 app.ui.status_error = true;
             }
@@ -234,7 +246,9 @@ fn pass(app: &mut PhotocraftApp, ui: &mut egui::Ui, press_ok: bool) {
         }
         _ => {}
     }
-    if state.is_open() {
+    super::shortcuts_chords::run_ask(app, chords);
+    // An import reopens the dialog on what it read: that session stays.
+    if state.is_open() && app.prefs_rt.shortcuts.is_none() {
         app.prefs_rt.shortcuts = Some(session);
     }
 }
@@ -284,6 +298,18 @@ fn save_text(app: &mut PhotocraftApp, state: &mut DialogState, suggested: &str, 
 /// `edit.keyboardShortcuts` call: the one writer of the shortcut preferences. An action's function
 /// key belongs to the action, not to a set, so the preferences' own stay whatever set was chosen.
 pub(crate) fn save_keys(app: &mut PhotocraftApp, keymap: &Keymap, profiles: &Profiles) -> Result<Value, String> {
+    // The chords and conditions stay as they are: a reset clears them, so they are written back.
+    let (chords, whens) = (app.session.prefs().chords.clone(), app.session.prefs().shortcut_when.clone());
+    save_keys_with(app, keymap, profiles, (&chords, &whens))
+}
+
+/// [`save_keys`] with the chords and When conditions of the Chords and Conditions tab (command id → text).
+pub(crate) fn save_keys_with(
+    app: &mut PhotocraftApp,
+    keymap: &Keymap,
+    profiles: &Profiles,
+    (chords, whens): (&BTreeMap<String, String>, &BTreeMap<String, String>),
+) -> Result<Value, String> {
     let (mut set, mut alternates) = keymap_defs::overrides_to_prefs(keymap.overrides());
     let prefs = app.session.prefs();
     let is_action = |id: &String| id.starts_with(photocraft_engine::actions_cmds::PLAY_SHORTCUT_PREFIX);
@@ -306,7 +332,7 @@ pub(crate) fn save_keys(app: &mut PhotocraftApp, keymap: &Keymap, profiles: &Pro
         })
         .collect();
     let active = if active == DEFAULTS_NAME { "" } else { active };
-    let call = json!({"reset": true, "set": set, "alternates": alternates, "sets": sets, "activeSet": active, "allowUnknown": true, "removeConflicts": false});
+    let call = json!({"reset": true, "set": set, "alternates": alternates, "sets": sets, "activeSet": active, "allowUnknown": true, "removeConflicts": false, "chords": chords, "when": whens});
     app.run("edit.keyboardShortcuts", call).map_err(|e| e.to_string())
 }
 
@@ -329,7 +355,7 @@ fn menus_body(ui: &mut egui::Ui, rows: &[Row], draft: &mut MenusDraft) -> bool {
         draft.hidden.clear();
     }
     let items: Vec<&Row> = rows.iter().filter(|row| row.label != "---").collect();
-    let colors: Vec<Entry<&'static str>> = COLORS.iter().map(|c| Entry::new(*c, *c)).collect();
+    let t = crate::theme::Tokens::get(ui.ctx());
     let height = ui.spacing().interact_size.y;
     // PLAN: the framework `Table` draws a value in each cell and cannot hold a Checkbox or a Select, so the rows are laid out by hand.
     egui::ScrollArea::vertical().auto_shrink([false, false]).show_rows(ui, height, items.len(), |ui, range| {
@@ -340,7 +366,11 @@ fn menus_body(ui: &mut egui::Ui, rows: &[Row], draft: &mut MenusDraft) -> bool {
                 |set| set.id_salt = Some(egui::Id::unique(id)),
                 |ui| {
                     LayoutRow::new().show(ui, |ui, _| {
-                        Text::new(format!("{} › {}", row.path.join(" › "), row.label)).show(ui);
+                        // The name has a column of its own, so the controls line up from row to row.
+                        ui.allocate_ui(egui::vec2(540.0, height), |ui| {
+                            ui.set_min_width(540.0);
+                            Text::new(format!("{} › {}", row.path.join(" › "), row.label)).show(ui);
+                        });
                         // Items that can't be hidden (File › Close, Save…, Edit › Menus…) have no visibility
                         // control at all, as in the reference application (#5096, #14335).
                         if MenuCustomization::hideable(id) {
@@ -355,15 +385,15 @@ fn menus_body(ui: &mut egui::Ui, rows: &[Row], draft: &mut MenusDraft) -> bool {
                                 }
                                 None => {}
                             }
+                        } else {
+                            ui.add_space(62.0);
                         }
-                        let current = draft.colors.get(id).map_or("none", String::as_str).to_owned();
-                        let current = COLORS.iter().copied().find(|c| *c == current).unwrap_or("none");
-                        let picked = Select::new(tl!("Color").to_string(), Bind::given(current), &colors).show(ui);
-                        if let Some(&color) = picked.events.value() {
+                        let mut color = draft.colors.get(id).map_or("none", String::as_str).to_owned();
+                        if super::shortcuts_menus::color_dot(ui, &t, &mut color) {
                             if color == "none" {
                                 draft.colors.remove(id);
                             } else {
-                                draft.colors.insert(id.to_owned(), color.to_owned());
+                                draft.colors.insert(id.to_owned(), color);
                             }
                         }
                     });

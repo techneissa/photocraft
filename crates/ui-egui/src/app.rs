@@ -59,6 +59,7 @@ impl PhotocraftApp {
             streams: HashMap::new(),
             info_samplers: None,
             monitors: Default::default(),
+            keybinds: Default::default(),
             thumbnail_cache: std::sync::Arc::new(std::sync::Mutex::new(crate::home_recent_ui::ThumbnailCache::default())),
             canvas_tools: Default::default(),
             live_stroke: None,
@@ -299,6 +300,8 @@ impl eframe::App for PhotocraftApp {
         // Native menu clicks become the commands they fire (see `native_menu`).
         native_menu::poll(self, ctx);
         shortcuts::clipboard_keys(ctx, ctx.text_edit_focused() || self.ui.text_edit.is_some(), raw_input);
+        // The fork's chords and When conditions take their keys before craft's keymap sees them.
+        crate::keybinds::runtime::filter(self, ctx, raw_input);
         #[cfg(not(target_arch = "wasm32"))]
         self.withdraw_stale_input(ctx);
         // A pen held still is no touch screen's press-and-hold right click (stylus.rs).

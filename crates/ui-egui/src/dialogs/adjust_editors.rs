@@ -35,6 +35,7 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 
+mod curve_points; // fork: Curves point sliders and Show Clipping (fork/levels-curves-clipping.md)
 mod session;
 pub mod values;
 
@@ -222,6 +223,24 @@ fn reset_legacy_toggle(value: BrightnessContrast, previous_legacy: bool, reset: 
     if reset && value.legacy != previous_legacy { BrightnessContrast::new(0.0, 0.0, value.legacy) } else { value }
 }
 
+/// Hands the clipping display an editor reports to the dialog.
+///
+/// The panel reports `Some` only while Alt-dragging an input end and `None` as soon as that gesture ends. The previous
+/// report is kept in shared setup state: setup is cloned for each pass, and a per-clone Cell loses the release edge.
+fn report_clipping(setup: &EditorSetup, cx: &mut AdjustDialogCx<'_>, clipping: Option<LevelsClip>) {
+    let changed = setup.reported_clipping.lock().ok().map(|mut previous| {
+        if *previous == clipping {
+            false
+        } else {
+            *previous = clipping;
+            true
+        }
+    });
+    if changed != Some(false) {
+        *cx.clipping = clipping;
+    }
+}
+
 /// Shows the editor of `kind` over `value` for one pass.
 fn show(kind: &str, setup: &EditorSetup, ui: &mut Ui, value: &mut AdjustValue, cx: &mut AdjustDialogCx<'_>) -> AdjustOut {
     let context = cx.context;
@@ -246,20 +265,7 @@ fn show(kind: &str, setup: &EditorSetup, ui: &mut Ui, value: &mut AdjustValue, c
                 panel = panel.pickers_unavailable();
             }
             let out = panel.show(ui);
-            // The panel reports `Some` only while Alt-dragging an input end and `None` as
-            // soon as that gesture ends. Keep the previous report in shared setup state:
-            // setup is cloned for each pass, and a per-clone Cell loses the release edge.
-            let changed = setup.reported_clipping.lock().ok().map(|mut previous| {
-                if *previous == out.clipping {
-                    false
-                } else {
-                    *previous = out.clipping;
-                    true
-                }
-            });
-            if changed != Some(false) {
-                *cx.clipping = out.clipping;
-            }
+            report_clipping(setup, cx, out.clipping);
             lifted(out.edit, |levels| AdjustValue::Levels { levels })
         }
         ("curves", AdjustValue::Curves { curves }) => {
@@ -280,6 +286,14 @@ fn show(kind: &str, setup: &EditorSetup, ui: &mut Ui, value: &mut AdjustValue, c
             }
             let out = panel.show(ui);
             let mut edit = out.edit.map(|curves| AdjustValue::Curves { curves });
+            // fork: the black point and white point sliders and Show Clipping (the framework's panel has none).
+            if context.is_dialog() {
+                let points = curve_points::point_row(ui, curves, out.channel);
+                for event in &points.edit {
+                    edit.push(event.clone());
+                }
+                report_clipping(setup, cx, points.clipping);
+            }
             // The panel reports the other mode's icon and leaves the conversion to the engine.
             if let Some(mode) = out.mode {
                 let from = AdjustValue::Curves { curves: curves.clone() };
