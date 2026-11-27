@@ -31,4 +31,4 @@ cargo test -p photocraft-ml
 
 ## After the craft UI merge (2026-11-27)
 
-Partly works: Select Subject runs the AI models; `edit.removeSubject` has no menu item; Settings ▸ AI Models is gone (`photocraft-cli models` still downloads). Rebuild: rebuild Settings ▸ AI Models (`prefs_ui/ai_models.rs`) and add Edit ▸ Remove Subject.
+Works: Settings › AI Models is a page of the craft Settings window (`prefs_ui/ai_models.rs`, drawn by `custom_rows.rs` as a custom page): the Select Subject and Object Selection engine choices, the macOS Vision row and one row per model (state, Download, Remove). The two engine rows are hidden on the Tools page. Downloads live in `Runtime::ai_models` (shared with the window), so closing the window leaves them running. Edit ▸ Remove Subject is in the menu (`menus/items.rs`, after Content-Aware Fill). Rebuild: nothing.

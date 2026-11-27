@@ -481,6 +481,7 @@ fn footer(app: &mut PhotocraftApp, picked: Option<crate::smart_ui::FilterDrag>, 
     let active = st.active_layer.and_then(|id| doc.layer(id));
     match action {
         LayersFooterAction::Link => actions.push(("layer.linkLayers".into(), json!({}))),
+        // Null params: the click takes the menu's path, which also sets up the brush (fork/double-exposure.md).
         LayersFooterAction::NewLayer { ask, below, .. } => {
             let params = if ask {
                 Value::Null
@@ -532,8 +533,12 @@ fn footer(app: &mut PhotocraftApp, picked: Option<crate::smart_ui::FilterDrag>, 
                 None => actions.push((cmd.into(), json!({}))),
             }
         }
-        // fork: the footer's first extra button is Place Photo (fork/place-photos.md); null params open its picker.
-        LayersFooterAction::More(0) => actions.push((crate::place_photos::COMMAND.into(), Value::Null)),
+        // fork: the footer's `more` buttons are Double Exposure (while shown) and Place Photo; null params open the picker.
+        LayersFooterAction::More(i) => {
+            if let Some(command) = super::layers_tree::more_commands(app).get(i) {
+                actions.push(((*command).into(), Value::Null));
+            }
+        }
         LayersFooterAction::Adjustment(id) => actions.push((id, json!({}))),
         LayersFooterAction::Style(kind) => {
             crate::layer_style::open(app, (!kind.is_empty()).then_some(kind.as_str()));

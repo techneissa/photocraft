@@ -30,4 +30,4 @@ cargo test -p photocraft-engine-core --lib -- remove_subject cutout
 
 ## After the craft UI merge (2026-11-27)
 
-Works: Remove Subject fills with LaMa on Candle (engine). Rebuild: only the AI Models row.
+Works: the LaMa row is on Settings › AI Models (see [select-subject-ai.md](select-subject-ai.md)). Rebuild: nothing.

@@ -5,10 +5,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-use egui::RichText;
+use craft::theme::variant::Tone;
+use craft::ui::buttons::Button;
+use craft::ui::contract::{Props as _, Show as _, ShowContainer as _};
+use craft::ui::display::Text;
+use craft::ui::layout_components::Row;
+use craft::ui::patterns::preferences::SettingsDraft;
+use craft::ui::style::TypeRole;
 use photocraft_ml::{MlError, Model, Source};
-
-use crate::{theme::Tokens, widgets};
 
 #[derive(Clone, Debug, PartialEq)]
 enum Phase {
@@ -138,6 +142,9 @@ impl ModelJob {
     }
 }
 
+/// The id of the page in the Settings window.
+pub(super) const PAGE: &str = "aiModels";
+
 pub(super) struct Runtime {
     rows: Vec<ModelJob>,
 }
@@ -157,8 +164,7 @@ impl Runtime {
 }
 
 pub(super) fn privacy(ui: &mut egui::Ui) {
-    ui.label(tl!("Models are optional and run entirely on this computer. Downloading fetches the model file from Hugging Face; no images or documents are ever uploaded. Without a model, Select Subject, Remove Background and Remove Subject use the built-in (non-AI) methods."));
-    ui.add_space(8.0);
+    Text::new(tl!("Models are optional and run entirely on this computer. Downloading fetches the model file from Hugging Face; no images or documents are ever uploaded. Without a model, Select Subject, Remove Background and Remove Subject use the built-in (non-AI) methods.").to_string()).show(ui);
 }
 
 /// A row's title. The full BiRefNet's is in Title Case (and English only, like SAM 3's); the older rows keep the
@@ -202,48 +208,88 @@ fn progress_fraction(done: u64, total: u64) -> f32 {
     if total == 0 { 0.0 } else { (done as f64 / total as f64).clamp(0.0, 1.0) as f32 }
 }
 
+/// The AI Models page: the privacy note, the two engine choices (written to the draft like any row), the macOS
+/// Vision row and one row per downloadable model.
+pub(super) fn page(ui: &mut egui::Ui, runtime: &mut Runtime, draft: &mut SettingsDraft) {
+    privacy(ui);
+    for (key, label, salt) in [
+        ("tools.selectSubjectEngine", tl!("Select Subject Engine"), "ai-subject-engine"),
+        ("tools.objectSelectionEngine", tl!("Object Selection Engine"), "ai-object-engine"),
+    ] {
+        let current: String = draft.get(key).unwrap_or_else(|| "auto".into());
+        if let Some(next) = super::custom_rows::choose(ui, label, salt, current, &super::custom_rows::choices_of(key)) {
+            draft.set(key, &next);
+        }
+    }
+    show(ui, runtime);
+}
+
+/// Whether this computer has the macOS Vision cutout (Mac only).
+fn vision_available() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        photocraft_macvision::available()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
+    }
+}
+
 pub(super) fn show(ui: &mut egui::Ui, runtime: &mut Runtime) {
     show_with(ui, runtime, |model| photocraft_ml::model_location(model).map(|l| l.source));
 }
 
+/// The macOS Vision row: built into the system, so it has no download.
+fn vision_row(ui: &mut egui::Ui) {
+    ui.separator();
+    Row::new().show(ui, |ui, _| {
+        Text::new(tl!("macOS (Apple Vision, Mac only)").to_string()).role(TypeRole::BodyStrong).show(ui);
+        Text::new((if vision_available() { tl!("Built in") } else { tl!("Not available on this computer") }).to_string()).role(TypeRole::Caption).show(ui);
+    });
+    Text::new(tl!("Select Subject, Remove Background").to_string()).show(ui);
+}
+
 fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, found: impl Fn(Model) -> Option<Source>) {
-    let t = Tokens::get(ui.ctx());
+    vision_row(ui);
     for row in &mut runtime.rows {
         row.source = found(row.model);
         row.refresh(row.source.is_some());
         let state = row.lock().clone();
         ui.push_id(row.model, |ui| {
             ui.separator();
-            ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new(title(row.model)).font(crate::theme::semibold(12.5)).color(t.text));
+            Row::new().show(ui, |ui, _| {
+                Text::new(title(row.model).to_string()).role(TypeRole::BodyStrong).show(ui);
                 if !matches!(state.phase, Phase::Downloading { .. }) {
-                    ui.label(RichText::new(if state.phase == Phase::Installed { tl!("Installed") } else { tl!("Not installed") }).color(t.text_dim));
+                    Text::new((if state.phase == Phase::Installed { tl!("Installed") } else { tl!("Not installed") }).to_string())
+                        .role(TypeRole::Caption)
+                        .show(ui);
                 }
             });
-            ui.label(powers(row.model));
+            Text::new(powers(row.model).to_string()).show(ui);
             let size = mb(row.model.size_bytes());
-            ui.label(RichText::new(crate::i18n::fmt(tl!("{size} MB · {licence}"), &[("size", &size), ("licence", row.model.licence())])).color(t.text_dim));
+            let detail = crate::i18n::fmt(tl!("{size} MB · {licence}"), &[("size", &size), ("licence", row.model.licence())]);
+            Text::new(detail).role(TypeRole::Caption).show(ui);
             if let (Phase::Installed, Some(source)) = (&state.phase, row.source) {
-                ui.label(RichText::new(crate::i18n::fmt(tl!("Found in: {place}"), &[("place", place(source))])).color(t.text_dim));
+                Text::new(crate::i18n::fmt(tl!("Found in: {place}"), &[("place", place(source))])).role(TypeRole::Caption).show(ui);
             }
             // The shared folder the model lives in, or goes to when it is downloaded (SAM 3 without its files shows its own below).
             if (row.model.downloadable() || state.phase == Phase::Installed)
                 && let Some(dir) = photocraft_ml::install_dir(row.model)
             {
                 let folder = dir.display().to_string();
-                let line = crate::i18n::fmt(tl!("Folder: {folder}"), &[("folder", &folder)]);
-                ui.add(egui::Label::new(RichText::new(line).color(t.text_dim)).selectable(true));
+                Text::new(crate::i18n::fmt(tl!("Folder: {folder}"), &[("folder", &folder)])).role(TypeRole::Caption).show(ui);
             }
             match state.phase {
                 // No public download (SAM 3): say where the files go instead of a Download button.
                 Phase::Idle if !row.model.downloadable() => {
-                    ui.label(tl!("No public download. Put these files in the folder below:"));
-                    ui.label(RichText::new(row.model.files().iter().map(|f| f.name).collect::<Vec<_>>().join(", ")).color(t.text_dim));
+                    Text::new(tl!("No public download. Put these files in the folder below:").to_string()).show(ui);
+                    Text::new(row.model.files().iter().map(|f| f.name).collect::<Vec<_>>().join(", ")).role(TypeRole::Caption).show(ui);
                     let folder = photocraft_ml::install_dir(row.model).map_or_else(|| tl!("The models folder").to_string(), |d| d.display().to_string());
-                    ui.add(egui::Label::new(RichText::new(folder).color(t.text_dim)).selectable(true));
+                    Text::new(folder).role(TypeRole::Caption).show(ui);
                 }
                 Phase::Idle => {
-                    if widgets::secondary_button(ui, tl!("Download"), 0.0).clicked() {
+                    if Button::new(tl!("Download")).show(ui).clicked() {
                         row.start_with(photocraft_ml::download);
                     }
                 }
@@ -253,13 +299,9 @@ fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, found: impl Fn(Model) -> 
                         tl!("{done} / {total} MB ({percent}%)"),
                         &[("done", &mb(done)), ("total", &mb(total)), ("percent", &format!("{:.0}", fraction * 100.0))],
                     );
-                    ui.add(egui::ProgressBar::new(fraction).text(progress).fill(t.accent));
+                    ui.add(egui::ProgressBar::new(fraction).text(progress));
                     let cancelling = row.cancel.load(Ordering::Relaxed);
-                    if ui
-                        .add_enabled_ui(!cancelling, |ui| widgets::secondary_button(ui, if cancelling { tl!("Cancelling…") } else { tl!("Cancel") }, 0.0))
-                        .inner
-                        .clicked()
-                    {
+                    if Button::new(if cancelling { tl!("Cancelling…") } else { tl!("Cancel") }).enabled(!cancelling).show(ui).clicked() {
                         row.cancel();
                     }
                 }
@@ -267,20 +309,19 @@ fn show_with(ui: &mut egui::Ui, runtime: &mut Runtime, found: impl Fn(Model) -> 
                 // there by hand (SAM 3, no public download) are not removed either: they may be the only copy.
                 Phase::Installed if row.source == Some(Source::Old) || !row.model.downloadable() => {}
                 Phase::Installed => {
-                    ui.horizontal(|ui| {
-                        if widgets::secondary_button(ui, if row.confirm_remove { confirm_remove_label(row.source) } else { tl!("Remove") }, 0.0).clicked() {
+                    Row::new().show(ui, |ui, _| {
+                        if Button::new(if row.confirm_remove { confirm_remove_label(row.source) } else { tl!("Remove") }).show(ui).clicked() {
                             row.remove_with(photocraft_ml::remove);
                         }
-                        if row.confirm_remove && widgets::secondary_button(ui, tl!("Cancel"), 0.0).clicked() {
+                        if row.confirm_remove && Button::new(tl!("Cancel")).show(ui).clicked() {
                             row.confirm_remove = false;
                         }
                     });
                 }
             }
             if let Some(error) = &state.error {
-                ui.label(RichText::new(tl!(error.as_str())).color(t.danger));
+                Text::new(error.clone()).tone(Tone::Bad).show(ui);
             }
-            ui.add_space(8.0);
         });
     }
     runtime.repaint_while_active(ui.ctx());
@@ -386,9 +427,10 @@ mod tests {
     #[test]
     fn separate_models_run_concurrently_and_survive_closing_preferences() {
         let mut app = crate::PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-        let dialog = super::super::open_preferences(&mut app, "aiModels");
+        super::super::open_preferences(&mut app, "aiModels");
+        let shared = std::sync::Arc::clone(&app.prefs_rt.ai_models);
         let mut releases = Vec::new();
-        for row in &mut app.prefs_rt.ai_models.rows {
+        for row in &mut shared.lock().unwrap().rows {
             let (tx, rx) = mpsc::channel();
             releases.push(tx);
             assert!(row.start_with(move |_, _, cancel| {
@@ -397,13 +439,16 @@ mod tests {
                 Ok(PathBuf::from("fake-model"))
             }));
         }
-        app.ui.dialogs.retain(|d| d.id != dialog);
-        assert!(app.prefs_rt.ai_models.rows.iter().all(ModelJob::active));
+        // Closing the window leaves the downloads running.
+        use craft::ui::dialog::StackDialog as _;
+        let id = app.framework.dialogs.get::<super::super::dialogs::PrefsDialog>().map(|d| d.id()).unwrap();
+        app.framework.dialogs.cancel_by_id(&egui::Context::default(), id);
+        assert!(shared.lock().unwrap().rows.iter().all(ModelJob::active));
         super::super::open_preferences(&mut app, "aiModels");
         for tx in releases {
             tx.send(()).unwrap();
         }
-        for row in &app.prefs_rt.ai_models.rows {
+        for row in &shared.lock().unwrap().rows {
             wait_for(row, |s| s.phase == Phase::Installed);
         }
     }

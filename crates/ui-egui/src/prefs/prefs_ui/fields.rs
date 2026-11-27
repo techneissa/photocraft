@@ -156,6 +156,12 @@ pub(super) fn rules(ctx: &egui::Context) -> Vec<SettingRule> {
     ] {
         tweak(&mut rules, path, |r| r.hidden());
     }
+    // fork: the engine choices are on the AI Models page (`ai_models::page`); the browser has no such page.
+    if cfg!(not(target_arch = "wasm32")) {
+        for path in ["tools.selectSubjectEngine", "tools.objectSelectionEngine"] {
+            tweak(&mut rules, path, |r| r.hidden());
+        }
+    }
     // The web build has no Agents page (`custom_rows::AGENTS_PAGE`): it shows the settings PhotoCraft had before the
     // ArtCraft Launcher's switch.
     if cfg!(target_arch = "wasm32") {
@@ -185,6 +191,8 @@ pub(super) fn rules(ctx: &egui::Context) -> Vec<SettingRule> {
     ] {
         tweak(&mut rules, path, |r| r.custom());
     }
+    // fork: the update check, the settings buttons and the Sync Folder block hang on the page's last row.
+    tweak(&mut rules, super::general_row::KEY, |r| r.custom_rows());
     // Rows that draw their own label or heading, so the window adds none: the Appearance page (Appearance Mode, the
     // themes), Rendering Mode's select and the Memory Usage block.
     for path in ["interface.appearanceMode", "performance.renderingMode", "performance.memoryUsageMb"] {
@@ -243,6 +251,9 @@ fn label_override(key: &str) -> Option<&'static str> {
         "doNotAppendCopy" => "Do not append \"copy\" to filename when saving a copy",
         "pcraftFullComposite" => "Save Full-Size Composite in .pcraft Files",
         "generatorEnabled" => "Enable Generator",
+        // fork: Settings › General (fork/background-lock-setting.md) and Interface (fork/double-exposure.md).
+        "lockBackgroundLayer" => "Lock the Background Layer",
+        "showDoubleExposureButton" => "Double Exposure button",
         "lowLatencyDrawing" => "Low-Latency Drawing (vsync off, applies at next launch)",
         "sizeLimitMb" => "Scratch Size Limit (MB, 0 = No Limit)",
         "gpuMemoryMb" => "GPU Memory (MB, 0 = Automatic)",
@@ -265,6 +276,9 @@ pub(super) fn choice_label(v: &str) -> String {
         "16" => "16 Bits/Channel".into(),
         "postScript" => "PostScript (72 points/inch)".into(),
         "traditional" => "Traditional (72.27 points/inch)".into(),
+        "macos" => "macOS (Apple Vision, Mac only)".into(),
+        "model" => "AI Model (download in Preferences › AI Models)".into(),
+        "sam3" => "SAM 3 (model in Preferences › AI Models)".into(),
         "vulkan" => "Vulkan".into(),
         "dx12" => "DirectX 12".into(),
         "metal" => "Metal".into(),
@@ -272,8 +286,6 @@ pub(super) fn choice_label(v: &str) -> String {
         "ahd" => "AHD (adaptive homogeneity)".into(),
         "mhc" => "Malvar–He–Cutler".into(),
         "cpu" => "CPU (no GPU acceleration)".into(),
-        // fork: the engine choices (fork/sam3-click-select.md).
-        "sam3" => "SAM 3 (model in Preferences › AI Models)".into(),
         v => spelled(v),
     }
 }

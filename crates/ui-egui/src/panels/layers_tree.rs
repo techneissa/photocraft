@@ -93,6 +93,8 @@ struct LayersFacts<'a> {
     link_enabled: bool,
     /// fork: the Place Photo footer button (icon, tooltip, enabled), fork/place-photos.md.
     place_photo: (&'static str, String, bool),
+    /// fork: the Double Exposure button of the footer: `None` while it is hidden, else whether it is enabled.
+    double_exposure: Option<bool>,
     #[memo_props(hash = "a plain model id")]
     hovered: Option<LayerId>,
     working_text: Option<u64>,
@@ -100,6 +102,22 @@ struct LayersFacts<'a> {
     missing: craft::ui::contract::Revision,
     foreign_drag: bool,
     picked: Option<crate::smart_ui::FilterDrag>,
+}
+
+/// fork: the footer's Double Exposure button: `None` while Preferences › Interface hides it, else whether the command
+/// can run (fork/double-exposure.md).
+/// The commands of the footer's `more` buttons, in drawing order: a press on button `i` runs `more_commands(app)[i]`.
+pub(crate) fn more_commands(app: &PhotocraftApp) -> Vec<&'static str> {
+    let mut commands = Vec::new();
+    if double_exposure_button(app).is_some() {
+        commands.push(crate::double_exposure::COMMAND);
+    }
+    commands.push(crate::place_photos::COMMAND);
+    commands
+}
+
+fn double_exposure_button(app: &PhotocraftApp) -> Option<bool> {
+    app.session.prefs().interface.show_double_exposure_button.then(|| app.session.is_enabled(crate::double_exposure::COMMAND))
 }
 
 /// The id the Layers panel's model is derived under.
@@ -128,6 +146,7 @@ pub(crate) fn model(
         vector_mask_target: app.ui.vector_mask_target,
         link_enabled: app.session.is_enabled("layer.linkLayers"),
         place_photo: crate::place_photos::footer_button(app),
+        double_exposure: double_exposure_button(app),
         hovered: app.canvas_hover_layer,
         working_text: working_text(app),
         missing: app.session.missing_links_revision(),
@@ -182,6 +201,7 @@ pub(crate) struct PhotoLayers {
     vector_mask_target: bool,
     link_enabled: bool,
     place_photo: (&'static str, String, bool),
+    double_exposure: Option<bool>,
     hovered: Option<LayerId>,
     /// A Type Mask session's working text, which the panel never lists.
     working_text: Option<u64>,
@@ -216,6 +236,7 @@ impl PhotoLayers {
             vector_mask_target: ui.vector_mask_target,
             link_enabled: app.session.is_enabled("layer.linkLayers"),
             place_photo: crate::place_photos::footer_button(app),
+            double_exposure: double_exposure_button(app),
             hovered: app.canvas_hover_layer,
             working_text: working_text(app),
             empty,
@@ -502,6 +523,9 @@ impl LayerTree for PhotoLayers {
         let mut footer = LayersFooterState::new(tl!(delete).to_string());
         footer.delete_enabled = active.is_some();
         footer.link_enabled = self.link_enabled;
+        // fork: Double Exposure next to the footer's other buttons (fork/double-exposure.md).
+        // fork: the buttons after Link Layers, in the order of [`more_commands`]: Double Exposure while shown, then Place Photo.
+        footer.more.extend(self.double_exposure.map(|enabled| ("double-exposure", tl!("Double Exposure").to_string(), enabled)));
         footer.mask_label = crate::layer_menu_ui::mask_button_command(active, self.doc().selection.is_some(), false).map(|_| {
             if active.is_some_and(|l| l.mask.is_some()) {
                 tl!("Add vector mask").to_string()

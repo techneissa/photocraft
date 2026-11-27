@@ -1,28 +1,27 @@
 //! The web build's stand-in for [`settings_folder`](super): a browser has no sync folder, so the
-//! row, the commands, the start offer and the save on quit do nothing. The names match the
+//! block, the commands, the start offer and the save on quit do nothing. The names match the
 //! native module's, so the hooks in the shared code need no `cfg`.
 
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use super::PhotocraftApp;
+use super::settings_sync::Request;
 
-/// What the row asked for: nothing, on the web.
-#[derive(Clone, Copy, Debug, Default)]
-pub(super) struct Clicks;
-
-pub(super) fn row_matches(_: &str) -> bool {
-    false
+/// Who saved a settings file: never known in a browser, which has no sync folder.
+#[derive(Clone, Debug)]
+pub(super) struct SavedBy {
+    pub(super) computer: String,
 }
 
-pub(super) fn row(_: &mut egui::Ui, _: &PhotocraftApp, _: &mut Map<String, Value>) -> Clicks {
-    Clicks
+impl SavedBy {
+    pub(super) fn when_text(&self) -> String {
+        String::new()
+    }
 }
 
-pub(super) fn run(_: &mut PhotocraftApp, _: &mut Map<String, Value>, _: Clicks) {}
-
-pub(super) fn saved_line(_: &mut egui::Ui, _: &Map<String, Value>) {}
-
-pub(super) fn note_loaded(_: &mut PhotocraftApp, _: &Map<String, Value>) {}
+pub(super) fn run(_: &mut PhotocraftApp, _: Request) -> Result<Value, String> {
+    Ok(Value::Null)
+}
 
 pub(super) fn invoke(_: &mut PhotocraftApp, _: &str, _: &Value) -> Option<Result<Value, String>> {
     None

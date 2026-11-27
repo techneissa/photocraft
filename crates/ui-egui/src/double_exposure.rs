@@ -58,12 +58,12 @@ fn paint_setup(app: &mut PhotocraftApp) {
     photocraft_engine::brush_cmds::remember_brush(&mut app.session);
     let tools = &mut app.session.tools;
     let kept = app.prefs_rt.double_exposure_brush.take().filter(|s| s.rev == tools.brush_rev);
-    let stash = kept.unwrap_or_else(|| Stash { brush: tools.brush.clone(), preset: tools.current_preset.clone(), rev: tools.brush_rev });
+    let stash = kept.unwrap_or_else(|| Stash { brush: (*tools.brush).clone(), preset: tools.current_preset.clone(), rev: tools.brush_rev });
     let mut brush = crate::paint_mouse::fresh_brush(Tool::Brush, &tools.brush);
     brush.size = size;
     brush.hardness = 0.0;
     brush.erase = false;
-    tools.brush = brush;
+    *tools.brush = brush;
     tools.current_preset = None;
     tools.brush_saved_rev = tools.brush_rev;
     app.prefs_rt.double_exposure_brush = Some(Stash { rev: tools.brush_rev, ..stash });
@@ -80,7 +80,7 @@ pub(crate) fn restore_brush(app: &mut PhotocraftApp) {
     let Some(stash) = app.prefs_rt.double_exposure_brush.take() else { return };
     let tools = &mut app.session.tools;
     if tools.brush_rev == stash.rev {
-        tools.brush = stash.brush;
+        *tools.brush = stash.brush;
         tools.current_preset = stash.preset;
         tools.brush_changed();
     }

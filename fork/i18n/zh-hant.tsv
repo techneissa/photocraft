@@ -20,6 +20,38 @@
 	{n} min ago	{n} 分鐘前
 	{n} h ago	{n} 小時前
 	Yesterday	昨天
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	和弦與條件
+	Search commands, chords, conditions	搜尋指令、和弦、條件
+	Export	匯出
+	Import	匯入
+	Export Shortcuts as JSON…	將快速鍵匯出為 JSON…
+	Import Shortcuts from JSON…	從 JSON 匯入快速鍵…
+	A chord is two keys in a row; a condition limits where a command's keys work.	和弦是連續按下的兩個鍵；條件限定指令的按鍵在哪裡生效。
+	Press two keys…	請按兩個鍵…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	點擊後連續按兩個鍵。Esc 取消，⌫ 移除和弦。
+	Always	一律
+	That is not a chord: press two keys in a row.	這不是和弦：請連續按兩個鍵。
+	Imported {file}. The shortcuts are saved.	已匯入 {file}。快速鍵已儲存。
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} 也是 {command} 的快速鍵：它會等待和弦的第二個鍵。
+	{key} is also used by {command} in the same context.	{key} 在相同情境下也被 {command} 使用。
+	{key} was pressed, but no shortcut continues with that key	已按下 {key}，但沒有快速鍵以該鍵繼續
+	{count} shortcut condition(s) in your settings could not be read and are ignored	設定中有 {count} 個快速鍵條件無法讀取，已被忽略
+	and {count} more	另有 {count} 個
+	Color: {name}	顏色：{name}
+	Red	紅色
+	Orange	橙色
+	Yellow	黃色
+	Green	綠色
+	Blue	藍色
+	Violet	紫色
+	Gray	灰色
+	Add Condition	新增條件
+	The shortcut works only while…	快速鍵僅在以下情況生效…
+	Back	返回
+	Is	是
+	Is Not	不是
+
 # Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
 	Assign Shortcut…	指定快速鍵…
 @id	settingsPage.contextMenus	快顯選單

@@ -60,7 +60,7 @@ fn config_path() -> std::path::PathBuf {
 
 /// Services whose preferences store reads and writes `files`. A zero debounce makes the first `tick` after a
 /// change write it.
-fn services_on(files: &Arc<MemoryFiles>) -> crate::Services {
+pub(super) fn services_on(files: &Arc<MemoryFiles>) -> crate::Services {
     let options = OpenOptions::new(Location::Dir(DIR.into())).debounce(Duration::ZERO).files(files.clone());
     crate::Services { settings: Some(SettingsStore::<prefs::SavedPrefs>::open_with(options)), ..Default::default() }
 }
@@ -147,18 +147,18 @@ fn saved_text(files: &MemoryFiles) -> Option<String> {
 }
 
 /// Opens Preferences on `section`.
-fn open_prefs(app: &mut PhotocraftApp, section: &str) {
+pub(super) fn open_prefs(app: &mut PhotocraftApp, section: &str) {
     open_preferences(app, section);
     assert!(window_open(app), "Preferences did not open");
 }
 
 /// Edits the open window's draft the way a row does.
-fn edit(app: &mut PhotocraftApp, key: &str, value: PrefValue) {
+pub(super) fn edit(app: &mut PhotocraftApp, key: &str, value: PrefValue) {
     assert!(set_draft(app, key, value), "{key}: the window refused the value");
 }
 
 /// A kittest harness on an app (built inside it, on the harness's context) with Preferences open on `section`.
-fn prefs_harness(
+pub(super) fn prefs_harness(
     files: &Arc<MemoryFiles>,
     section: &'static str,
     size: egui::Vec2,

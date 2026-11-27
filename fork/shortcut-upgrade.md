@@ -10,7 +10,7 @@ Keyboard Shortcuts upgrade in the existing window: chords (⌘K then C) with a k
 
 ## Own files
 
-engine-core `when/`, `prefs/chords.rs`, `prefs/chord_cmds.rs`, `shortcut_backup.rs` (+ tests); ui-egui `keybinds.rs` + `keybinds/`, `prefs/prefs_ui/shortcuts_chords.rs` (+ tests); `assets/icons/download.svg`, `upload.svg` (Lucide)
+engine-core `when/`, `prefs/chords.rs`, `prefs/chord_cmds.rs`, `shortcut_backup.rs` (+ tests); ui-egui `keybinds.rs` + `keybinds/`, `prefs/prefs_ui/shortcuts_chords.rs`, `shortcuts_when.rs` (+ tests); `assets/icons/download.svg`, `upload.svg` (Lucide)
 
 ## Hooks in official files
 
@@ -25,11 +25,13 @@ Works again on craft's keymap, as the fork's own key layer in front of it:
 - The Chords and Conditions tab of Keyboard Shortcuts and Menus (`prefs_ui/shortcuts_chords.rs`): search; per command a chord button (click, press two keys; Esc cancels, ⌫ removes), a clash icon with its note, a When text field (red with the parse error); Export and Import JSON buttons (the backup file of `shortcut_backup`; Import applies at once and reopens the dialog). While it records, the key layer hands it the presses and nothing runs.
 - OK writes the chords and conditions with the keys. The save resets the keys, and a reset clears chords and conditions, so `save_keys` writes them back (also for a `.kys` import).
 
-Not rebuilt: the When builder (autocomplete, `!`, + chips; the field takes the text and shows parse errors), the clash icon beside the key in craft's own table row, the Assign Shortcut entry from right-clicks (fork/assign-shortcut-palette.md). A shortcut set (the dialog's Set menu) still carries keys only.
+The When field has its autocomplete again (`prefs_ui/shortcuts_when.rs`): while it has focus, a list above it offers context keys, `!` forms, operators and values (Tab, ↑ ↓ and a click take one), and `+` opens the builder (key, Is or Is Not, value) that adds a part with `&&`. Craft's own table row shows the clash icon again, with the clashing command in its tooltip (fork/shortcuts-window.md, craft-libs patch 8). The help line under the tab's search is one sentence.
+
+Not rebuilt: the condition as readable chips at rest (the field shows the text). A shortcut set (the dialog's Set menu) still carries keys only.
 
 ## Tests
 
 ```bash
 cargo test -p photocraft-engine-core --lib -- when chords chord_cmds shortcut_backup shortcut_sets
-cargo test -p photocraft-ui-egui --lib -- keybinds shortcuts_chords shortcut_capture shortcut_set
+cargo test -p photocraft-ui-egui --lib -- keybinds shortcuts_chords shortcuts_when shortcut_capture shortcut_set
 ```

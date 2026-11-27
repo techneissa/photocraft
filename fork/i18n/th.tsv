@@ -3,6 +3,38 @@
 	AI Models	โมเดล AI
 	subject segmentation (BiRefNet-lite)	การแยกวัตถุหลัก (BiRefNet-lite)
 	inpainting (LaMa)	การเติมภาพ (LaMa)
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	คอร์ดและเงื่อนไข
+	Search commands, chords, conditions	ค้นหาคำสั่ง คอร์ด เงื่อนไข
+	Export	ส่งออก
+	Import	นำเข้า
+	Export Shortcuts as JSON…	ส่งออกทางลัดเป็น JSON…
+	Import Shortcuts from JSON…	นำเข้าทางลัดจาก JSON…
+	A chord is two keys in a row; a condition limits where a command's keys work.	คอร์ดคือการกดสองปุ่มต่อเนื่องกัน ส่วนเงื่อนไขจำกัดว่าปุ่มของคำสั่งทำงานที่ใด
+	Press two keys…	กดสองปุ่ม…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	คลิก แล้วกดสองปุ่มต่อเนื่องกัน Esc ยกเลิก ⌫ ลบคอร์ด
+	Always	เสมอ
+	That is not a chord: press two keys in a row.	นั่นไม่ใช่คอร์ด: กดสองปุ่มต่อเนื่องกัน
+	Imported {file}. The shortcuts are saved.	นำเข้า {file} แล้ว บันทึกทางลัดแล้ว
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} เป็นทางลัดของ {command} ด้วย: จะรอปุ่มที่สองของคอร์ด
+	{key} is also used by {command} in the same context.	{command} ก็ใช้ {key} ในบริบทเดียวกัน
+	{key} was pressed, but no shortcut continues with that key	กด {key} แล้ว แต่ไม่มีทางลัดที่ต่อจากปุ่มนั้น
+	{count} shortcut condition(s) in your settings could not be read and are ignored	อ่านเงื่อนไขทางลัด {count} รายการในการตั้งค่าไม่ได้ จึงถูกข้ามไป
+	and {count} more	และอีก {count}
+	Color: {name}	สี: {name}
+	Red	แดง
+	Orange	ส้ม
+	Yellow	เหลือง
+	Green	เขียว
+	Blue	น้ำเงิน
+	Violet	ม่วง
+	Gray	เทา
+	Add Condition	เพิ่มเงื่อนไข
+	The shortcut works only while…	ทางลัดทำงานเฉพาะเมื่อ…
+	Back	กลับ
+	Is	คือ
+	Is Not	ไม่ใช่
+
 # Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
 	Assign Shortcut…	กำหนดแป้นพิมพ์ลัด…
 @id	settingsPage.contextMenus	เมนูบริบท

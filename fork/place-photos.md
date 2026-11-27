@@ -16,7 +16,7 @@ File ▸ Place Embedded… on ⇧⌘P (Place Linked unchanged), and an icon-only
 
 - engine-core `cmd/file_cmds.rs` (`file.placeEmbedded` default key `Cmd+Shift+P`), ui-egui `menu_catalog.rs` (the key)
 - ui-egui `lib.rs` (module), `panels/layers_tree.rs` (`place_photo` in the model and its facts; `footer()` pushes it onto `LayersFooterState::more`), `panels/layers_events.rs` (`LayersFooterAction::More(0)` runs Place Embedded with null params, which opens the picker), `icon_data.rs` (icon)
-- craft-libs fork copy, patch 8 ([craft-libs.md](craft-libs.md)): the footer's `more` buttons
+- craft-libs fork copy, patch 9 ([craft-libs.md](craft-libs.md)): the footer's `more` buttons
 - `ATTRIBUTION.md` (icon row; `place-photo.svg` in the Lucide row's exceptions)
 
 ## Tests
@@ -29,4 +29,4 @@ cargo test -p photocraft-ui-egui --lib -- file_dialog icons::
 
 ## After the craft UI merge (2026-11-27)
 
-Rebuilt on the craft UI (`feat/step2-layers-transform`): the Place Photo button is back through patch 8; several photos at once come from the official code, so `place_photos.rs` shrank to the button and its tests went (they tested the fork's own picker).
+Rebuilt on the craft UI (`feat/step2-layers-transform`): the Place Photo button is back through patch 9; several photos at once come from the official code, so `place_photos.rs` shrank to the button and its tests went (they tested the fork's own picker).

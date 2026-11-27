@@ -46,6 +46,14 @@ const PLACE_AFTER: &[(&str, &str)] = &[
     ("view.rotateRight", "view.rotateLeft"),
     ("view.resetView", "view.rotateRight"),
     ("filter.other.colorToAlpha", "filter.other.offset"),
+    // fork: Layer › Double Exposure (fork/double-exposure.md), Edit › Remove Subject (fork/select-subject-ai.md) and the
+    // settings sync items (fork/settings-sync.md).
+    ("layer.doubleExposure", "layer.maskAllObjects"),
+    ("edit.removeSubject", "edit.contentAwareFill"),
+    ("edit.preferences.exportSettings", "edit.preferences.rawDefaults"),
+    ("edit.preferences.importSettings", "edit.preferences.exportSettings"),
+    ("edit.preferences.saveSettingsToFolder", "edit.preferences.importSettings"),
+    ("edit.preferences.loadSettingsFromFolder", "edit.preferences.saveSettingsToFolder"),
 ];
 
 /// The menu rows of one state of the app, built once and kept until a fact they show changes

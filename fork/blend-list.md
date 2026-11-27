@@ -25,7 +25,7 @@ Rebuilt on craft's blend lists (`Select` over `blend_entries`), with two patches
 
 Own files now: `crates/ui-egui/src/blend_wheel.rs` and `blend_wheel/tests.rs` (compiled in again). Official-file hooks: `app/framework.rs` (1 line), `lib.rs` (`mod blend_wheel`), and the official test `options_bar_mode_wheel_tests.rs` turns the preference on. The preference (`interface.scrollWheelChangesBlendMode`) stays in engine-core `prefs.rs`.
 
-- **Tooltip:** patch 9 hides the box's own "Blend Mode" tooltip while its list is open (a window-tall list would sit under it and the tooltip covered "Normal"). Every component with a popup now shows no tooltip while its popup is open.
+- **Tooltip:** patch 10 hides the box's own "Blend Mode" tooltip while its list is open (a window-tall list would sit under it and the tooltip covered "Normal"). Every component with a popup now shows no tooltip while its popup is open.
 
 ## Tests
 

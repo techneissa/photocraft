@@ -20,6 +20,38 @@
 	{n} min ago	{n}분 전
 	{n} h ago	{n}시간 전
 	Yesterday	어제
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	코드와 조건
+	Search commands, chords, conditions	명령, 코드, 조건 검색
+	Export	내보내기
+	Import	가져오기
+	Export Shortcuts as JSON…	단축키를 JSON으로 내보내기…
+	Import Shortcuts from JSON…	JSON에서 단축키 가져오기…
+	A chord is two keys in a row; a condition limits where a command's keys work.	코드는 연속으로 누르는 두 키이고, 조건은 명령의 키가 작동하는 곳을 제한합니다.
+	Press two keys…	키 두 개를 누르세요…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	클릭한 다음 키 두 개를 연달아 누르세요. Esc는 취소, ⌫는 코드를 제거합니다.
+	Always	항상
+	That is not a chord: press two keys in a row.	코드가 아닙니다. 키 두 개를 연달아 누르세요.
+	Imported {file}. The shortcuts are saved.	{file}을(를) 가져왔습니다. 단축키가 저장되었습니다.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key}은(는) {command}의 단축키이기도 합니다. 코드의 두 번째 키를 기다립니다.
+	{key} is also used by {command} in the same context.	{key}은(는) 같은 상황에서 {command}도 사용합니다.
+	{key} was pressed, but no shortcut continues with that key	{key}을(를) 눌렀지만 그 키로 이어지는 단축키가 없습니다
+	{count} shortcut condition(s) in your settings could not be read and are ignored	설정의 단축키 조건 {count}개를 읽을 수 없어 무시됩니다
+	and {count} more	외 {count}개
+	Color: {name}	색상: {name}
+	Red	빨강
+	Orange	주황
+	Yellow	노랑
+	Green	초록
+	Blue	파랑
+	Violet	보라
+	Gray	회색
+	Add Condition	조건 추가
+	The shortcut works only while…	단축키는 다음일 때만 작동합니다…
+	Back	뒤로
+	Is	같음
+	Is Not	같지 않음
+
 # Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
 	Assign Shortcut…	단축키 지정…
 @id	settingsPage.contextMenus	상황별 메뉴
