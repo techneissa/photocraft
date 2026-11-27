@@ -26,19 +26,19 @@ fn rect(h: &H, label: &str) -> egui::Rect {
 }
 
 #[test]
-fn home_and_the_links_sit_in_a_rail_left_of_the_content_at_desktop_width() {
+fn home_and_learn_sit_in_a_rail_left_of_the_content_and_the_community_links_are_hidden() {
     let h = harness();
     let hint = rect(&h, DROP_HINT);
     let title = rect(&h, "PhotoCraft");
-    for label in ["Home", "Learn", "Website", "Discord", "GitHub"] {
+    for label in ["Home", "Learn"] {
         let link = rect(&h, label);
         assert!(link.right() <= hint.left(), "{label} {link:?} must be in the rail left of the drop hint {hint:?}");
         assert!(link.right() <= title.left(), "{label} {link:?} must be left of the title {title:?}");
     }
     assert!(rect(&h, "Home").bottom() <= rect(&h, "Learn").top(), "Learn follows Home");
-    let middle = h.ctx.content_rect().center().y;
+    // Fork: the website, Discord and GitHub links stay off Home (fork/hide-discord-button.md).
     for label in ["Website", "Discord", "GitHub"] {
-        assert!(rect(&h, label).top() > middle, "{label} sits at the bottom of the rail");
+        assert!(h.query_all_by_label(label).next().is_none(), "{label} is hidden");
     }
     assert!(title.bottom() <= hint.top(), "the title is above the page");
 }
@@ -56,7 +56,8 @@ fn card_width(width: f32) -> f32 {
         .build_ui_state(|ui, app: &mut Box<PhotocraftApp>| super::start_screen(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(4);
-    rect(&h, "card-6.png").width()
+    // Fork: a card's name also carries its age line ("card-6.png, Just now").
+    h.query_all_by_label_contains("card-6.png").next().expect("card-6.png is shown").rect().width()
 }
 
 /// #16172: the recent cards keep one size, as many to a row as fit, as before the framework move; they do not grow

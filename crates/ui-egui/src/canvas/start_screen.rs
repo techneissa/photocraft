@@ -8,9 +8,6 @@ use craft::ui::shell::{StartAction, StartLink, StartScreen};
 
 use super::PhotocraftApp;
 
-/// Recent files listed on the Home screen.
-const HOME_RECENT: usize = 11;
-
 /// The recent cards keep one size, as many to a row as fit (six on a desktop window), instead of growing to fill it:
 /// a factor on the card thumbnail.
 const HOME_CARD_ZOOM: f32 = 1.65;
@@ -20,19 +17,20 @@ const HOME_CARD_ZOOM: f32 = 1.65;
 pub(super) fn start_screen(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let ctx = ui.ctx().clone();
     let show_recent = !cfg!(target_arch = "wasm32") && app.session.prefs().interface.show_home_recent_files;
-    let recent = if show_recent { crate::home_recent_ui::recent_files(app, HOME_RECENT) } else { Vec::new() };
+    let recent = if show_recent { super::home_grid::recent_files(app) } else { Vec::new() };
     let thumbs = crate::home_recent_ui::thumbnails(&ctx);
     // The source reads the app, so the page binds copies of the view and the sort and they are written back after.
     let (mut view, mut sort) = (app.ui.chrome.home_recent_view, app.ui.chrome.home_recent_sort);
     let links = links();
-    let footer = footer_links();
+    // Fork: the website, Discord and GitHub links stay off Home (fork/hide-discord-button.md).
+    let footer: [StartLink; 0] = [];
     let actions = {
         let source = crate::home_recent_ui::source(app, &ctx);
         StartScreen::new(Bind::bound(&mut view), Bind::bound(&mut sort), &recent)
             .thumbnails(&thumbs, &source)
             .links(&links[..])
             .home_layout(Label::from(crate::native_menu::APP_NAME), &footer[..])
-            .max_recent(HOME_RECENT)
+            .max_recent(super::home_grid::count(app))
             .card_zoom(HOME_CARD_ZOOM)
             .drop_hint(Label::from(tl!("Drop an image or PSD anywhere to open it.")))
             .show(ui)
@@ -73,16 +71,6 @@ fn links() -> [StartLink; 2] {
     [
         StartLink::command(tl!("Home"), Some(IconId::new("home")), "window.home").selected(true),
         StartLink::url(tl!("Learn"), Some(IconId::new("sparkles")), crate::links::TUTORIALS),
-    ]
-}
-
-/// The community pages, at the bottom of the Home rail.
-fn footer_links() -> [StartLink; 3] {
-    [
-        StartLink::url(tl!("Website"), Some(IconId::new("link")), crate::links::APP_PAGE),
-        // A speech bubble and a chain link, as the rail showed before the framework move (#15449).
-        StartLink::url(tl!("Discord"), Some(IconId::new("note")), crate::links::DISCORD),
-        StartLink::url(tl!("GitHub"), Some(IconId::new("link_layers")), crate::links::GITHUB),
     ]
 }
 

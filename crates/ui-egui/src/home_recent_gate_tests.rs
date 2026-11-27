@@ -48,7 +48,8 @@ fn home(path: &str) -> Harness<'static, (Box<PhotocraftApp>, bool)> {
 /// Click the row, as synthetic input when `automation` is set. The framework start screen names
 /// a recent row by its file name, so that name is the access label the click finds.
 fn click(h: &mut Harness<'static, (Box<PhotocraftApp>, bool)>, automation: bool) {
-    h.get_by_label("outsideroot.png").click();
+    // Fork: a row's name also carries its size and age line ("outsideroot.png, Just now").
+    h.get_by_label_contains("outsideroot.png").click();
     h.state_mut().0.automation_input = automation;
     h.step();
     h.state_mut().0.automation_input = false;

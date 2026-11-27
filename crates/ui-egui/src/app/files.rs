@@ -14,6 +14,13 @@ impl PhotocraftApp {
     /// the preferences (`fileHandling.recentFiles`), so it survives a restart; `ui.recent_files`
     /// mirrors it for the menus and the Home screen.
     pub fn push_recent(&mut self, path: &str) {
+        let now = web_time::SystemTime::now().duration_since(web_time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+        self.push_recent_at(path, now);
+    }
+
+    /// [`Self::push_recent`] with the time of opening, in seconds since 1970 (fork: the Home screen
+    /// shows it under each file; `fileHandling.recentOpened` keeps it).
+    pub fn push_recent_at(&mut self, path: &str, opened: u64) {
         let cap = self.recent_cap();
         let mut r = self.session.prefs().file_handling.recent_files.clone();
         r.retain(|p| p != path);
@@ -21,9 +28,14 @@ impl PhotocraftApp {
         let evicted: Vec<String> = if r.len() > cap { r[cap..].to_vec() } else { Vec::new() };
         r.truncate(cap);
         *self.ui.recent_files = r.clone();
-        self.session.prefs.edit(|p| p.file_handling.recent_files = r);
+        let path = path.to_string();
+        self.session.prefs.edit(|p| {
+            p.file_handling.recent_opened.insert(path.clone(), opened);
+            p.file_handling.recent_opened.retain(|k, _| r.contains(k));
+            p.file_handling.recent_files = r;
+        });
         let mut cache = self.thumbnail_cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        cache.invalidate(path);
+        cache.invalidate(&path);
         for evicted_path in evicted {
             cache.invalidate(&evicted_path);
         }
@@ -32,7 +44,10 @@ impl PhotocraftApp {
     /// File › Open Recent › Clear Recent File List.
     pub fn clear_recent(&mut self) {
         self.ui.recent_files.clear();
-        self.session.prefs.edit(|p| p.file_handling.recent_files.clear());
+        self.session.prefs.edit(|p| {
+            p.file_handling.recent_files.clear();
+            p.file_handling.recent_opened.clear();
+        });
         self.thumbnail_cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clear();
     }
 
@@ -40,7 +55,10 @@ impl PhotocraftApp {
     /// file stays on disk, and opening it again lists it again.
     pub fn remove_recent(&mut self, path: &str) {
         self.ui.recent_files.retain(|p| p != path);
-        self.session.prefs.edit(|p| p.file_handling.recent_files.retain(|r| r != path));
+        self.session.prefs.edit(|p| {
+            p.file_handling.recent_files.retain(|r| r != path);
+            p.file_handling.recent_opened.remove(path);
+        });
         self.thumbnail_cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner).invalidate(path);
     }
 

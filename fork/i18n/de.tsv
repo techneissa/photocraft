@@ -40,3 +40,10 @@
 	Blue	Blau
 	Violet	Violett
 	Gray	Grau
+
+# Home recent files (fork/home-recent-grid.md)
+	Recent files on Home	Zuletzt geöffnete Dateien auf Start
+	Just now	Gerade eben
+	{n} min ago	vor {n} Min.
+	{n} h ago	vor {n} Std.
+	Yesterday	Gestern

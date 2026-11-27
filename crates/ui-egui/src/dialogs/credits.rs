@@ -95,7 +95,7 @@ fn about_info_for(identity: crate::os_window::LaunchIdentity, version: String, c
     }
     let version = if nightly { nightly_about_version(&version, commit) } else { version };
     AboutInfo::new(crate::os_window::name_for(identity), tl!("PhotoCraft — an open-source, native image editor written in Rust."), version)
-        .community(AboutLink::new(tl!("Join us on Discord"), crate::links::DISCORD))
+        // Fork: no "Join us on Discord" button (fork/hide-discord-button.md).
         .links(links)
         .built_with("egui · wgpu · photocraft-engine")
 }
@@ -144,7 +144,7 @@ mod nightly_about_tests {
             info.links.iter().map(|link| link.url.as_str()).collect::<Vec<_>>(),
             [crate::links::APP_PAGE, crate::links::GITHUB, crate::links::ARTCRAFT_WEBSITE]
         );
-        assert_eq!(info.community.unwrap().url, crate::links::DISCORD);
+        assert!(info.community.is_none(), "no Discord button");
     }
 
     #[test]
@@ -157,7 +157,7 @@ mod nightly_about_tests {
         assert_eq!(info.version, expected.version);
         assert_eq!(info.links.len(), 4);
         assert_eq!(info.links.last().unwrap().url, crate::links::ISSUES);
-        assert_eq!(info.community.unwrap().url, crate::links::DISCORD);
+        assert!(info.community.is_none(), "no Discord button");
     }
 
     #[test]

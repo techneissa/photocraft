@@ -14,3 +14,9 @@
 	Confirm remove	제거 확인
 	subject segmentation (BiRefNet-lite)	피사체 분할 (BiRefNet-lite)
 	inpainting (LaMa)	이미지 복원 (LaMa)
+# Home recent files (fork/home-recent-grid.md)
+	Recent files on Home	홈에 표시할 최근 파일
+	Just now	방금
+	{n} min ago	{n}분 전
+	{n} h ago	{n}시간 전
+	Yesterday	어제

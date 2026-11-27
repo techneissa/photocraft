@@ -107,14 +107,22 @@ impl Stamp {
 #[derive(Default)]
 pub(crate) struct ThumbnailCache {
     stamps: HashMap<String, Stamp>,
+    /// Fork: the sizes in pixels the decoding jobs found, for the line under each file (`canvas/home_grid.rs`).
+    sizes: crate::canvas::home_grid::Sizes,
 }
 
 impl ThumbnailCache {
     /// Invalidate the cached thumbnail for a single path (e.g. after save, open, or remove).
     pub(crate) fn invalidate(&mut self, path: &str) {
+        self.sizes.set(path, None);
         let stamp = self.stamps.entry(path.to_string()).or_default();
         // The generation survives: it is what makes the next revision differ from the one the store holds.
         *stamp = Stamp { generation: stamp.generation + 1, ..Stamp::default() };
+    }
+
+    /// The sizes the decoding jobs found, shared with them.
+    pub(crate) fn sizes(&self) -> crate::canvas::home_grid::Sizes {
+        self.sizes.clone()
     }
 
     /// Clear all cached thumbnails (e.g. on Clear Recent Files).
@@ -183,10 +191,16 @@ impl ThumbSource<ThumbKey> for RecentThumbs<'_> {
         // The size comes from the stat the revision was made from: the job decodes the file that stat saw. A missing
         // file has none, and the web has no files to decode.
         #[cfg(not(target_arch = "wasm32"))]
-        if let Some(len) = lock(self.cache).stamps.get(&*path).and_then(|s| s.disk.as_ref()).and_then(|d| d.seen).map(|(_, len)| len) {
+        let (len, sizes) = {
+            let cache = lock(self.cache);
+            (cache.stamps.get(&*path).and_then(|s| s.disk.as_ref()).and_then(|d| d.seen).map(|(_, len)| len), cache.sizes())
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(len) = len {
             let path = path.into_owned();
             let job: ThumbJob = Box::new(move |_cancel| {
-                Ok(match load_thumbnail_catching_panic(|| load_thumbnail_image_bounded(&path, len)) {
+                // Fork: a PSD shows the picture inside it, and the size is kept for the line under the name.
+                Ok(match load_thumbnail_catching_panic(|| crate::canvas::home_grid::load(&path, len, &sizes, load_thumbnail_image_bounded)) {
                     Some(img) => LoadedPicture::Image(img),
                     None => LoadedPicture::Blank,
                 })

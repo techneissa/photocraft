@@ -14,3 +14,9 @@
 	Confirm remove	Подтвердить удаление
 	subject segmentation (BiRefNet-lite)	сегментация объектов (BiRefNet-lite)
 	inpainting (LaMa)	восстановление изображения (LaMa)
+# Home recent files (fork/home-recent-grid.md)
+	Recent files on Home	Недавние файлы на главной
+	Just now	Только что
+	{n} min ago	{n} мин назад
+	{n} h ago	{n} ч назад
+	Yesterday	Вчера
