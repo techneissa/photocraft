@@ -59,6 +59,13 @@ pub(super) struct PrefsCustom {
     /// The suite's `AI-MCP` flag: the Agents page points to the ArtCraft Launcher's switch.
     #[cfg(not(target_arch = "wasm32"))]
     mcp_flag: bool,
+    /// What Settings › General adds to Automatically Check for Updates (`general_row`).
+    pub(super) general: super::general_row::Facts,
+    /// The requests and prompts the window shares with the app (`settings_sync`).
+    bridge: super::settings_sync::Shared,
+    /// The AI model downloads, shared with the app so they outlive the window (`ai_models`).
+    #[cfg(not(target_arch = "wasm32"))]
+    models: std::sync::Arc<std::sync::Mutex<super::ai_models::Runtime>>,
 }
 
 impl PrefsCustom {
@@ -67,7 +74,17 @@ impl PrefsCustom {
     pub(super) fn new(app: &PhotocraftApp, picker_open: bool) -> Self {
         let mut gpu_info = app.perf.gpu_info.lines();
         gpu_info.extend(gpu_memory_lines(app));
+        let sync = &app.session.prefs().sync;
+        let general = super::general_row::Facts {
+            folder: sync.folder.clone(),
+            keep: sync.keep,
+            offered: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            update: app.fork_update_rt.state.clone(),
+        };
         PrefsCustom {
+            general,
+            bridge: std::sync::Arc::clone(&app.prefs_rt.bridge),
             suite: app.framework.suite().view(),
             picker_open,
             lang: crate::i18n::Lang::from_pref(&app.session.prefs().interface.language),
@@ -78,6 +95,8 @@ impl PrefsCustom {
             agent_status: app.services.agent_link.as_ref().map(|link| link.status().clone()).unwrap_or_default(),
             #[cfg(not(target_arch = "wasm32"))]
             mcp_flag: app.services.agent_switch.as_ref().is_some_and(|switch| switch.mcp_flag()),
+            #[cfg(not(target_arch = "wasm32"))]
+            models: std::sync::Arc::clone(&app.prefs_rt.ai_models),
         }
     }
 }
@@ -95,6 +114,7 @@ impl CustomSettings<PrefPages> for PrefsCustom {
             "tools.pressureCurve" => pressure_curve_row(ui, draft),
             "tools.tabletInput" => tablet_input_row(ui, draft),
             APPEARANCE_MODE => self.appearance_row(ui, draft),
+            super::general_row::KEY => super::general_row::show(ui, draft, &self.general, &self.bridge),
             _ => {}
         }
         false
@@ -104,12 +124,32 @@ impl CustomSettings<PrefPages> for PrefsCustom {
     fn page(&mut self, ui: &mut egui::Ui, page: &str, draft: &mut SettingsDraft) -> bool {
         if page == AGENTS_PAGE {
             craft::automation::ui::agents::AgentsPage::new(AGENTS_PAGE, draft, &self.agent_status).mcp_flag(self.mcp_flag).show(ui);
+        } else if page == super::ai_models::PAGE {
+            let mut runtime = self.models.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            super::ai_models::page(ui, &mut runtime, draft);
         }
         false
     }
 
+    /// The prompts of the window itself: save before closing, and an import's question (the window is app-modal, so a
+    /// prompt in the main window could not be answered).
+    fn nested(&mut self, ui: &mut egui::Ui, _draft: &mut SettingsDraft) {
+        super::close_keys::show_prompt(ui, &self.bridge);
+        let ask = super::settings_sync::lock(&self.bridge).import.clone();
+        if let Some(ask) = ask
+            && let Some(answer) = super::settings_sync::prompt_of(&ask).show(ui).answer
+        {
+            let mut bridge = super::settings_sync::lock(&self.bridge);
+            bridge.import = None;
+            if answer.choice == craft::ui::dialog::PromptChoice::Proceed {
+                bridge.import_confirmed = Some(ask);
+            }
+        }
+    }
+
     fn nested_open(&self) -> bool {
-        self.picker_open
+        let bridge = super::settings_sync::lock(&self.bridge);
+        self.picker_open || bridge.close_asking || bridge.import.is_some()
     }
 }
 
@@ -139,7 +179,7 @@ fn help(ui: &mut egui::Ui, text: &str) {
 }
 
 /// A select over `(id, label)` options; the id picked this pass.
-fn choose(ui: &mut egui::Ui, label: &str, salt: &'static str, current: String, options: &[(String, String)]) -> Option<String> {
+pub(super) fn choose(ui: &mut egui::Ui, label: &str, salt: &'static str, current: String, options: &[(String, String)]) -> Option<String> {
     let entries: Vec<Entry<String>> = options.iter().map(|(id, name)| Entry::new(id.clone(), name.clone())).collect();
     let mut picked = None;
     Field::new(label.to_string()).id_salt(salt).show(ui, |ui, _| {
@@ -149,7 +189,7 @@ fn choose(ui: &mut egui::Ui, label: &str, salt: &'static str, current: String, o
 }
 
 /// The choices a preference path lists, with their shown labels.
-fn choices_of(path: &str) -> Vec<(String, String)> {
+pub(super) fn choices_of(path: &str) -> Vec<(String, String)> {
     prefs::choices(path).unwrap_or(&[]).iter().map(|o| (o.to_string(), choice_label(o))).collect()
 }
 

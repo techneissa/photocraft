@@ -76,12 +76,14 @@ pub mod fork_update;
 // fork: chords and When conditions in front of craft's keymap (fork/shortcut-upgrade.md).
 pub mod keybinds;
 
+// fork: Layer › Double Exposure, the shell's half (fork/double-exposure.md).
+mod double_exposure;
+
 // fork: awaiting rebuild on craft UI (official merge of 2026-11-27). These fork interface modules stay in
 // the tree, compiled out; each rebuild lane brings its own back, see fork/<slug>.md. The `mod` lines, by the
 // file that held them:
 // lib.rs:
 //   mod assign_shortcut;               // fork/assign-shortcut-palette.md
-//   mod double_exposure;               // fork/double-exposure.md
 //   pub mod menu_custom;               // fork/context-menu-editor.md, fork/context-menu-shortcuts.md
 //   mod open_as_layers;                // fork/open-as-layers.md
 //   mod place_photos;                  // fork/place-photos.md
@@ -91,9 +93,6 @@ pub mod keybinds;
 // dialogs/select_mask_ui.rs: mod protect;            // fork/refine-hair.md
 // panels.rs:         pub(crate) mod title_bar_items; // fork/topbar-items.md
 //                    #[cfg(test)] mod brush_size_label_tests; // fork/settings-sync.md
-// prefs/prefs_ui.rs: mod ai_models;                  // fork/select-subject-ai.md, fork/birefnet-full.md
-//                    mod close_keys;                 // fork/settings-close-keys.md
-//                    mod settings_folder; mod settings_sync; // fork/settings-sync.md (settings_folder_web.rs on the web)
 // tools.rs:          pub(super) mod sam3_ui;         // fork/sam3-click-select.md, fork/sam3-box-subject.md
 //                    pub(crate) mod transform_live;  // fork/transform-live-blend.md
 // widgets.rs (now gone): mod dropdown_search;        // fork/dropdown-search.md (widgets/dropdown_search.rs)

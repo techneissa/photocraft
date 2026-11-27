@@ -26,4 +26,4 @@ cargo test -p photocraft-ui-egui --lib -- ai_models
 
 ## After the craft UI merge (2026-11-27)
 
-Compiled out, awaiting rebuild: the rows stay in `fork/i18n/ar.tsv`. Rebuild: comes back with the AI Models page.
+Works: the Arabic rows (and the Swedish ones) are in `fork/i18n/ar.tsv` and `sv.tsv`, with the new text of the rebuilt pages. Rebuild: nothing.

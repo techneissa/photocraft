@@ -39,4 +39,4 @@ cargo test -p photocraft-cli -- models
 
 ## After the craft UI merge (2026-11-27)
 
-Partly works: Select Subject and Remove Background use the full BiRefNet when installed; its AI Models row is gone. Rebuild: comes back with the AI Models page.
+Works: the Full BiRefNet row is on Settings › AI Models (see [select-subject-ai.md](select-subject-ai.md)). Rebuild: nothing.

@@ -13,3 +13,51 @@
 	Confirm remove	تأكيد الإزالة
 	subject segmentation (BiRefNet-lite)	تجزئة الموضوع (BiRefNet-lite)
 	inpainting (LaMa)	ملء الصورة (LaMa)
+# Settings pages rebuilt on the craft UI: AI Models, Settings sync, close keys, Double Exposure (fork/settings-sync.md and others)
+	 ({n} skipped)	 (تم تخطي {n})
+	Could not write {path}: {e}	تعذّرت كتابة {path}: {e}
+	Export Settings…	تصدير الإعدادات…
+	Exported settings to {path}	تم تصدير الإعدادات إلى {path}
+	Import Settings…	استيراد الإعدادات…
+	Import Settings	استيراد الإعدادات
+	Imported settings from {file}	تم استيراد الإعدادات من {file}
+	Imported settings, but could not save them: {e}	تم استيراد الإعدادات لكن تعذّر حفظها: {e}
+	Keep in Sync	إبقاء المزامنة
+	Load from Folder	تحميل من المجلد
+	None chosen	لم يتم اختيار مجلد
+	Not available on this computer	غير متوفر على هذا الكمبيوتر
+	Not in this PhotoCraft, skipped: {names}	غير موجودة في هذا PhotoCraft، تم تخطيها: {names}
+	Not in this PhotoCraft, skipped: {names} and {n} more	غير موجودة في هذا PhotoCraft، تم تخطيها: {names} و{n} أخرى
+	Remove for Every ArtCraft App?	الإزالة من كل تطبيقات ArtCraft؟
+	Replace these settings with those in {file}?	استبدال هذه الإعدادات بالموجودة في {file}؟
+	Save to Folder	حفظ في المجلد
+	Save your changes to Preferences before closing?	هل تريد حفظ تغييراتك على التفضيلات قبل الإغلاق؟
+	Saved on {computer}, {when}	تم الحفظ على {computer}، {when}
+	Saved settings to {path}	تم حفظ الإعدادات في {path}
+	Spelling Dictionary	قاموس الإملاء
+	Sync Folder	مجلد المزامنة
+	This isn't a PhotoCraft settings file: it is too big	هذا ليس ملف إعدادات PhotoCraft: إنه كبير جدًا
+	This isn't a PhotoCraft settings file: it isn't text	هذا ليس ملف إعدادات PhotoCraft: ليس نصًا
+	Tool Options and View Settings	خيارات الأدوات وإعدادات العرض
+	Use This Folder	استخدام هذا المجلد
+	Workspaces and Panels	مساحات العمل واللوحات
+	{n} skipped: {first}	تم تخطي {n}: {first}
+	Lock the Background Layer	قفل طبقة الخلفية
+	Double Exposure button	زر التعريض المزدوج
+	Double Exposure	التعريض المزدوج
+	Context Menus	القوائم السياقية
+	Check for Updates	التحقق من وجود تحديثات
+	Color Settings	إعدادات الألوان
+	Custom Folder	مجلد مخصص
+	Folder: {folder}	المجلد: {folder}
+	Found in: {place}	موجود في: {place}
+	No public download. Put these files in the folder below:	لا يوجد تنزيل عام. ضع هذه الملفات في المجلد أدناه:
+	Object Selection Engine	محرك تحديد الكائنات
+	Old PhotoCraft Folder (read only)	مجلد PhotoCraft القديم (للقراءة فقط)
+	Remove Subject	إزالة العنصر
+	Select Subject Engine	محرك تحديد العنصر
+	Selection by click or by text	التحديد بالنقر أو بالنص
+	Shared Folder	مجلد مشترك
+	The models folder	مجلد النماذج
+	macOS (Apple Vision, Mac only)	macOS (Apple Vision، لأجهزة Mac فقط)
+	Built in	مدمج

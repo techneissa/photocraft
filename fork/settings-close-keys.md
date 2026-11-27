@@ -26,4 +26,4 @@ cargo test -p photocraft-ui-egui --lib -- close_keys start_screen layer_shortcut
 
 ## After the craft UI merge (2026-11-27)
 
-Compiled out, awaiting rebuild: nothing. Rebuild: ⌘, and Esc close the craft Settings window, asking to save (`prefs_ui/close_keys.rs`).
+Works: ⌘, and Esc close the craft Settings window. With unsaved changes a Save / Don't Save / Cancel prompt shows inside the window (`prefs_ui/close_keys.rs`). The framework turns Esc into Cancel before the window sees a key, so `dialogs.rs` takes an Esc close (no pointer press that pass) with changes, gives the draft back and asks; Cancel and the close box still discard. Esc in a text field keeps its own job. Rebuild: nothing.

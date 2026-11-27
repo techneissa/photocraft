@@ -481,6 +481,8 @@ fn footer(app: &mut PhotocraftApp, picked: Option<crate::smart_ui::FilterDrag>, 
     let active = st.active_layer.and_then(|id| doc.layer(id));
     match action {
         LayersFooterAction::Link => actions.push(("layer.linkLayers".into(), json!({}))),
+        // Null params: the click takes the menu's path, which also sets up the brush (fork/double-exposure.md).
+        LayersFooterAction::Extra => actions.push((crate::double_exposure::COMMAND.into(), Value::Null)),
         LayersFooterAction::NewLayer { ask, below, .. } => {
             let params = if ask {
                 Value::Null

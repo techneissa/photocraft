@@ -422,6 +422,8 @@ pub(crate) const PROMPTS: &[PromptRow] = &[
     alerts::answer,
     crate::jobs_ui::answer,
     crate::gpu_status::answer,
+    // fork: the import prompt of Settings sync (fork/settings-sync.md).
+    crate::prefs_ui::import_answer,
     crate::actions::library::answer,
 ];
 

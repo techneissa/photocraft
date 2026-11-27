@@ -35,4 +35,4 @@ cargo test -p photocraft-automation --lib -- automation_rejects_ambient_path
 
 ## After the craft UI merge (2026-11-27)
 
-Partly works: Export / Import Settings and the sync folder commands run (engine; the workspaces part now holds craft's workspace set); the Settings buttons and the start-up offer are gone. Rebuild: rebuild the buttons and the offer (`prefs_ui/settings_sync.rs`, `settings_folder.rs`).
+Works: Settings › General ends with Export Settings… / Import Settings… and the Sync Folder block (`prefs_ui/general_row.rs`, hung on the page's last row); the buttons file requests in a bridge (`settings_sync::Bridge`) and `dialogs::take` runs them. The import prompt shows inside the window while it is open (it is app-modal) and on the dialog host otherwise. Edit ▸ Preferences lists the four commands. The offer at start and the save on quit are in `app.rs`. Gone with the old window: the Context Menus part of the file's checks (no editor yet) and the old draft replacement after an import (the window's unedited rows follow the saved values). `brush_size_label_tests` stays compiled out. Rebuild: nothing for the Settings side.
