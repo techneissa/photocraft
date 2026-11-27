@@ -79,6 +79,8 @@ pub(crate) fn canvas_picture(
         (st.revision, (st.damage_from(), st.last_damage.map(reach)), st.doc.id, st.doc.bounds())
     };
     let (mut doc, mut preview_key) = display_doc_live(app, idx, live);
+    // Drawn on the CPU: a transform box's moving pixels in place.
+    doc = crate::transform_live::cpu_doc(app, doc, preview_key);
     // A filter dialog's live preview: the GPU canvas draws it from its own texture, but the CPU canvas (no usable
     // GPU, a flipped or pixel-aspect-corrected view, a GPU fallback) and the raster sources draw its result, as the
     // channel views draw it. A preview reduced for a zoomed-out view (a proxy, factor `k`) covers the whole document
@@ -152,6 +154,13 @@ pub(crate) fn damage_since(
     // drawn over the box, not the whole document (a gigapixel canvas took over a second).
     if let Some(st) = app.session.documents().get(idx)
         && let Some(r) = crate::transform_tool::damage(app, st.doc.id, (seen.0, seen.1 ^ display_key), now, last_damage)
+    {
+        return Some(if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) });
+    }
+    // Between a transform box's previews (and the document): where the moving layer was and is.
+    if seen.0 == now.0
+        && let Some(st) = app.session.documents().get(idx)
+        && let Some(r) = crate::transform_live::damage(app, st.doc.id, now.0, seen.1 ^ display_key, now.1)
     {
         return Some(if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) });
     }
@@ -282,6 +291,8 @@ pub(super) fn ensure_gpu(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
         return false;
     };
     let (doc, raw_key) = display_doc_live(app, idx, live);
+    // A transform box's moving layer: the compositor draws it through the mesh.
+    gpu.set_live(crate::transform_live::current(app, id));
     let (display, _) = canvas_display(app, &doc, None);
     // Repeated pattern tiles sample the same texture, including pixels outside the unwrapped
     // viewport. Refresh the affected document region while Pattern Preview is enabled.

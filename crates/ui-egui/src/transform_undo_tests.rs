@@ -239,25 +239,13 @@ fn holding_space_still_pans_while_transforming() {
 fn transform_preview_stays_visible_while_panning() {
     let mut h = harness();
     begin(&mut h);
-    let texture = h
-        .state()
-        .transform_preview
-        .as_ref()
-        .unwrap()
-        .textures
-        .pick(&h.ctx, craft::imaging::ui::transform_preview::PreviewTextures::choose(1.0, 1.0, false), None)
-        .expect("the preview uploads its texels")
-        .0;
-    // The preview paints in the canvas's picture slot, a list shape holding the document and the preview.
-    fn shows(shape: &egui::epaint::Shape, texture: egui::TextureId) -> bool {
-        match shape {
-            egui::epaint::Shape::Vec(list) => list.iter().any(|shape| shows(shape, texture)),
-            egui::epaint::Shape::Mesh(mesh) => mesh.texture_id == texture,
-            _ => false,
-        }
-    }
-    let has_preview = |h: &Harness<'static, Box<PhotocraftApp>>| h.output().shapes.iter().any(|clipped| shows(&clipped.shape, texture));
-    assert!(has_preview(&h), "the transformed pixels are visible before panning");
+    // The moving layer is composited into the canvas image in its place (`transform_live`): the image is a live preview
+    // of the layer's document while the box is open.
+    let has_preview = |h: &mut Harness<'static, Box<PhotocraftApp>>| {
+        let (shown, key) = crate::canvas::display_doc(h.state_mut(), 0);
+        crate::transform_live::current(h.state(), shown.id).is_some() && crate::transform_live::is_live_key(key)
+    };
+    assert!(has_preview(&mut h), "the transformed pixels are visible before panning");
 
     let center0 = h.state().ui.views[0].center;
     let from = screen(&mut h, [200.0, 160.0]);
@@ -272,7 +260,7 @@ fn transform_preview_stays_visible_while_panning() {
     h.run_steps(1);
 
     assert_ne!(h.state().ui.views[0].center, center0, "the held Hand panned the view");
-    assert!(has_preview(&h), "the transformed layer stays visible during the pan");
+    assert!(has_preview(&mut h), "the transformed layer stays visible during the pan");
 }
 
 /// A transform started by dragging a Move-tool control: that first drag is undoable too.

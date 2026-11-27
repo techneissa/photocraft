@@ -184,7 +184,9 @@ pub(crate) fn display_doc_live(app: &mut PhotocraftApp, idx: usize, live: LivePr
         && pv.doc.id == st.doc.id
         && st.doc.layer(photocraft_doc::LayerId(t.layer)).is_some()
     {
-        return (pv.doc.clone(), crate::transform_tool::preview_key(pv.session));
+        let fixed = (pv.doc.clone(), crate::transform_tool::preview_key(pv.session));
+        // A layer's box: the moving pixels composited in the layer's place.
+        return crate::transform_live::display_doc(app, idx).unwrap_or(fixed);
     }
     // Layer Style dialog: show its effects live (Cancel just drops the preview). Before the steps below, which build
     // from the committed document and would hide it.

@@ -164,10 +164,10 @@ fn session_is_dropped_when_another_document_becomes_active() {
     let active = app.session.active_index().unwrap();
     // The session stays until drop_foreign; the preview must not follow this document (#5115).
     assert!(app.distort.puppet.is_some());
-    assert!(crate::distort_ui::display_doc(&app, active).is_none());
+    assert!(crate::distort_ui::display_doc(&mut app, active).is_none());
     crate::distort_ui::drop_foreign(&mut app, &ctx);
     assert!(app.distort.puppet.is_none());
-    assert!(crate::distort_ui::display_doc(&app, active).is_none());
+    assert!(crate::distort_ui::display_doc(&mut app, active).is_none());
     // Closing the document it was started on drops it too.
     assert!(app.session.set_active(0));
     crate::distort_ui::menu(&mut app, &ctx, "edit.puppetWarp", &json!({})).unwrap().unwrap();
