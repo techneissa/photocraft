@@ -8,3 +8,34 @@
 	inpainting (LaMa)	popunjavanje slike (LaMa)
 	Select Subject, Remove Background	Izaberi subjekat, Ukloni pozadinu
 	Remove Subject	Ukloni subjekat
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	Akordi i uvjeti
+	Search commands, chords, conditions	Traži naredbe, akorde, uvjete
+	Export	Izvezi
+	Import	Uvezi
+	Export Shortcuts as JSON…	Izvezi prečice kao JSON…
+	Import Shortcuts from JSON…	Uvezi prečice iz JSON-a…
+	A chord is two keys in a row; a condition limits where a command's keys work.	Akord su dvije tipke uzastopno; uvjet ograničava gdje tipke naredbe rade.
+	Press two keys…	Pritisnite dvije tipke…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	Kliknite, pa uzastopno pritisnite dvije tipke. Esc otkazuje, ⌫ uklanja akord.
+	Always	Uvijek
+	That is not a chord: press two keys in a row.	To nije akord: uzastopno pritisnite dvije tipke.
+	Imported {file}. The shortcuts are saved.	Uvezeno: {file}. Prečice su sačuvane.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} je i prečica za {command}: čeka drugu tipku akorda.
+	{key} is also used by {command} in the same context.	{key} u istom kontekstu koristi i {command}.
+	{key} was pressed, but no shortcut continues with that key	Pritisnuta je {key}, ali nijedna prečica ne nastavlja tom tipkom
+	{count} shortcut condition(s) in your settings could not be read and are ignored	{count} uvjeta prečica u postavkama nije se moglo pročitati i zanemaruju se
+	and {count} more	i još {count}
+	Color: {name}	Boja: {name}
+	Red	Crvena
+	Orange	Narandžasta
+	Yellow	Žuta
+	Green	Zelena
+	Blue	Plava
+	Violet	Ljubičasta
+	Gray	Siva
+	Add Condition	Dodaj uvjet
+	The shortcut works only while…	Prečica radi samo dok…
+	Back	Nazad
+	Is	Jeste
+	Is Not	Nije

@@ -21,7 +21,7 @@
 	Import	Importieren
 	Export Shortcuts as JSON…	Tastenkürzel als JSON exportieren…
 	Import Shortcuts from JSON…	Tastenkürzel aus JSON importieren…
-	A chord is two keys in a row, like ⌘K then C. A condition decides where a command's keys work, like tool == brush && hasSelection.	Ein Akkord sind zwei Tasten nacheinander, z. B. ⌘K, dann C. Eine Bedingung legt fest, wo die Tasten eines Befehls gelten, z. B. tool == brush && hasSelection.
+	A chord is two keys in a row; a condition limits where a command's keys work.	Ein Akkord sind zwei Tasten nacheinander; eine Bedingung legt fest, wo die Tasten eines Befehls gelten.
 	Press two keys…	Zwei Tasten drücken…
 	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	Klicken und zwei Tasten nacheinander drücken. Esc bricht ab, ⌫ entfernt den Akkord.
 	Always	Immer
@@ -40,6 +40,11 @@
 	Blue	Blau
 	Violet	Violett
 	Gray	Grau
+	Add Condition	Bedingung hinzufügen
+	The shortcut works only while…	Das Kürzel gilt nur, solange…
+	Back	Zurück
+	Is	Ist
+	Is Not	Ist nicht
 
 # Home recent files (fork/home-recent-grid.md)
 	Recent files on Home	Zuletzt geöffnete Dateien auf Start

@@ -66,9 +66,9 @@ impl ChordDraft {
         ChordDraft { chords: prefs.chords.clone(), whens: prefs.shortcut_when.clone(), rows, ..ChordDraft::default() }
     }
 
-    /// Why command `id`'s condition text can't be used, if so.
-    fn error(&self, id: &str) -> Option<String> {
-        self.whens.get(id).and_then(|text| photocraft_engine::when::parse(text).err().map(|e| e.to_string()))
+    /// Why a condition text can't be used, if so.
+    fn error_of(&self, text: &str) -> Option<String> {
+        photocraft_engine::when::parse(text).err().map(|e| e.to_string())
     }
 
     /// The note for command `id`: its chord's first key is another command's key, or two commands share the chord.
@@ -123,7 +123,8 @@ impl ChordDraft {
             self.chords.get(&row.id).map_or("", String::as_str),
             self.whens.get(&row.id).map_or("", String::as_str)
         );
-        let keys = row.keys.iter().map(|k| crate::shortcuts::pretty(k)).collect::<Vec<_>>().join(" ");
+        // The keys as symbols (⌘N) and as words (Cmd+N), so a search for "cmd" or "shift" finds them.
+        let keys = row.keys.iter().map(|k| format!("{} {k}", crate::shortcuts::pretty(k))).collect::<Vec<_>>().join(" ");
         let hay = format!("{hay} {keys}").to_lowercase();
         needle.split_whitespace().all(|word| hay.contains(word))
     }
@@ -157,13 +158,7 @@ fn body(ui: &mut egui::Ui, d: &mut ChordDraft) -> bool {
             d.ask = Ask::Import;
         }
     });
-    ui.label(
-        RichText::new(tl!(
-            "A chord is two keys in a row, like ⌘K then C. A condition decides where a command's keys work, like tool == brush && hasSelection."
-        ))
-        .size(11.5)
-        .weak(),
-    );
+    ui.label(RichText::new(tl!("A chord is two keys in a row; a condition limits where a command's keys work.")).size(11.5).weak());
     if !d.message.is_empty() {
         ui.colored_label(Color32::from_rgb(230, 120, 80), d.message.clone());
     }
@@ -204,18 +199,8 @@ fn body(ui: &mut egui::Ui, d: &mut ChordDraft) -> bool {
                     response.on_hover_text(note);
                 }
                 let mut when = d.whens.get(&row.id).cloned().unwrap_or_default();
-                let error = d.error(&row.id);
-                let edit = egui::TextEdit::singleline(&mut when)
-                    .id_salt(("when", &row.id))
-                    .desired_width(ui.available_width())
-                    .hint_text(tl!("Always"))
-                    .text_color_opt(error.as_ref().map(|_| Color32::from_rgb(235, 100, 90)));
-                let response = ui.add(edit);
-                let response = match &error {
-                    Some(e) => response.on_hover_text(e.clone()),
-                    None => response,
-                };
-                if response.changed() {
+                let error = d.error_of(&when);
+                if super::shortcuts_when::field(ui, &row.id, &mut when, error.as_ref()) {
                     if when.trim().is_empty() {
                         d.whens.remove(&row.id);
                     } else {

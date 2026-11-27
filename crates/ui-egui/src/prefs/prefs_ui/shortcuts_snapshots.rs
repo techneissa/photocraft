@@ -23,6 +23,13 @@ fn build(tab: &'static str) -> Harness<'static, Box<PhotocraftApp>> {
             ]);
         });
         crate::prefs_ui::open_shortcuts(&mut app, 0);
+        // A clash near the top of the list: Move Tool and Eyedropper Tool share one key.
+        if let Some(s) = app.prefs_rt.shortcuts.as_mut() {
+            let key = craft::keymap::Binding::parse("Cmd+Alt+J").unwrap();
+            for id in ["tools.select.move", "tools.select.eyedropper"] {
+                s.keymap.assign(&craft::keymap::CommandRef::new(id), key.clone(), craft::keymap::Policy::Keep).unwrap();
+            }
+        }
         if tab != "shortcuts"
             && let Some(s) = app.prefs_rt.shortcuts.as_mut()
         {
@@ -46,7 +53,9 @@ fn shortcuts_window_snapshots() {
         .stack_size(64 << 20)
         .spawn(move || {
             std::fs::create_dir_all(&directory).unwrap();
-            for tab in ["shortcuts", "chords", "menus"] {
+            // `PHOTOCRAFT_SHORTCUT_TABS` (comma list) picks the tabs: a build without the Toolbar tab leaves it out.
+            let tabs = std::env::var("PHOTOCRAFT_SHORTCUT_TABS").unwrap_or_else(|_| "shortcuts,chords,menus".to_owned());
+            for tab in tabs.split(',').map(|t| &*Box::leak(t.to_owned().into_boxed_str())) {
                 let mut h = build(tab);
                 h.render().expect("render the window").save(directory.join(format!("{phase}-{tab}.png"))).unwrap();
             }

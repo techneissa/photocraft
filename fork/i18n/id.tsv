@@ -14,3 +14,34 @@
 	Confirm remove	Konfirmasi penghapusan
 	subject segmentation (BiRefNet-lite)	segmentasi subjek (BiRefNet-lite)
 	inpainting (LaMa)	pengisian gambar (LaMa)
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	Akor dan kondisi
+	Search commands, chords, conditions	Cari perintah, akor, kondisi
+	Export	Ekspor
+	Import	Impor
+	Export Shortcuts as JSON…	Ekspor pintasan sebagai JSON…
+	Import Shortcuts from JSON…	Impor pintasan dari JSON…
+	A chord is two keys in a row; a condition limits where a command's keys work.	Akor adalah dua tombol berurutan; kondisi membatasi tempat tombol perintah berfungsi.
+	Press two keys…	Tekan dua tombol…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	Klik, lalu tekan dua tombol berurutan. Esc membatalkan, ⌫ menghapus akor.
+	Always	Selalu
+	That is not a chord: press two keys in a row.	Itu bukan akor: tekan dua tombol berurutan.
+	Imported {file}. The shortcuts are saved.	{file} diimpor. Pintasan telah disimpan.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} juga pintasan {command}: menunggu tombol kedua akor.
+	{key} is also used by {command} in the same context.	{key} juga dipakai oleh {command} dalam konteks yang sama.
+	{key} was pressed, but no shortcut continues with that key	{key} ditekan, tetapi tidak ada pintasan yang berlanjut dengan tombol itu
+	{count} shortcut condition(s) in your settings could not be read and are ignored	{count} kondisi pintasan di pengaturan tidak dapat dibaca dan diabaikan
+	and {count} more	dan {count} lagi
+	Color: {name}	Warna: {name}
+	Red	Merah
+	Orange	Oranye
+	Yellow	Kuning
+	Green	Hijau
+	Blue	Biru
+	Violet	Ungu
+	Gray	Abu-abu
+	Add Condition	Tambah kondisi
+	The shortcut works only while…	Pintasan hanya berfungsi saat…
+	Back	Kembali
+	Is	Adalah
+	Is Not	Bukan

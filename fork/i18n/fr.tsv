@@ -20,3 +20,34 @@
 	{n} min ago	il y a {n} min
 	{n} h ago	il y a {n} h
 	Yesterday	Hier
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	Accords et conditions
+	Search commands, chords, conditions	Rechercher des commandes, accords, conditions
+	Export	Exporter
+	Import	Importer
+	Export Shortcuts as JSON…	Exporter les raccourcis en JSON…
+	Import Shortcuts from JSON…	Importer des raccourcis depuis un JSON…
+	A chord is two keys in a row; a condition limits where a command's keys work.	Un accord est une suite de deux touches ; une condition limite où les touches d’une commande fonctionnent.
+	Press two keys…	Appuyez sur deux touches…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	Cliquez, puis appuyez sur deux touches à la suite. Échap annule, ⌫ supprime l’accord.
+	Always	Toujours
+	That is not a chord: press two keys in a row.	Ce n’est pas un accord : appuyez sur deux touches à la suite.
+	Imported {file}. The shortcuts are saved.	{file} importé. Les raccourcis sont enregistrés.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} est aussi le raccourci de {command} : il attend la deuxième touche de l’accord.
+	{key} is also used by {command} in the same context.	{key} est aussi utilisé par {command} dans le même contexte.
+	{key} was pressed, but no shortcut continues with that key	{key} a été pressée, mais aucun raccourci ne continue avec cette touche
+	{count} shortcut condition(s) in your settings could not be read and are ignored	{count} condition(s) de raccourci de vos réglages n’ont pas pu être lues et sont ignorées
+	and {count} more	et {count} de plus
+	Color: {name}	Couleur : {name}
+	Red	Rouge
+	Orange	Orange
+	Yellow	Jaune
+	Green	Vert
+	Blue	Bleu
+	Violet	Violet
+	Gray	Gris
+	Add Condition	Ajouter une condition
+	The shortcut works only while…	Le raccourci ne fonctionne que si…
+	Back	Retour
+	Is	Est
+	Is Not	N’est pas

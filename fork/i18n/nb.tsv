@@ -3,3 +3,34 @@
 	AI Models	AI-modeller
 	subject segmentation (BiRefNet-lite)	motivsegmentering (BiRefNet-lite)
 	inpainting (LaMa)	utfylling (LaMa)
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	Akkorder og betingelser
+	Search commands, chords, conditions	Søk i kommandoer, akkorder, betingelser
+	Export	Eksporter
+	Import	Importer
+	Export Shortcuts as JSON…	Eksporter hurtigtaster som JSON…
+	Import Shortcuts from JSON…	Importer hurtigtaster fra JSON…
+	A chord is two keys in a row; a condition limits where a command's keys work.	En akkord er to taster etter hverandre; en betingelse begrenser hvor tastene til en kommando virker.
+	Press two keys…	Trykk på to taster…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	Klikk, og trykk deretter på to taster etter hverandre. Esc avbryter, ⌫ fjerner akkorden.
+	Always	Alltid
+	That is not a chord: press two keys in a row.	Det er ikke en akkord: trykk på to taster etter hverandre.
+	Imported {file}. The shortcuts are saved.	{file} importert. Hurtigtastene er lagret.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} er også hurtigtasten til {command}: den venter på akkordens andre tast.
+	{key} is also used by {command} in the same context.	{key} brukes også av {command} i samme sammenheng.
+	{key} was pressed, but no shortcut continues with that key	{key} ble trykket, men ingen hurtigtast fortsetter med den tasten
+	{count} shortcut condition(s) in your settings could not be read and are ignored	{count} hurtigtastbetingelse(r) i innstillingene kunne ikke leses og ignoreres
+	and {count} more	og {count} til
+	Color: {name}	Farge: {name}
+	Red	Rød
+	Orange	Oransje
+	Yellow	Gul
+	Green	Grønn
+	Blue	Blå
+	Violet	Fiolett
+	Gray	Grå
+	Add Condition	Legg til betingelse
+	The shortcut works only while…	Hurtigtasten virker bare mens…
+	Back	Tilbake
+	Is	Er
+	Is Not	Er ikke

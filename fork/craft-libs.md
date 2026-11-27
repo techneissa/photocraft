@@ -17,6 +17,7 @@ PhotoCraft takes the craft interface framework from [storytold/craft-libs](https
 | 3 | the command palette reports the typed text of a pick and puts a learned command first | `ui-patterns` `panels/palette.rs`: `PaletteOutput::query`, `CommandPalette::learned` (a command that goes first among the matches) | [palette-frecency.md](palette-frecency.md): the command picked for a typed text |
 | 4 | tone histograms scale to the tallest level between the two ends and draw one column per level | `imaging` `ui/histogram/paint.rs`: `tone_top` takes the interior peak (edge peak only when nothing is between), `tone_mesh` draws a column per bin | [levels-histogram.md](levels-histogram.md) |
 | 5 | Select and Mask: Refine Hair button, Protect Subject box and a Refine Hair edit the app can turn on | `imaging` `ui/select_mask`: `SelectMaskEdit::RefineHair`, `RefineHairControl` and `RefineHairEvent`, `SelectMaskBar::hair` (the button, its Stop while a run waits, the box), `SelectMaskWorkspace::refine_hair`, `SelectMaskEvent::RefineHair`, three words in `words.rs`; without `refine_hair(Some(..))` the bar keeps the official disabled button | [refine-hair.md](refine-hair.md) |
+| 6 | shortcut table: Remove Shortcut on a right-click, the clashing command on the clash mark | `menu` `shortcuts/rows.rs` (`Row::clashes_with`), `shortcuts/view/table.rs` (a context menu with Remove Shortcut that clears the row's keys, a tooltip on the clash mark), `shortcuts/words.rs` (`remove_shortcut`, `shares_a_shortcut_with`); English only: craft's own dialog words have no translations in craft-i18n | [shortcuts-window.md](shortcuts-window.md) |
 
 ## Move to a new upstream rev
 
@@ -29,4 +30,4 @@ PhotoCraft takes the craft interface framework from [storytold/craft-libs](https
 
 ## Tests
 
-None of its own: the patches are used by [blend-list.md](blend-list.md), [palette-frecency.md](palette-frecency.md), [levels-histogram.md](levels-histogram.md) and [refine-hair.md](refine-hair.md), whose tests cover them.
+None of its own: the patches are used by [blend-list.md](blend-list.md), [palette-frecency.md](palette-frecency.md), [levels-histogram.md](levels-histogram.md) and [refine-hair.md](refine-hair.md), whose tests cover them (patch 6: `shortcuts_more` in [shortcuts-window.md](shortcuts-window.md)).
