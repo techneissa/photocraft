@@ -15,7 +15,7 @@ The Home screen puts the title, New document / Open and the drop hint at the top
 ## Hooks in official files
 
 - ui-egui `canvas.rs` (module), `canvas/start_screen.rs` (4 lines at the top of `start_screen`: the grid Home draws instead; the official body stays), `prefs/prefs_ui/fields.rs` (label of `homeRecentCount`)
-- engine `prefs.rs` (`Interface::home_recent_count`, default 12; `FileHandling::recent_opened`), `prefs/settings_sync.rs` (leaves `recentOpened` out), ui-egui `app/files.rs` (`push_recent` records the time), `Cargo.toml` (chrono for the date), `prefs/validate.rs` (range 1–100)
+- engine-core `prefs.rs` (`Interface::home_recent_count`, default 12; `FileHandling::recent_opened`), `prefs/settings_sync.rs` (leaves `recentOpened` out), ui-egui `app/files.rs` (`push_recent` records the time), `Cargo.toml` (chrono for the date), `prefs/validate.rs` (range 1–100)
 
 ## Tests
 
@@ -28,3 +28,7 @@ cargo test -p photocraft-ui-egui --lib -- home_grid home_recent start_screen
 ## When upstream merges
 
 If upstream changes `start_screen.rs`, keep the 4-line hook at the top of `start_screen`; copy any new header behaviour (buttons, drop hint) into `home_grid.rs` `header_ui`.
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: the preference `interface.homeRecentCount` is kept. Rebuild: rebuild the recent-files grid on the craft Home screen (`canvas/home_grid/`).

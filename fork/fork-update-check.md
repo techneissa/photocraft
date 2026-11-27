@@ -20,14 +20,18 @@ The app updates itself to techneissa's own builds (the release `custom-build` of
 
 ## Own files
 
-ui-egui `fork_update.rs` (state, check, update), `fork_update/release.rs` (reading the notes and the compare answer, the decision), `fork_update/github.rs` (the `Fetch` trait and the real reader), `fork_update/route.rs` (the app's commit, the update route), `fork_update/ui.rs` (window, Settings row), `fork_update/tests.rs`, `fork_update/snapshots.rs` (opt-in picture: `PHOTOCRAFT_UPDATE_SNAPSHOTS` folder)
+ui-egui `fork_update.rs` (state, check, update), `fork_update/release.rs` (reading the notes and the compare answer, the decision), `fork_update/github.rs` (the `Fetch` trait and the real reader), `fork_update/route.rs` (the app's commit, the update route), `fork_update/ui.rs` (window, Settings row), `fork_update/dialog.rs` (the window on craft's dialog host), `fork_update/tests.rs`, `fork_update/snapshots.rs` (opt-in picture: `PHOTOCRAFT_UPDATE_SNAPSHOTS` folder; compiled out)
 
 ## Hooks in official files
 
-ui-egui `lib.rs` (mod line, the field `fork_update_rt`), `app.rs` (its initial value), `updates_ui.rs` (the three hand-overs at the top of `check`, `tick`, `show`), `prefs/prefs_ui/fields.rs` (the Settings row in General); app `apps/photocraft/src/updates.rs` (the official service refuses, + test)
+ui-egui `lib.rs` (mod line, the field `fork_update_rt`), `app.rs` (its initial value), `updates_ui.rs` (`official_updater`: the official `Updater` is never made while `OFFICIAL_CHECK_OFF`; the hand-overs at the top of `check`, `tick`, `show`; two test helpers). Since the craft UI merge (2026-11-27) the window is craft-update's `UpdateCheckDialog` (`fork_update/dialog.rs`); `apps/photocraft/src/updates.rs` is gone upstream, and the engine has no update service any more.
 
 ## Tests
 
 ```bash
 cargo test -p photocraft-ui-egui --lib -- fork_update updates_ui
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Works: Help ▸ Check for Updates, the check at start and the window (craft-update's dialog) use the `custom-build` release; the official updater is never made. Rebuild: only the Settings › General row (`fork_update/ui.rs`).

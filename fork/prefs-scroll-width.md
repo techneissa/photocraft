@@ -23,3 +23,7 @@ ui-egui `prefs/prefs_ui/fields.rs` (`auto_shrink`), `prefs_ui/shortcuts.rs` (`na
 ```bash
 cargo test -p photocraft-ui-egui --lib -- prefs_ui
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: nothing (the old Preferences window is gone). Rebuild: check the craft Settings window; redo only what it lacks.

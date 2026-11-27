@@ -19,7 +19,7 @@ The command palette (⌘F, ⌘P) learns from the commands run through it, as lau
 
 ## Hooks in official files
 
-- engine `prefs.rs` (`Preferences::palette_history`), `prefs/settings_sync.rs` (`paletteHistory` in `NOT_IN_FILE`)
+- engine-core `prefs.rs` (`Preferences::palette_history`), `prefs/settings_sync.rs` (`paletteHistory` in `NOT_IN_FILE`)
 - ui-egui `dialogs/palette.rs` (`mod frecency`; the history passed to the list; `frecency::note` when a row runs), `dialogs/palette/list.rs` (fork file: `all_hits` takes the history, always lists the rest under the recents, `History::apply` before ranking), `dialogs/palette/list/upgrade_tests.rs` (the new arguments)
 
 ## Tests
@@ -33,3 +33,7 @@ cargo test -p photocraft-ui-egui --lib -- frecency palette
 ## When upstream merges
 
 The official palette moves to the craft UI framework in the Nov 17 update (step two of the official merge): move `History::apply` and `note` to wherever it builds and runs its rows.
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: the preference `paletteHistory` is kept. Rebuild: rank craft's command palette by use (`dialogs/palette/frecency.rs`).

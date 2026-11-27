@@ -40,8 +40,13 @@ WORKSPACE_WIDE = (
 # compiled by every machine anyway) plus its tests on 4 cores (a third of the tests ran in 308 s on the first run
 # of 2026-11-03: 4911 tests, 3935 s of test time in all). A package missing here counts DEFAULT_WEIGHT. Measured from
 # the Fork CI runs of 2026-11-03 and 2026-11-05; algo from the official run of 2026-11-18 (873 s of test time).
+# The engine split (official merge of 2026-11-27): engine-core holds most of the old engine's tests, the top crate
+# `engine` the ones that run paint commands (tests/it) and panic_hunt; their weights are estimates until a run measures them.
 WEIGHT_OVERRIDES = {
-    "photocraft-engine": 540,
+    "photocraft-engine": 250,
+    "photocraft-engine-core": 450,
+    "photocraft-engine-paint": 60,
+    "photocraft-engine-vector": 40,
     "photocraft-ui-egui": 1025,
     "photocraft-algo": 400,
     "photocraft-io": 170,
@@ -58,11 +63,11 @@ WEIGHT_OVERRIDES = {
 DEFAULT_WEIGHT = 30
 # The compile part of a sharded package's weight: every shard pays it again, only the test part divides by the shard
 # count (ui-egui's lib tests compile for about ten minutes; its 5000 tests need 7 on four cores).
-COMPILE_WEIGHT = {"photocraft-ui-egui": 600, "photocraft-engine": 250}
+COMPILE_WEIGHT = {"photocraft-ui-egui": 600, "photocraft-engine-core": 250}
 
 # Packages whose tests are cut into shards, one machine per shard (nextest `--partition count:i/n` takes every n-th
 # test of the package's test binaries). A shard still compiles the package, so more shards than this buy little.
-SHARDS = {"photocraft-ui-egui": 4, "photocraft-engine": 2}
+SHARDS = {"photocraft-ui-egui": 4, "photocraft-engine-core": 2}
 
 # Machines (groups) a run uses when --part gives no total; .github/workflows/fork-ci.yml's matrix must match.
 # The one-off steps and the other packages take the first groups, the shards the last ones.

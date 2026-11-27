@@ -45,10 +45,14 @@ known="$(sed -e 's/#.*//' -e 's/[[:space:]]*$//' -e '/^$/d' fork/known-failures.
 skipped_steps="$(printf '%s\n' "$known" | sed -n 's/^step  *//p')"
 skipped_tests="$(printf '%s\n' "$known" | grep -v '^step ' || true)"
 
-# The steps this script knows. A step upstream adds to cmd_ci fails the run until it is added here.
-known_steps="fmt clippy layers panel-commands scorecard test panic_hunt doctest wasm i18n"
-upstream_steps="$(awk '/^fn cmd_ci\(\)/{f=1} f && /let mut done/{exit} f' xtask/src/main.rs |
-  sed -n 's/^[[:space:]]*(\{0,1\}"\([a-z_0-9-]*\)",.*/\1/p')"
+# The steps this script knows. A step upstream adds to CI_STEPS (xtask/src/main.rs) fails the run until it is added
+# here; finding no step at all fails too, so a change to how upstream lists them can't turn the guard off.
+known_steps="fmt egui-fork clippy layers panel-commands test-binaries scorecard test panic_hunt doctest wasm i18n"
+upstream_steps="$(awk '/^const CI_STEPS/{f=1; next} f && /^\];/{exit} f' xtask/src/main.rs |
+  sed -n 's/^[[:space:]]*("\([a-z_0-9-]*\)",.*/\1/p')"
+if [ -z "$upstream_steps" ]; then
+  echo "::error::fork/ci.sh found no step in xtask/src/main.rs CI_STEPS: update its reading of the step list"; exit 1
+fi
 for s in $upstream_steps; do
   case " $known_steps " in *" $s "*) ;; *)
     echo "::error::cargo xtask ci has a new step '$s': add it to fork/ci.sh"; exit 1 ;;
@@ -85,9 +89,11 @@ if [ "$ONEOFF" = 1 ]; then
   step affected-tests python3 -I fork/test_affected.py
   step fmt cargo fmt --all -- --check
   if [ "$RUST" = 1 ]; then
+    step egui-fork cargo xtask egui-fork
     step clippy cargo clippy --locked $CLIPPY_ARGS --all-targets --keep-going -- -D warnings
     step layers cargo xtask layers
     step panel-commands cargo xtask panel-commands
+    step test-binaries cargo xtask test-binaries
     step scorecard cargo xtask scorecard --check
     step wasm cargo xtask wasm
   fi

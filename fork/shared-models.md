@@ -25,3 +25,7 @@ cargo test -p photocraft-ml
 cargo test -p photocraft-ui-egui --lib -- ai_models
 cargo test -p photocraft-cli -- models
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Works: old models move into the shared ArtCraft folder at start (`apps/photocraft/src/main.rs`). Rebuild: nothing.

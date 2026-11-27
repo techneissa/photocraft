@@ -23,3 +23,7 @@ ui-egui `canvas/start_screen.rs`, `dialogs.rs` (2 lines removed each), `links.rs
 ```bash
 cargo test -p photocraft-ui-egui --lib -- close_keys start_screen layer_shortcut native_menu title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: the official Home screen and About show Discord again. Rebuild: hide Discord on the craft Home screen and in About.

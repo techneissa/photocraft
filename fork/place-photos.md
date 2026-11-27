@@ -14,7 +14,7 @@ File ▸ Place Embedded… on ⇧⌘P (Place Linked unchanged) and takes several
 
 ## Hooks in official files
 
-- engine `cmd/file_cmds.rs` (`file.placeEmbedded` default key `Cmd+Shift+P`)
+- engine-core `cmd/file_cmds.rs` (`file.placeEmbedded` default key `Cmd+Shift+P`)
 - ui-egui `lib.rs` (module), `menu_catalog.rs` (the key), `menus/view_cmds/dialogs.rs` (3 lines: Place Embedded without params → `place_photos::pick`), `file_open.rs` (`DropPlace::Path` and its arm in `place_next_dropped`), `file_dialog.rs` (`read_picked` made `pub(crate)`; `place_photos` passes `usize::MAX` for main's size cap), `panels/layers.rs` (1 line: the button), `icon_data.rs` (icon), `file_dialog/tests.rs` (the Place Embedded test expects a multi-select)
 - `ATTRIBUTION.md` (icon row; `place-photo.svg` in the Lucide row's exceptions)
 
@@ -25,3 +25,7 @@ File ▸ Place Embedded… on ⇧⌘P (Place Linked unchanged) and takes several
 ```bash
 cargo test -p photocraft-ui-egui --lib -- place_photos file_dialog
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Partly works: ⇧⌘P is Place Embedded (engine); several photos at once and the Layers panel button are gone. Rebuild: multi-file Place and the Place Photo button on the craft UI (`place_photos.rs`).

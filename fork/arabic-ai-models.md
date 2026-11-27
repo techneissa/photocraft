@@ -23,3 +23,7 @@ ui-egui `i18n/ar.tsv` (13 lines appended)
 ```bash
 cargo test -p photocraft-ui-egui --lib -- ai_models
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: the rows stay in `fork/i18n/ar.tsv`. Rebuild: comes back with the AI Models page.

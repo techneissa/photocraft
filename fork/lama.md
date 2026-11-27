@@ -10,20 +10,24 @@ Remove Subject fills with LaMa from the same `big-lama.pt` LightCraft uses, run 
 
 ## Own files
 
-`crates/lama/` (the copy: `checkpoint.rs`, `cl.rs`, `error.rs`, `fft.rs`, `layers.rs`, `net.rs`, `region.rs`, `lib.rs`, `tests.rs`; ours: `run.rs`, `synthetic.rs`, `tests/real_model.rs`, README, `Lama::predict`), `crates/ml/src/migrate.rs`
+`crates/lama/` (the copy: `checkpoint.rs`, `cl.rs`, `error.rs`, `fft.rs`, `layers.rs`, `net.rs`, `region.rs`, `lib.rs`, `tests.rs`; ours: `run.rs`, `synthetic.rs`, `tests/it/real_model.rs`, README, `Lama::predict`), `crates/ml/src/migrate.rs`
 
 ## Hooks in official files
 
-`Cargo.toml`, `Cargo.lock`, `xtask/src/layers.rs` (`lama` before `ml` in L4), `crates/ml` (`Cargo.toml`, `inpaint.rs`, `lib.rs`, `store.rs`, `install.rs`), `crates/engine/Cargo.toml` (dev-dependency) and `cmd/remove_subject_cmds.rs` (one test), `apps/photocraft/Cargo.toml` and `main.rs` (the start-up move), `apps/photocraft-cli/src/models.rs`, ui-egui `prefs/prefs_ui/ai_models.rs` and `i18n/sv.tsv`; `docs/ml.md`, `ATTRIBUTION.md`, `NOTICE`
+`Cargo.toml`, `Cargo.lock`, `xtask/src/layers.rs` (`lama` before `ml` in L4), `crates/ml` (`Cargo.toml`, `inpaint.rs`, `lib.rs`, `store.rs`, `install.rs`), `crates/engine-core/Cargo.toml` (dev-dependency) and `cmd/remove_subject_cmds.rs` (one test), `apps/photocraft/Cargo.toml` and `main.rs` (the start-up move), `apps/photocraft-cli/src/models.rs`, ui-egui `prefs/prefs_ui/ai_models.rs` and `i18n/sv.tsv`; `docs/ml.md`, `ATTRIBUTION.md`, `NOTICE`
 
 ## Tests
 
 ```bash
 cargo test -p photocraft-lama -p photocraft-ml
-cargo test -p photocraft-engine --lib -- remove_subject cutout
-# real model, read only, by hand: cargo test -p photocraft-lama --release --test real_model -- --ignored --nocapture
+cargo test -p photocraft-engine-core --lib -- remove_subject cutout
+# real model, read only, by hand: cargo test -p photocraft-lama --release --test it real_model -- --ignored --nocapture
 ```
 
 ## When upstream merges
 
 `crates/lama` is ours and does not clash. If upstream rewrites `photocraft-ml`'s `inpaint.rs` (it still has the ONNX call `backend::run_with(Model::Lama, …)`), keep this version: the window code is theirs, the network call is `predict`.
+
+## After the craft UI merge (2026-11-27)
+
+Works: Remove Subject fills with LaMa on Candle (engine). Rebuild: only the AI Models row.

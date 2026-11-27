@@ -10,17 +10,21 @@ Keyboard Shortcuts upgrade in the existing window: chords (⌘K then C) with a k
 
 ## Own files
 
-engine `when/`, `prefs/chords.rs`, `prefs/chord_cmds.rs`, `shortcut_backup.rs` (+ tests); ui-egui `keybinds.rs` + `keybinds/`, `prefs/prefs_ui/shortcut_target.rs` (`open_shortcuts_for`, the one entry point Assign Shortcut… uses), `shortcuts_when.rs`, `shortcuts_chord.rs`, `shortcuts_backup.rs`, `shortcuts_upgrade_tests.rs`; `assets/icons/download.svg`, `upload.svg` (Lucide)
+engine-core `when/`, `prefs/chords.rs`, `prefs/chord_cmds.rs`, `shortcut_backup.rs` (+ tests); ui-egui `keybinds.rs` + `keybinds/`, `prefs/prefs_ui/shortcut_target.rs` (`open_shortcuts_for`, the one entry point Assign Shortcut… uses), `shortcuts_when.rs`, `shortcuts_chord.rs`, `shortcuts_backup.rs`, `shortcuts_upgrade_tests.rs`; `assets/icons/download.svg`, `upload.svg` (Lucide)
 
 ## Hooks in official files
 
-engine `lib.rs`, `prefs.rs` (`chords`, `shortcut_when`), `prefs/validate.rs`, `prefs/customize.rs`, `shortcut_sets.rs`; ui-egui `lib.rs`, `app.rs`, `app/frame.rs`, `input/shortcuts.rs` (chord poll, `tool_on`), `input/shortcut_dispatch.rs` (When-false → no key), `prefs/prefs_ui.rs`, `prefs_ui/dialogs.rs` (width up to 1000), `prefs_ui/shortcuts.rs` (column, chips, icons, clash icon), `file_dialog.rs` (`pick_file_bytes_limited`), `icon_data.rs`, `prefs_ui/tests.rs` + `shortcut_set_tests.rs`, `ATTRIBUTION.md` (Lucide count)
+engine-core `lib.rs`, `prefs.rs` (`chords`, `shortcut_when`), `prefs/validate.rs`, `prefs/customize.rs`, `shortcut_sets.rs`; ui-egui `lib.rs`, `app.rs`, `app/frame.rs`, `input/shortcuts.rs` (chord poll, `tool_on`), `input/shortcut_dispatch.rs` (When-false → no key), `prefs/prefs_ui.rs`, `prefs_ui/dialogs.rs` (width up to 1000), `prefs_ui/shortcuts.rs` (column, chips, icons, clash icon), `file_dialog.rs` (`pick_file_bytes_limited`), `icon_data.rs`, `prefs_ui/tests.rs` + `shortcut_set_tests.rs`, `ATTRIBUTION.md` (Lucide count)
 
 ## Tests
 
-engine `when chords chord_cmds shortcut_backup shortcut_sets`, ui-egui `keybinds shortcuts_upgrade shortcut_capture shortcut_set`
+engine-core `when chords chord_cmds shortcut_backup shortcut_sets`, ui-egui `keybinds shortcuts_upgrade shortcut_capture shortcut_set`
 
 ```bash
-cargo test -p photocraft-engine --lib -- when chords chord_cmds shortcut_backup shortcut_sets image_cmds mode_cmds
+cargo test -p photocraft-engine-core --lib -- when chords chord_cmds shortcut_backup shortcut_sets image_cmds mode_cmds
 cargo test -p photocraft-ui-egui --lib -- close_keys start_screen layer_shortcut native_menu title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Partly works: chords and When conditions are stored, exported and imported by the engine; the key dispatch no longer reads them. Rebuild: rebuild the chord and When dispatch (`keybinds/`) and the Keyboard Shortcuts parts (`prefs_ui/shortcuts_*.rs`) on craft's keymap.

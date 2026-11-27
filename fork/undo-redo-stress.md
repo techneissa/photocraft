@@ -23,3 +23,7 @@ none
 ```bash
 cargo test -p photocraft-engine --test undo_redo_stress
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Works: the test runs (`crates/engine/tests/undo_redo_stress.rs`, allow-listed as its own binary). Rebuild: nothing.

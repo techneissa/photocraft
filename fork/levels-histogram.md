@@ -31,3 +31,7 @@ cargo test -p photocraft-ui-egui --lib -- tone histogram
 ## When upstream merges
 
 If upstream changes `histogram_scale_top` or `draw_histogram`, keep the interior-peak scale and the column drawing; the Histogram panel and Camera Raw share the look.
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: nothing. Rebuild: check craft's Levels and Curves histograms; redo the per-level columns if missing.

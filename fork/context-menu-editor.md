@@ -14,7 +14,7 @@ Arrange the right-click menus (Preferences ▸ Context Menus): canvas with/witho
 
 ## Hooks in official files
 
-engine `prefs.rs` (`context_menus`); ui-egui `lib.rs`, `canvas/canvas_tool_menu.rs` (3 small changes), `canvas/tabs.rs` (`tab_context_menu` takes the saved value), `canvas.rs` (test re-export), `panels/layer_menu_ui.rs`, `prefs/prefs_ui/fields.rs` + `dialogs.rs` (page route, draft, OK commit; merged with the AI Models section list by hand), `canvas/tests.rs`
+engine-core `prefs.rs` (`context_menus`); ui-egui `lib.rs`, `canvas/canvas_tool_menu.rs` (3 small changes), `canvas/tabs.rs` (`tab_context_menu` takes the saved value), `canvas.rs` (test re-export), `panels/layer_menu_ui.rs`, `prefs/prefs_ui/fields.rs` + `dialogs.rs` (page route, draft, OK commit; merged with the AI Models section list by hand), `canvas/tests.rs`
 
 ## Tests
 
@@ -25,3 +25,7 @@ cargo test -p photocraft-ui-egui --lib -- close_keys start_screen layer_shortcut
 ```
 
 **Official merge of 2026-11-27:** the document tab menu has the official 8 rows with separators after Move to New Window and Open Document… (#11403). `menus.rs` `TAB_ROWS` lists them; `canvas/tabs.rs` keeps the official `tab_context_menu` (its tests call it) and the canvas calls `tab_context_menu_arranged`.
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: the preference `contextMenus` is kept and synced. Rebuild: rebuild the Context Menus page and apply it to craft's context menus (`menu_custom/`).

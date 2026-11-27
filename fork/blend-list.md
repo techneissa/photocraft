@@ -14,7 +14,7 @@ Blend mode lists as tall as the window allows (no fixed 14-row cap, upstream iss
 
 ## Hooks in official files
 
-`widgets/dropdown.rs` (`list_height()`, one `let list` per call site), engine `prefs.rs` (`interface.scroll_wheel_changes_blend_mode`), ui-egui `lib.rs`, `prefs/prefs_ui/save.rs` (1 line), `panels/layers.rs` (2), `panels/options_bar.rs` (1), `panels/brush_controls.rs` (2): `dropdown_wheel_hovered` → `blend_wheel::dropdown`; official tests `blend_dropdown_wheel_tests.rs`, `options_bar_mode_wheel_tests.rs` (helpers `pub(crate)`, preference on)
+`widgets/dropdown.rs` (`list_height()`, one `let list` per call site), engine-core `prefs.rs` (`interface.scroll_wheel_changes_blend_mode`), ui-egui `lib.rs`, `prefs/prefs_ui/save.rs` (1 line), `panels/layers.rs` (2), `panels/options_bar.rs` (1), `panels/brush_controls.rs` (2): `dropdown_wheel_hovered` → `blend_wheel::dropdown`; official tests `blend_dropdown_wheel_tests.rs`, `options_bar_mode_wheel_tests.rs` (helpers `pub(crate)`, preference on)
 
 ## Tests
 
@@ -25,3 +25,7 @@ cargo test -p photocraft-ui-egui --lib -- open_as_layers double_exposure blend_w
 ```
 
 **Official merge of 2026-11-27 (official code up to 2026-11-17):** the official dropdown (`widgets/dropdown.rs` `combo_list`, #5495) now sizes every list to the room above or below its box, which is what this feature's `list_height` did; `list_height` is gone and the official sizing is used. The wheel preference stays the fork's.
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: the preference `interface.scrollWheelChangesBlendMode` is kept. Rebuild: make craft's blend mode list window-tall and wheel-scrolling (`blend_wheel.rs`).

@@ -7,141 +7,70 @@
 //! change them with `prefs.get` / `prefs.set`); this module only edits a working copy in a dialog
 //! and commits it with those commands on Apply or OK.
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::VecDeque;
 
-use egui::{Color32, RichText, Sense, vec2};
-use photocraft_doc::DocId;
+use egui::Color32;
 use photocraft_engine::jobs::{JobEvent, JobId, JobOutcome, Started};
-#[cfg(test)]
-use photocraft_engine::prefs::Theme;
-use photocraft_engine::prefs::{self, AppearanceMode, DarkTheme, LightTheme, SECTIONS, Theme as SavedTheme};
-use photocraft_engine::snap::{SnapLine, SnapOptions, SnapTargets};
-use serde_json::{Map, Value, json};
+use photocraft_engine::prefs::{self, AppearanceMode};
+use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::state::DialogKind;
-use crate::theme::{ThemeKind, Tokens};
-
-#[cfg(not(target_arch = "wasm32"))]
-mod ai_models;
-
-/// Shell-only sections have runtime actions rather than saved preference fields.
-const SHELL_SECTIONS: &[(&str, &str)] = &[
-    #[cfg(not(target_arch = "wasm32"))]
-    ("aiModels", "AI Models"),
-];
-
-fn sections() -> impl Iterator<Item = (&'static str, &'static str)> {
-    SECTIONS.iter().chain(SHELL_SECTIONS).copied()
-}
 
 /// Shell runtime state for preferences, autosave and snapping (not serialised).
 #[derive(Default)]
 pub struct Runtime {
-    #[cfg(not(target_arch = "wasm32"))]
-    ai_models: ai_models::Runtime,
     loaded: bool,
-    /// Preferences revision last written to storage (or loaded from it).
-    saved_rev: u64,
-    /// This instance's preferences as of `saved_rev`: the base of the three-way merge on save.
-    saved_value: Option<Value>,
-    save_retry: SaveRetry,
-    next_autosave_ms: f64,
-    /// Last revision whose recovery file was actually written successfully.
-    autosaved: HashMap<DocId, u64>,
-    /// Queued writes must not masquerade as durable snapshots.
-    autosave_pending: HashMap<DocId, u64>,
     recovery_started: bool,
     recovery_queue: VecDeque<crate::Recoverable>,
     recovery_pending: Option<(JobId, String)>,
     log_len: usize,
-    /// Snapping state of the drag in progress (see `snap_ui`).
-    pub(crate) snap: Option<crate::snap_ui::ActiveSnap>,
-    pub(crate) snap_lines: Vec<SnapLine>,
-    pub(crate) guide_targets: Option<((DocId, u64, SnapOptions), SnapTargets)>,
-    /// Checkerboard colours the cached CPU checker texture was built with.
-    pub(crate) checker_key: Option<[[u8; 3]; 2]>,
+    /// The preferences revision last handed to the settings writer.
+    saved_rev: u64,
+    #[cfg(target_arch = "wasm32")]
+    pub(super) saved_colors: Option<Value>,
+    /// The open Keyboard Shortcuts and Menus window.
+    pub(crate) shortcuts: Option<shortcuts::ShortcutsSession>,
     /// Style last sent to the GPU canvas.
     pub(crate) gpu_style: Option<crate::gpu_canvas::CanvasStyle>,
     /// `unitsAndRulers.showRulers` as last applied to View › Rulers.
     show_rulers: Option<bool>,
     /// Tool options as last remembered in the preferences (see `tool_memory`).
     pub(crate) tool_options: Option<crate::state::ToolOptions>,
-    /// MCP settings the agent connection was last set up for (`agents::sync_agent_link`).
-    agent_link: Option<prefs::Integrations>,
-    /// When to try again after the agent connection failed to start (a taken port), in seconds of
-    /// `gpu_canvas::now_ms`; `None` while it runs or is off.
-    agent_link_retry: Option<f64>,
     pub(crate) selected_tool: Option<crate::state::Tool>,
     pub(crate) tool_colors: Option<[[[f32; 4]; 2]; 2]>,
     pub(crate) tool_cmyk_picks: crate::tool_memory::CmykPicks,
+    pub(crate) tool_cmyk_roles: Option<crate::tool_memory::CmykRoles>,
     pub(crate) group_tools: Option<Vec<crate::state::Tool>>,
     /// The tool owning the session brush and the other tools' brushes, as last remembered.
     pub(crate) tool_brushes: Option<crate::tool_memory::ToolBrushes>,
-    /// The Brush's own brush while Double Exposure's soft one stands in for it.
-    pub(crate) double_exposure_brush: Option<crate::double_exposure::Stash>,
 }
 
 // ------------------------------------------------------------------ shortcuts
 
 pub use crate::shortcuts::{default_shortcut, effective_shortcut};
 
+#[cfg(not(target_arch = "wasm32"))]
 mod agents;
 mod appearance;
-mod close_keys;
+mod custom_rows;
 mod dialogs;
 mod fields;
-mod graphics;
+mod presets;
 mod save;
-#[cfg(not(target_arch = "wasm32"))]
-mod settings_folder;
-#[cfg(target_arch = "wasm32")]
-#[path = "prefs_ui/settings_folder_web.rs"]
-mod settings_folder;
-mod settings_sync;
-mod shortcut_target;
-mod shortcuts;
-mod shortcuts_backup;
-mod shortcuts_chord;
-mod shortcuts_items;
-mod shortcuts_menus;
-mod shortcuts_record;
-mod shortcuts_rows;
-mod shortcuts_search;
-mod shortcuts_when;
-mod shortcuts_window;
+pub(crate) mod shortcuts;
 mod startup;
 
-#[cfg(test)]
-use appearance::{DARK_THEME_OPTIONS, LIGHT_THEME_OPTIONS, display_scale, favorite_theme_groups, selected_theme};
-pub(crate) use appearance::{appearance_context_menu, cycle_appearance, step_brightness, sync_appearance};
+// PLAN: assumed top-w18's appearance file keeps `display_scale` and `selected_theme` and exports `theme_menu`.
 pub use appearance::{canvas_style, pasteboard_color};
-pub use close_keys::{close_shortcut, esc_closes, prompting, remember_typing, request_close, show_prompt};
-pub use dialogs::{
-    PREFERENCES_SIZE, apply, confirm, invoke, is_preferences, open_mismatch, open_preferences, open_shortcuts, owns, preferences_changed, width,
-};
+pub(crate) use appearance::{cycle_appearance, interface_zoom, show_selected_theme, step_brightness, sync_appearance, theme_menu};
 #[cfg(test)]
-use dialogs::{preference_values, presets_io_body, settings_height};
-pub use fields::body;
-#[cfg(test)]
-use fields::{
-    choice_label, export_field_visible, field_visible, has_visible_fields, hex_field, humanize, preference_sections, section_fields, tools_field_visible,
-};
-#[cfg(test)]
-use graphics::{gpu_status_rows, rendering_mode_value};
-use save::SaveRetry;
+pub(crate) use dialogs::set_draft;
+pub use dialogs::{apply_window, invoke, open_preferences, window_open};
+pub(crate) use dialogs::{feed, take as take_window};
+pub(crate) use presets::{PRESETS_FAMILY, take as take_presets};
 pub(crate) use save::save_preferences;
-#[cfg(test)]
-use save::{SAVE_RETRY_MAX_S, SAVE_RETRY_S, merge_changes, persist};
 pub use save::{autosave_now, tick};
-pub use settings_folder::{offer_newer_file as offer_newer_sync_file, save_on_exit as save_sync_on_exit};
-/// The one entry point for Assign Shortcut…: the dialog on a command with capture on.
-pub use shortcut_target::open_shortcuts_for;
-#[cfg(test)]
-pub(crate) use shortcuts::capture_key_press;
-pub(crate) use shortcuts::capturing_shortcut;
-pub use shortcuts::{is_modifier_key, reserved_shortcut, shortcut_items, shortcut_text};
-pub use shortcuts_window::{MIN as SHORTCUTS_MIN, SIZE as SHORTCUTS_SIZE, is_window as is_shortcuts, size_id as shortcuts_size_id};
+pub use shortcuts::{open as open_shortcuts, recording, shortcuts_open, show as show_shortcuts};
 pub use startup::load;
 pub(crate) use startup::{on_recovery_event, remember_rulers};
 
@@ -150,27 +79,12 @@ pub(crate) use startup::{on_recovery_event, remember_rulers};
 #[cfg(test)]
 mod agents_tests;
 #[cfg(test)]
-mod close_keys_tests;
-#[cfg(test)]
 mod recovery_tests;
 
-#[cfg(test)]
-#[cfg(not(target_arch = "wasm32"))]
-mod settings_folder_tests;
-#[cfg(test)]
-mod settings_sync_tests;
 #[cfg(test)]
 mod shortcut_capture_tests;
 #[cfg(test)]
 mod shortcut_set_tests;
-#[cfg(test)]
-mod shortcuts_items_tests;
-#[cfg(test)]
-mod shortcuts_upgrade_tests;
-#[cfg(test)]
-mod shortcuts_window_snapshots;
-#[cfg(test)]
-mod shortcuts_window_tests;
 
 #[cfg(test)]
 mod tests;

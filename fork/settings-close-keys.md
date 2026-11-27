@@ -23,3 +23,7 @@ ui-egui `input/shortcuts.rs` (hook), `prefs/prefs_ui.rs`, `prefs_ui/dialogs.rs`
 ```bash
 cargo test -p photocraft-ui-egui --lib -- close_keys start_screen layer_shortcut native_menu title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: nothing. Rebuild: ⌘, and Esc close the craft Settings window, asking to save (`prefs_ui/close_keys.rs`).

@@ -1159,7 +1159,7 @@ mod native {
         #[test]
         fn missing_editor_errors_name_the_dialog_option() {
             let dialog = include_str!("../../../crates/ui-egui/src/smart_svg_ui.rs");
-            assert!(dialog.contains(&format!("(Editor::Program, \"{OTHER_APPLICATION}\")")), "the dialog label changed");
+            assert!(dialog.contains(&format!("(Editor::Program, \"program\", \"{OTHER_APPLICATION}\")")), "the dialog label changed");
             let source = include_str!("external_svg.rs");
             assert!(!source.contains(concat!("Other ", "editor")), "errors must name the dialog's option");
             #[cfg(target_os = "linux")]
@@ -1383,7 +1383,11 @@ mod native {
             assert!(owned.read(&stamp).is_err());
             assert!(owned.overwrite(b"<svg/>").is_err());
             std::fs::remove_file(&owned.file).unwrap();
+            #[cfg(not(target_vendor = "apple"))]
             rustix::fs::mkfifoat(rustix::fs::CWD, &owned.file, rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR).unwrap();
+            // fork: rustix has no `mkfifoat` on Apple targets (the fork builds on a Mac); the system tool makes the FIFO there.
+            #[cfg(target_vendor = "apple")]
+            assert!(std::process::Command::new("mkfifo").arg(&owned.file).status().unwrap().success());
             assert!(owned.stamp().is_err());
             assert!(owned.read(&stamp).is_err());
             assert_eq!(std::fs::read(&target).unwrap(), b"private contents");

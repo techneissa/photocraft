@@ -14,17 +14,21 @@ none
 
 ## Hooks in official files
 
-engine `cmd/channel_cmds.rs` + `channel_cmds/targeting.rs`, `cmd/distort_cmds.rs` + tests, `cmd/lens_cmds.rs`, `cmd/vp_cmds.rs`, `session/execute.rs`, `cmd/edit_cmds.rs` + `edit_cmds/clipboard_tests.rs`, `cmd/extra_cmds.rs`; ui-egui `dialogs/distort_ui.rs`, `liquify_ui.rs` + tests, `rasterize_prompt.rs` + tests, `camera_raw_ui/open.rs`, `menus/state.rs`, `app/clipboard.rs`, `lib.rs`, `mask_clipboard_tests.rs`, `canvas.rs`, `canvas/gesture.rs`, `polygon_lasso_tests.rs`, `tools/lasso_ui.rs` + tests, `dialogs/filter_dialog.rs` + tests; `docs/clipboard.md`, `docs/ui-parity.md`
+engine-core `cmd/channel_cmds.rs` + `channel_cmds/targeting.rs`, `cmd/distort_cmds.rs` + tests, `cmd/lens_cmds.rs`, `cmd/vp_cmds.rs`, `session/execute.rs`, `cmd/edit_cmds.rs` + `edit_cmds/clipboard_tests.rs`, `cmd/extra_cmds.rs`; ui-egui `dialogs/distort_ui.rs`, `liquify_ui.rs` + tests, `rasterize_prompt.rs` + tests, `camera_raw_ui/open.rs`, `menus/state.rs`, `app/clipboard.rs`, `lib.rs`, `mask_clipboard_tests.rs`, `canvas.rs`, `canvas/gesture.rs`, `polygon_lasso_tests.rs`, `tools/lasso_ui.rs` + tests, `dialogs/filter_dialog.rs` + tests; `docs/clipboard.md`, `docs/ui-parity.md`
 
 ## Tests
 
-engine `distort_cmds lens_cmds channel_cmds targeting vp_cmds edit_cmds clipboard`; ui-egui `liquify_ui rasterize_prompt distort_ui camera_raw mask_clipboard polygon_lasso lasso_ui filter_dialog`
+engine-core `distort_cmds lens_cmds channel_cmds targeting vp_cmds edit_cmds clipboard`; ui-egui `liquify_ui rasterize_prompt distort_ui camera_raw mask_clipboard polygon_lasso lasso_ui filter_dialog`
 
 ```bash
-cargo test -p photocraft-engine --lib -- distort_cmds lens_cmds channel_cmds targeting vp_cmds edit_cmds clipboard
+cargo test -p photocraft-engine-core --lib -- distort_cmds lens_cmds channel_cmds targeting vp_cmds edit_cmds clipboard
 cargo test -p photocraft-ui-egui --lib -- liquify_ui rasterize_prompt distort_ui camera_raw mask_clipboard polygon_lasso lasso_ui filter_dialog
 ```
 
 ## When upstream merges
 
 **When upstream merges #10469, #10375, #6734 or #9304:** by merge commit git sees it as merged; if squashed, the merge conflicts in the files under Own files and Hooks: keep upstream's version and do not cherry-pick again. #10375 conflicted once with main (`edit_cmds.rs`: `Clip.components: None` added to its masked-layer arm and its `copy(s, false, false)` signature)
+
+## After the craft UI merge (2026-11-27)
+
+Partly works: the engine side of PR #10469 works (#6734 is upstream now); the interface parts of #10469 and #9304/#10375 are gone with the old screens. Rebuild: check the craft UI's Liquify, Camera Raw and mask copy and paste against the four PRs; redo what upstream still lacks.

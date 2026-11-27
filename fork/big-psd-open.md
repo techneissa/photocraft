@@ -24,3 +24,7 @@ A big layered PSD shows a preview on the Home screen. (Opening it is now officia
 cargo test -p photocraft-io --lib fork_psd_preview
 cargo test -p photocraft-ui-egui --lib psd_preview_is_the_merged
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: the PSD preview reader (`crates/io/src/fork_psd_preview.rs`) builds; no Home grid uses it. Rebuild: comes back with the Home grid.

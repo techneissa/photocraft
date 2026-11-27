@@ -231,7 +231,7 @@ fn update_unused() -> Result<(), String> {
     Err("no update in this test".into())
 }
 
-fn app_with(fetch: std::sync::Arc<Fake>, commit: fn() -> Result<String, String>, update: fn() -> Result<(), String>) -> PhotocraftApp {
+fn app_with(fetch: std::sync::Arc<Fake>, commit: fn() -> Result<String, String>, update: fn() -> Result<(), String>) -> Box<PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Services::default());
     app.fork_update_rt = Runtime::with_parts(Parts { fetch, commit, update });
     app
@@ -239,9 +239,8 @@ fn app_with(fetch: std::sync::Arc<Fake>, commit: fn() -> Result<String, String>,
 
 /// Frames until the check finishes.
 fn settle(app: &mut PhotocraftApp) {
-    let ctx = egui::Context::default();
     for _ in 0..500 {
-        super::tick(app, &ctx);
+        super::tick(app);
         if app.fork_update_rt.state != State::Checking {
             return;
         }
@@ -291,27 +290,44 @@ fn an_unknown_commit_fails_without_asking_github() {
     assert!(fake.asked().is_empty());
 }
 
+/// The official update check never runs: Help › Check for Updates, the check at start and the
+/// window all go to this module, even when an official updater exists (the app never makes one).
 #[test]
 fn help_menu_check_replaces_the_official_one_and_always_opens_the_window() {
     let fake = Fake::new(Err("Couldn't reach GitHub.".into()), Err("x".into()));
     let mut app = app_with(fake, commit_known, update_unused);
-    // The official check must not start, whatever the engine's own service would do.
+    // An official updater whose every check is counted: none may start.
     let official = std::sync::Arc::new(AtomicUsize::new(0));
     let counter = official.clone();
-    app.session.updates.check = Some(Box::new(move || {
+    let source: craft::update::updater::CheckSource = std::sync::Arc::new(move || {
         counter.fetch_add(1, Ordering::SeqCst);
         Err("official".into())
-    }));
-    let ctx = egui::Context::default();
+    });
+    crate::updates_ui::install_updater_for_test(
+        &mut app,
+        craft::update::updater::Updater::new(&crate::UPDATE_APP, photocraft_engine::build_info::VERSION).with_source(source),
+    );
+    let ctx = app.ctx().clone();
     let reply = crate::menus::invoke(&mut app, &ctx, "help.checkForUpdates", json!({})).unwrap();
     assert_eq!(reply["status"], "checking");
     assert!(app.fork_update_rt.open);
     settle(&mut app);
+    crate::updates_ui::show(&mut app, &ctx);
     assert!(matches!(app.fork_update_rt.state, State::Failed(_)));
     assert!(app.fork_update_rt.open, "a failed manual check shows its message");
+    // A started official check would have left Idle at once (its own test shows it does).
+    assert_eq!(crate::updates_ui::official_status(&app), Some(craft::update::updater::Status::Idle), "the official update check never starts");
     assert_eq!(official.load(Ordering::SeqCst), 0, "the official update check never runs");
-    assert_eq!(app.session.updates.status, photocraft_engine::updates_cmds::Status::Idle);
     assert!(crate::menus::invoke(&mut app, &ctx, "help.checkForUpdates", json!({"x": 1})).is_err());
+}
+
+/// The app as it starts: the official updater is never made, so nothing can ask the official
+/// releases (the official check's own tests make one with the switch off).
+#[test]
+fn the_app_never_makes_the_official_updater() {
+    const { assert!(super::OFFICIAL_CHECK_OFF) };
+    assert!(!cfg!(test) || !super::official_off_default(), "in tests the default is off so the official tests run");
+    assert!(crate::updates_ui::official_updater(super::OFFICIAL_CHECK_OFF).is_none());
 }
 
 #[test]
@@ -380,5 +396,4 @@ fn the_words_shown_for_each_state() {
 #[test]
 fn the_official_check_is_off_in_the_app() {
     const { assert!(super::OFFICIAL_CHECK_OFF) };
-    assert!(super::ui::row_matches("") && super::ui::row_matches("updates") && !super::ui::row_matches("zoom"));
 }

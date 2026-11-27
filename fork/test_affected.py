@@ -17,19 +17,20 @@ def pkg(dir_, deps=(), doc=False, feature=False):
     return {"dir": dir_ + "/", "deps": set(deps), "doc": doc, "feature": feature}
 
 
-# a small workspace shaped like PhotoCraft: geom <- raster <- codecs <- io <- engine <- ui-egui <- app
+# a small workspace shaped like PhotoCraft: geom <- raster <- codecs <- io <- engine-core <- engine <- ui-egui <- app
 PKGS = {
     "photocraft-geom": pkg("crates/geom"),
     "photocraft-raster": pkg("crates/raster", ["photocraft-geom"]),
     "photocraft-codecs": pkg("crates/codecs", ["photocraft-raster"], feature=True),
     "photocraft-io": pkg("crates/io", ["photocraft-codecs"], doc=True, feature=True),
     "photocraft-testkit": pkg("crates/testkit"),
-    "photocraft-engine": pkg("crates/engine", ["photocraft-io", "photocraft-testkit"]),
+    "photocraft-engine-core": pkg("crates/engine-core", ["photocraft-io", "photocraft-testkit"]),
+    "photocraft-engine": pkg("crates/engine", ["photocraft-engine-core", "photocraft-testkit"]),
     "photocraft-ui-egui": pkg("crates/ui-egui", ["photocraft-engine", "photocraft-testkit"]),
     "photocraft": pkg("apps/photocraft", ["photocraft-ui-egui"], feature=True),
     "xtask": pkg("xtask"),
 }
-WEIGHTS = {n: 10 for n in PKGS} | {"photocraft-ui-egui": 1000, "photocraft-engine": 500}
+WEIGHTS = {n: 10 for n in PKGS} | {"photocraft-ui-egui": 1000, "photocraft-engine-core": 500, "photocraft-engine": 100}
 
 
 def affects(*paths):
@@ -50,7 +51,7 @@ class Scope(unittest.TestCase):
         self.assertEqual(scope, "some")
         self.assertEqual(
             names,
-            ["photocraft", "photocraft-codecs", "photocraft-engine", "photocraft-io", "photocraft-raster", "photocraft-ui-egui"],
+            ["photocraft", "photocraft-codecs", "photocraft-engine", "photocraft-engine-core", "photocraft-io", "photocraft-raster", "photocraft-ui-egui"],
         )
 
     def test_a_dev_dependency_counts(self):
@@ -93,7 +94,7 @@ class Groups(unittest.TestCase):
         self.assertEqual(tests[0]["crates"], [])
 
     def test_the_packages_above_a_sharded_one_share_group_two(self):
-        self.assertEqual(plan()["tests"][1]["crates"], ["photocraft"])
+        self.assertEqual(plan()["tests"][1]["crates"], ["photocraft", "photocraft-engine"])
 
     def test_the_heaviest_package_is_alone_when_the_others_are_light(self):
         self.assertIn((100, ["big"]), affected.balance({"big": 100, "a": 10, "b": 10, "c": 10}, 3))
@@ -162,8 +163,9 @@ class Shards(unittest.TestCase):
         r = plan()
         hunts = [t for t in r["tests"] if t["panic_hunt"]]
         self.assertEqual(len(hunts), 1)
-        self.assertEqual(hunts[0]["crates"], ["photocraft-engine"])
-        self.assertTrue(hunts[0]["shard"].startswith("1/"))
+        self.assertIn("photocraft-engine", hunts[0]["crates"])
+        # Since the engine split the top crate `engine` is not sharded: panic_hunt runs where it is tested.
+        self.assertTrue(hunts[0]["shard"] in ("",) or hunts[0]["shard"].startswith("1/"))
 
     def test_panic_hunt_follows_the_engine_when_it_is_not_sharded(self):
         r = plan(groups=1)
@@ -177,8 +179,8 @@ class Shards(unittest.TestCase):
 class Features(unittest.TestCase):
     def test_a_machine_gets_the_heif_feature_of_every_package_it_builds(self):
         r = plan()
-        engine = next(t for t in r["tests"] if t["crates"] == ["photocraft-engine"])
-        self.assertEqual(engine["features"], ["photocraft-codecs/heif", "photocraft-io/heif"])  # engine builds io and codecs
+        engine = next(t for t in r["tests"] if t["crates"] == ["photocraft-engine-core"])
+        self.assertEqual(engine["features"], ["photocraft-codecs/heif", "photocraft-io/heif"])  # engine-core builds io and codecs
 
     def test_no_feature_no_flag(self):
         self.assertEqual(affected.features_for(["photocraft-geom"], PKGS), [])
@@ -256,8 +258,9 @@ class Drift(unittest.TestCase):
     def test_xtask_ci_steps_are_the_ones_fork_ci_sh_runs(self):
         """A step upstream adds to `cargo xtask ci` has to be added to fork/ci.sh by hand (the script also fails then)."""
         src = (ROOT / "xtask/src/main.rs").read_text(encoding="utf-8")
-        body = src.split("fn cmd_ci()", 1)[1].split("let mut done", 1)[0]
-        names = set(re.findall(r'^\s*\(?"([a-z_0-9]+)",', body, re.M))
+        body = src.split("const CI_STEPS", 1)[1].split("\n];", 1)[0]
+        names = set(re.findall(r'^\s*\("([a-z_0-9-]+)",', body, re.M))
+        self.assertTrue(names, "no step found in CI_STEPS")
         script = (ROOT / "fork/ci.sh").read_text(encoding="utf-8")
         known = re.search(r'known_steps="([^"]+)"', script).group(1).split()
         self.assertTrue(names <= set(known), names - set(known))

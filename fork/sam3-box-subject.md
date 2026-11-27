@@ -10,19 +10,23 @@ Object Selection's dragged rectangle selects with SAM 3 when its encoding is rea
 
 ## Own files
 
-engine `cmd/sam3_select/{boxed,subject,tests_box}.rs`, `examples/sam3_box_demo.rs`
+engine-core `cmd/sam3_select/{boxed,subject,tests_box}.rs`, `examples/sam3_box_demo.rs`
 
 ## Hooks in official files
 
-sam3 `tracker.rs` (`BoxPrompt`, `embed_prompts`), `lib.rs` (`segment_boxed`), `service.rs` (`boxed`), `service/tests.rs`, `tests/real_model.rs`; engine `cmd/sam3_select.rs` (`can_run`, `ready_encoding`, modules), `cmd/sam3_select/{backend,mask,tests}.rs`, `cmd/smartselect_cmds.rs` (`object_selection` rect path, `find_subject_region` `sam3` argument), `cmd/cutout_cmds.rs`, `cmd/remove_subject_cmds.rs`, `prefs.rs` (`SubjectEngine::Sam3`), `tests/sam3_real_model.rs`; ui-egui `tools/retouch_ui.rs` (comment), 5 `i18n/*.tsv` (`sv` 41 lines, `da`, `fi`, `nb` 3 lines each); `docs/ml.md`
+sam3 `tracker.rs` (`BoxPrompt`, `embed_prompts`), `lib.rs` (`segment_boxed`), `service.rs` (`boxed`), `service/tests.rs`, `tests/it/real_model.rs`; engine-core `cmd/sam3_select.rs` (`can_run`, `ready_encoding`, modules), `cmd/sam3_select/{backend,mask,tests}.rs`, `cmd/smartselect_cmds.rs` (`object_selection` rect path, `find_subject_region` `sam3` argument), `cmd/cutout_cmds.rs`, `cmd/remove_subject_cmds.rs`, `prefs.rs` (`SubjectEngine::Sam3`), `crates/engine/tests/it/sam3_real_model.rs`; ui-egui `tools/retouch_ui.rs` (comment), 5 `i18n/*.tsv` (`sv` 41 lines, `da`, `fi`, `nb` 3 lines each); `docs/ml.md`
 
 ## Tests
 
 ```bash
 cargo test -p photocraft-sam3 --lib
-cargo test -p photocraft-engine --lib -- sam3_select smartselect
+cargo test -p photocraft-engine-core --lib -- sam3_select smartselect
 cargo test -p photocraft-ui-egui --lib -- ai_models
 # real model, by hand (about 20 GB of memory):
-# cargo test -p photocraft-sam3 --release --test real_model -- --ignored --nocapture
-# cargo test -p photocraft-engine --release --test sam3_real_model -- --ignored --nocapture
+# cargo test -p photocraft-sam3 --release --test it real_model -- --ignored --nocapture
+# cargo test -p photocraft-engine --release --test it sam3_real_model -- --ignored --nocapture
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Partly works: `select.subject` with engine `sam3` and the box prompt work in the engine; tool and Settings parts are gone. Rebuild: comes back with `sam3_ui.rs` and the AI Models page.

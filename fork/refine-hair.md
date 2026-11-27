@@ -12,18 +12,22 @@ Refine Hair in Select and Mask (upstream issue #2671): the button builds a trima
 
 ## Own files
 
-`crates/algo/src/hair.rs`, `hair/tests.rs`, `crates/engine/src/cmd/hair_cmds.rs`, `hair_cmds/tests.rs`; Protect Subject: engine `cmd/sam3_select/{protect,tests_protect}.rs`, ui-egui `dialogs/select_mask_ui/protect.rs` and `protect/tests.rs`
+`crates/algo/src/hair.rs`, `hair/tests.rs`, `crates/engine-core/src/cmd/hair_cmds.rs`, `hair_cmds/tests.rs`; Protect Subject: engine-core `cmd/sam3_select/{protect,tests_protect}.rs`, ui-egui `dialogs/select_mask_ui/protect.rs` and `protect/tests.rs`
 
 ## Hooks in official files
 
-`algo/lib.rs` (mod line); `algo/hair.rs` (`refine_hair_protected`, `protect_erosion`; `refine_hair` calls it with `None`); `engine/cmd.rs` (mod and specs lines, placed apart from the fork's `remove_subject_cmds` line); `engine/lib.rs` (re-export); `select_mask_edits.rs` (edit variant, parse, apply, size check, tests); ui-egui `select_mask_ui.rs` (button enabled, radius scaling; Protect Subject: `protect` module line, a field, the checkbox, `job` takes `&mut` and a finder, Esc and OK while waiting) and its `tests.rs`; engine `sam3_select.rs` (module lines, `sam3_backend_installed`), `smartselect_cmds.rs` (`attach` in `refine_edge`), `hair_cmds.rs` (`protectSubject`), `select_mask_edits.rs` (`protect` field, `attach`)
+`algo/lib.rs` (mod line); `algo/hair.rs` (`refine_hair_protected`, `protect_erosion`; `refine_hair` calls it with `None`); `engine/cmd.rs` (mod and specs lines, placed apart from the fork's `remove_subject_cmds` line); `engine/lib.rs` (re-export); `select_mask_edits.rs` (edit variant, parse, apply, size check, tests); ui-egui `select_mask_ui.rs` (button enabled, radius scaling; Protect Subject: `protect` module line, a field, the checkbox, `job` takes `&mut` and a finder, Esc and OK while waiting) and its `tests.rs`; engine-core `sam3_select.rs` (module lines, `sam3_backend_installed`), `smartselect_cmds.rs` (`attach` in `refine_edge`), `hair_cmds.rs` (`protectSubject`), `select_mask_edits.rs` (`protect` field, `attach`)
 
 ## Tests
 
 ```bash
 cargo test -p photocraft-algo --lib hair::
-cargo test -p photocraft-engine --lib -- hair_cmds select_mask_edits sam3_select
+cargo test -p photocraft-engine-core --lib -- hair_cmds select_mask_edits sam3_select
 cargo test -p photocraft-ui-egui --lib -- select_mask_ui
 # real model, by hand (about 20 GB of memory; the portrait as raw RGB, see $WORKSPACE/assets/photocraft/shots/refine-hair/SOURCE.txt):
-# PHOTOCRAFT_HAIR_RGB=cora.rgb PHOTOCRAFT_HAIR_SIZE=541x778 cargo test -p photocraft-engine --test sam3_real_model -- --ignored --nocapture protect_subject
+# PHOTOCRAFT_HAIR_RGB=cora.rgb PHOTOCRAFT_HAIR_SIZE=541x778 cargo test -p photocraft-engine --test it sam3_real_model -- --ignored --nocapture protect_subject
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Partly works: the command `select.refineHair` runs; the Select and Mask button and Protect Subject box are gone. Rebuild: add them to craft's Select and Mask (`dialogs/select_mask_ui/protect.rs`).

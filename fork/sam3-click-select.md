@@ -10,20 +10,24 @@ Object Selection and Quick Selection use SAM 3 when its model is installed and t
 
 ## Own files
 
-engine `cmd/sam3_select.rs` + `cmd/sam3_select/{backend,mask,tests}.rs`, `examples/sam3_click_demo.rs`, `tests/sam3_real_model.rs`; ml `marker.rs`; ui-egui `tools/sam3_ui.rs` + `tools/sam3_ui/tests.rs`
+engine-core `cmd/sam3_select.rs` + `cmd/sam3_select/{backend,mask,tests}.rs`, `examples/sam3_click_demo.rs`, `crates/engine/tests/it/sam3_real_model.rs`; ml `marker.rs`; ui-egui `tools/sam3_ui.rs` + `tools/sam3_ui/tests.rs`
 
 ## Hooks in official files
 
-`Cargo.toml`, `Cargo.lock`, engine `Cargo.toml`, `cmd.rs` (module + specs), `lib.rs` (field, `pub use`), `prefs.rs` (`ObjectEngine`, `tools.objectSelectionEngine`), `prefs/validate.rs`, `session/documents.rs`, `session/execute.rs` (drop on edit/close), `cmd/smartselect_cmds.rs` (`object_at_point`, `quick_selection`, `stretch_taps`); ml `store.rs` (`model_present`, marker in `hash_ok`), `lib.rs`; sam3 `service.rs` (`is_current`); ui-egui `lib.rs`, `app.rs`, `app/frame.rs` (tick), `tools.rs`, `tools/object_finder.rs` (SAM 3 hover), `tools/retouch_ui.rs` (`refine`, notes), `prefs/prefs_ui/fields.rs` + `tests.rs`; `docs/ml.md`
+`Cargo.toml`, `Cargo.lock`, engine-core `Cargo.toml`, `cmd.rs` (module + specs), `lib.rs` (field, `pub use`), `prefs.rs` (`ObjectEngine`, `tools.objectSelectionEngine`), `prefs/validate.rs`, `session/documents.rs`, `session/execute.rs` (drop on edit/close), `cmd/smartselect_cmds.rs` (`object_at_point`, `quick_selection`, `stretch_taps`); ml `store.rs` (`model_present`, marker in `hash_ok`), `lib.rs`; sam3 `service.rs` (`is_current`); ui-egui `lib.rs`, `app.rs`, `app/frame.rs` (tick), `tools.rs`, `tools/object_finder.rs` (SAM 3 hover), `tools/retouch_ui.rs` (`refine`, notes), `prefs/prefs_ui/fields.rs` + `tests.rs`; `docs/ml.md`
 
 ## Tests
 
 ```bash
-cargo test -p photocraft-engine --lib -- sam3_select smartselect
+cargo test -p photocraft-engine-core --lib -- sam3_select smartselect
 cargo test -p photocraft-ml --lib
 cargo test -p photocraft-sam3 --lib
 cargo test -p photocraft-ui-egui --lib -- sam3_ui object_finder retouch_ui
 # real model, by hand (about 20 GB of memory):
-# cargo test -p photocraft-engine --test sam3_real_model -- --ignored --nocapture
+# cargo test -p photocraft-engine --test it sam3_real_model -- --ignored --nocapture
 # PHOTOCRAFT_SAM3_IMAGE=photo.jpg PHOTOCRAFT_SAM3_POINT=x,y cargo test -p photocraft-ui-egui --lib -- --ignored real_model --nocapture
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Partly works: Object and Quick Selection use SAM 3 once `select.objectPrepare` has run; nothing starts it or shows hover. Rebuild: rebuild `tools/sam3_ui.rs` on the craft tools (prepare, hover, ⇧/⌥ refine).

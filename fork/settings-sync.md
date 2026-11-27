@@ -17,18 +17,22 @@ Export Settings… / Import Settings… move all settings to another Mac in one 
 
 ## Own files
 
-engine `prefs/settings_sync.rs` + `settings_sync/tests.rs`, `prefs/settings_folder.rs` (`SyncPrefs`, every target) + `settings_folder/native.rs` + `settings_folder/tests.rs` (the folder, file, clock and commands, not on wasm); ui-egui `prefs/prefs_ui/settings_sync.rs` + `settings_sync_tests.rs`, `prefs/prefs_ui/settings_folder.rs` + `settings_folder_tests.rs`, `panels/brush_size_label_tests.rs`
+engine-core `prefs/settings_sync.rs` + `settings_sync/tests.rs`, `prefs/settings_folder.rs` (`SyncPrefs`, every target) + `settings_folder/native.rs` + `settings_folder/tests.rs` (the folder, file, clock and commands, not on wasm); ui-egui `prefs/prefs_ui/settings_sync.rs` + `settings_sync_tests.rs`, `prefs/prefs_ui/settings_folder.rs` + `settings_folder_tests.rs`, `panels/brush_size_label_tests.rs`
 
 ## Hooks in official files
 
-engine `Cargo.toml` (`chrono` with `clock`, for the Mac's time zone), `lib.rs` (`Session::settings_checks`, `Session::sync_env`, not on wasm), `prefs.rs` (`mod settings_sync`, `mod settings_folder`, the field `sync`), `prefs/cmds.rs` (two specs added, then two more, not on wasm), `shortcut_sets.rs` (`validate` is `pub(crate)`); automation `workspace.rs` (+ test: the two commands with `path` are refused for agents; `sync.*` in `prefs.set` is refused, the two folder commands are allowed); ui-egui `app.rs` (the offer at start, the save on quit), `prefs/prefs_ui.rs` (mods, two re-exports), `prefs_ui/dialogs.rs` (route, OK on the prompt), `prefs_ui/fields.rs` (icons beside the search field, the Sync Folder row, prompt body), `dialogs.rs` (OK reads Import), `menus/items.rs` (menu order, four items), `panels.rs` (test mod), `panels/brush_controls.rs` (brush size text 2 pt higher, preview 1 pt higher)
+engine-core `Cargo.toml` (`chrono` with `clock`, for the Mac's time zone), `lib.rs` (`Session::settings_checks`, `Session::sync_env`, not on wasm), `prefs.rs` (`mod settings_sync`, `mod settings_folder`, the field `sync`), `prefs/cmds.rs` (two specs added, then two more, not on wasm), `shortcut_sets.rs` (`validate` is `pub(crate)`); automation `workspace.rs` (+ test: the two commands with `path` are refused for agents; `sync.*` in `prefs.set` is refused, the two folder commands are allowed); ui-egui `app.rs` (the offer at start, the save on quit), `prefs/prefs_ui.rs` (mods, two re-exports), `prefs_ui/dialogs.rs` (route, OK on the prompt), `prefs_ui/fields.rs` (icons beside the search field, the Sync Folder row, prompt body), `dialogs.rs` (OK reads Import), `menus/items.rs` (menu order, four items), `panels.rs` (test mod), `panels/brush_controls.rs` (brush size text 2 pt higher, preview 1 pt higher)
 
 ## Tests
 
-engine `settings_sync settings_folder`, automation `automation_rejects_ambient_path`, ui-egui `settings_sync settings_folder brush_size_label`
+engine-core `settings_sync settings_folder`, automation `automation_rejects_ambient_path`, ui-egui `settings_sync settings_folder brush_size_label`
 
 ```bash
-cargo test -p photocraft-engine --lib -- settings_sync settings_folder
+cargo test -p photocraft-engine-core --lib -- settings_sync settings_folder
 cargo test -p photocraft-ui-egui --lib -- settings_sync settings_folder brush_size_label
 cargo test -p photocraft-automation --lib -- automation_rejects_ambient_path
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Partly works: Export / Import Settings and the sync folder commands run (engine; the workspaces part now holds craft's workspace set); the Settings buttons and the start-up offer are gone. Rebuild: rebuild the buttons and the offer (`prefs_ui/settings_sync.rs`, `settings_folder.rs`).

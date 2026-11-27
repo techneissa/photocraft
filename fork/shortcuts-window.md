@@ -21,3 +21,7 @@ ui-egui `dialogs.rs` (resizable and minimum size for the window, size kept like 
 ```bash
 cargo test -p photocraft-ui-egui --lib -- shortcuts_window shortcuts_search shortcuts_rows shortcuts_menus shortcuts_items shortcut_capture shortcuts_upgrade czech_shortcut_conflicts kys_import prefs_ui dialogs::
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: nothing. Rebuild: rebuild the Keyboard Shortcuts window parts on craft's keymap editor (`prefs_ui/shortcuts_*.rs`).

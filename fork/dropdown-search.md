@@ -27,3 +27,7 @@ cargo test -p photocraft-ui-egui --lib -- open_as_layers double_exposure blend_w
 ```
 
 **Official merge of 2026-11-27:** the official dropdown moved from `craft_ui::ComboBox` to its own `combo_list`, so the `Searchable` trait is gone: `dropdown_with` and `dropdown_with_tooltips` call `find.header(ui)` as the first row inside the list (it scrolls with the rows) and keep the official greyed-option rule (`enabled` rows are left out of the matches).
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: nothing; check first whether craft's dropdown already filters as you type. Rebuild: add type-to-filter to craft's dropdown (`widgets/dropdown_search.rs`), or drop it if craft has it.

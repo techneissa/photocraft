@@ -38,3 +38,7 @@ cargo test -p photocraft-ui-egui --lib -- color_picker_preview
 **When upstream merges #8216:** if by merge commit, git sees it as already merged; if squashed, the merge conflicts in the files under Own files and Hooks: keep upstream's version where it matches and do not cherry-pick #8216 again.
 
 **Official merge of 2026-11-27:** a large layer's box now prepares in the background (`begin.rs`, `Prepared`, `on_prepared`). The live preview is decided before that: with a live session nothing is prepared (an empty image, no "above" picture) and the box opens at once. `transform_fx.rs` was deleted again (upstream had changed it); `styled` previews are off everywhere.
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: the GPU live pass (`crates/gpu/src/live.rs`) still builds; no transform tool feeds it. Rebuild: hook `tools/transform_live.rs` into the craft UI's Free Transform, Warp, Puppet Warp and Perspective Warp.

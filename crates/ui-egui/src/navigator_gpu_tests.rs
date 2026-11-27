@@ -5,7 +5,7 @@
 use crate::PhotocraftApp;
 use serde_json::json;
 
-type Harness = egui_kittest::Harness<'static, PhotocraftApp>;
+type Harness = egui_kittest::Harness<'static, Box<PhotocraftApp>>;
 
 fn harness() -> Option<Harness> {
     let built = std::panic::catch_unwind(|| {
@@ -16,11 +16,11 @@ fn harness() -> Option<Harness> {
             .wgpu_setup(crate::gpu_canvas::wgpu_setup())
             .build_eframe(|cc| {
                 PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-                let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+                let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
                 if let Some(rs) = cc.wgpu_render_state.as_ref() {
                     app.set_wgpu(rs.clone());
                 }
-                app.ui.panels.navigator = true;
+                crate::panel_docking::show_panel(&mut app, "navigator", Some(true)).unwrap();
                 app.run("file.new", json!({"width": 400, "height": 300, "background": "white"})).unwrap();
                 app.run("select.rect", json!({"x": 0, "y": 0, "width": 200, "height": 300})).unwrap();
                 app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
@@ -38,9 +38,23 @@ fn harness() -> Option<Harness> {
     }
 }
 
-/// The colour at fractions (`fx`, `fy`) of the Navigator preview.
+/// The Navigator's preview box: the node the framework names for the panel, the smallest one big enough to be
+/// the box and not a dock tab.
+// PLAN: assumes the preview box is the accessibility node labelled "Navigator" (`Navigator::new(label, ..)`).
+fn preview_box(h: &Harness) -> egui::Rect {
+    use egui_kittest::kittest::Queryable as _;
+    h.get_all_by_label("Navigator")
+        .map(|node| node.rect())
+        .filter(|r| r.width() >= 40.0 && r.height() >= 40.0)
+        .min_by(|a, b| a.area().total_cmp(&b.area()))
+        .expect("navigator preview drawn")
+}
+
+/// The colour at fractions (`fx`, `fy`) of the Navigator's picture: the 400 × 300 document fitted in the box.
 fn preview_px(h: &mut Harness, fx: f32, fy: f32) -> [u8; 4] {
-    let r = crate::panels::last_navigator_preview(&h.ctx).expect("navigator preview drawn");
+    let frame = preview_box(h);
+    let scale = (frame.width() / 400.0).min(frame.height() / 300.0);
+    let r = egui::Rect::from_center_size(frame.center(), egui::vec2(400.0, 300.0) * scale);
     let img = h.render().expect("render");
     let (x, y) = ((r.left() + r.width() * fx) as u32, (r.top() + r.height() * fy) as u32);
     img.get_pixel(x, y).0
@@ -92,33 +106,4 @@ fn navigator_draws_the_gpu_canvas_texture_and_follows_edits() {
     assert!(!h.state().navigator_gpu.contains_key(&id), "no GPU view while the canvas draws on the CPU");
     assert!(h.state().navigator_textures.contains_key(&id), "the CPU thumbnail again");
     assert!(near(preview_px(&mut h, 0.25, 0.5), [255, 0, 0]) && near(preview_px(&mut h, 0.75, 0.5), [0, 0, 255]), "same picture, unflipped");
-}
-
-#[test]
-fn navigator_stays_on_the_gpu_texture_while_a_free_transform_box_moves() {
-    let _gpu = photocraft_testkit::gpu_lock();
-    let Some(mut h) = harness() else { return };
-    h.run_steps(8);
-    if !h.state().perf.gpu {
-        eprintln!("skipping: the canvas fell back to the CPU here");
-        return;
-    }
-    let id = h.state().session.active().expect("doc").doc.id;
-    h.state_mut().run("layer.new.layer", json!({})).unwrap();
-    h.state_mut().run("select.rect", json!({"x": 100, "y": 100, "width": 100, "height": 100})).unwrap();
-    h.state_mut().run("edit.fill", json!({"color": "#0000ff"})).unwrap();
-    h.state_mut().run("select.deselect", json!({})).unwrap();
-    h.run_steps(4);
-    let ctx = h.ctx.clone();
-    crate::transform_tool::begin(h.state_mut(), &ctx).unwrap();
-    // Each step moves the box, so each frame has a new mesh to show.
-    for _ in 0..4 {
-        let t = h.state_mut().ui.transform.as_mut().expect("box open");
-        t.quad = t.quad.map(|q| [q[0] + 25.0, q[1] + 25.0]);
-        h.run_steps(2);
-        assert!(h.state().navigator_gpu.contains_key(&id), "the Navigator keeps the GPU canvas view");
-        assert!(!h.state().navigator_textures.contains_key(&id), "no CPU composite of the moving mesh");
-    }
-    assert!(near(preview_px(&mut h, 0.625, 0.75), [0, 0, 255]), "the Navigator shows the box where it is");
-    assert!(near(preview_px(&mut h, 0.375, 0.5), [255, 0, 0]), "and the red it left behind");
 }

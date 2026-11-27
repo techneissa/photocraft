@@ -40,3 +40,7 @@ cargo test -p photocraft-ui-egui --lib -- clipping_bench --ignored --nocapture -
 ## When upstream merges
 
 If #3693 merges (it is open and conflicts with `main`), take its version of the Levels files and keep the Curves parts: `curves_clipping*`, `curve_points.rs`, and the three places in `levels_clipping.rs` that name Curves (`sync`, `dialog`, `thresholds`). If upstream adds its own Curves clipping view, drop `curves_clipping*` and `curve_points.rs` and the hooks in `curves.rs`.
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: upstream merged PR #3693 (Levels clipping); the fork's Curves clipping is gone. Rebuild: rebuild Curves ⌥-drag clipping and point sliders (`curves_clipping.rs`, `dialogs/adjust_editors/curve_points.rs`).

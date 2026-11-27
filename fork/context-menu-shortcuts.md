@@ -21,3 +21,7 @@ ui-egui `canvas/canvas_tool_menu.rs` (2 lines), `canvas/tabs.rs` (`tab_context_m
 ```bash
 cargo test -p photocraft-ui-egui --lib -- menu_custom::shortcut
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: nothing. Rebuild: show shortcuts in craft's context menus (`menu_custom/shortcut.rs`).
