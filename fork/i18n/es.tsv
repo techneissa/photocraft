@@ -62,3 +62,7 @@
 	Move up	Subir
 	Move down	Bajar
 	Search commands	Buscar comandos
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Abrir como capas…
+	Place Photo	Colocar foto
+	Duplicated to {document}	Duplicado en {document}

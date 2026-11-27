@@ -27,4 +27,4 @@ cargo test -p photocraft-ui-egui --lib -- open_as_layers double_exposure blend_w
 
 ## After the craft UI merge (2026-11-27)
 
-Works: Layer ▸ Double Exposure (after Mask All Objects) and the Layers panel button (after Link Layers, a craft-libs patch, see [craft-libs.md](craft-libs.md)); `interface.showDoubleExposureButton` is out of `HIDDEN_UNTIL_IMPLEMENTED` and shows as "Double Exposure button" on Settings › Interface. Rebuild: nothing.
+Works: Layer ▸ Double Exposure (after Mask All Objects) and the Layers panel button (after Link Layers; the first of the footer's `more` buttons, craft-libs patch 9, see [craft-libs.md](craft-libs.md)); `interface.showDoubleExposureButton` is out of `HIDDEN_UNTIL_IMPLEMENTED` and shows as "Double Exposure button" on Settings › Interface. Rebuild: nothing.

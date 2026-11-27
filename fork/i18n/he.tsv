@@ -45,3 +45,7 @@
 	Move up	הזזה למעלה
 	Move down	הזזה למטה
 	Search commands	חיפוש פקודות
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	פתיחה כשכבות…
+	Place Photo	הצבת תמונה
+	Duplicated to {document}	שוכפל אל {document}

@@ -62,3 +62,7 @@
 	Move up	上移
 	Move down	下移
 	Search commands	搜尋指令
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	以圖層開啟…
+	Place Photo	置入相片
+	Duplicated to {document}	已複製到 {document}
