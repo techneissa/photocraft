@@ -262,3 +262,38 @@ fn an_expansion_that_empties_the_mesh_is_refused() {
     assert_eq!(v["expansion"], -2.0);
     assert!(v["triangles"].as_u64().unwrap() > 0);
 }
+
+/// The pinned layer previews in its place with its blend mode, and the canvas shows what the commit makes: red in
+/// Difference over white is cyan where the pins moved it, white where it left.
+#[test]
+fn the_preview_keeps_the_layers_blend_mode_and_matches_the_commit() {
+    let mut app = paint_app(100, 80, Rect::new(20, 30, 80, 50));
+    app.session.execute("layer.setProps", json!({"blend": "Difference"})).unwrap();
+    // Difference over transparency shows nothing: put a white background under the layer.
+    app.session
+        .edit("paint", |doc, _| {
+            let mut bg = photocraft_doc::Layer::raster("bg", doc.pixel_format());
+            bg.surface_mut().unwrap().fill_rect(Rect::new(0, 0, 100, 80), &[1.0, 1.0, 1.0, 1.0]);
+            doc.layers.insert(0, bg);
+            Ok(())
+        })
+        .unwrap();
+    app.sync_views();
+    let ctx = app.ctx().clone();
+    begin(&mut app, &ctx, "edit.puppetWarp").unwrap();
+    add_pin(&mut app, [25.0, 40.0], [25.0, 40.0]);
+    add_pin(&mut app, [75.0, 40.0], [75.0, 15.0]);
+    let (shown, key) = crate::canvas::display_doc(&mut app, 0);
+    assert!(crate::transform_live::is_live_key(key));
+    assert!(crate::transform_live::current(&app, shown.id).is_some(), "the GPU gets the live mesh");
+    let r = Rect::new(0, 0, 100, 80);
+    let preview = photocraft_compose::render(&crate::transform_live::cpu_doc(&mut app, shown, key), r);
+    commit(&mut app);
+    let committed = photocraft_compose::render(&app.session.active().unwrap().doc, r);
+    let at = |b: &photocraft_compose::Buffer, x: usize, y: usize| b.px[y * 100 + x];
+    let p = at(&preview, 75, 17);
+    assert!(p[0] < 0.1 && p[1] > 0.9 && p[2] > 0.9, "cyan where the pin took it: {p:?}");
+    assert!(at(&preview, 75, 45)[0] > 0.95, "white where it left: {:?}", at(&preview, 75, 45));
+    let far = preview.px.iter().zip(&committed.px).filter(|(a, b)| (0..4).any(|k| (a[k] - b[k]).abs() > 8.0 / 255.0)).count();
+    assert!(far <= 120, "{far} pixels of the preview differ from the commit");
+}
