@@ -79,6 +79,8 @@ mod settings_sync;
 pub(crate) mod shortcuts;
 mod shortcuts_chords;
 mod shortcuts_menus;
+mod shortcuts_toolbar;
+mod shortcuts_when;
 mod startup;
 
 // PLAN: assumed top-w18's appearance file keeps `display_scale` and `selected_theme` and exports `theme_menu`.
@@ -116,6 +118,8 @@ mod shortcut_capture_tests;
 mod shortcut_set_tests;
 #[cfg(test)]
 mod shortcuts_chords_tests;
+#[cfg(test)]
+mod shortcuts_more_tests;
 #[cfg(test)]
 mod shortcuts_snapshots;
 

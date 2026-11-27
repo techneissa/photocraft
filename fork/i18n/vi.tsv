@@ -14,6 +14,38 @@
 	Confirm remove	Xác nhận xóa
 	subject segmentation (BiRefNet-lite)	phân đoạn chủ thể (BiRefNet-lite)
 	inpainting (LaMa)	điền ảnh (LaMa)
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	Hợp phím và điều kiện
+	Search commands, chords, conditions	Tìm lệnh, hợp phím, điều kiện
+	Export	Xuất
+	Import	Nhập
+	Export Shortcuts as JSON…	Xuất phím tắt dưới dạng JSON…
+	Import Shortcuts from JSON…	Nhập phím tắt từ JSON…
+	A chord is two keys in a row; a condition limits where a command's keys work.	Hợp phím là hai phím nhấn liên tiếp; điều kiện giới hạn nơi các phím của lệnh có tác dụng.
+	Press two keys…	Nhấn hai phím…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	Nhấp, rồi nhấn hai phím liên tiếp. Esc hủy, ⌫ xóa hợp phím.
+	Always	Luôn luôn
+	That is not a chord: press two keys in a row.	Đó không phải hợp phím: hãy nhấn hai phím liên tiếp.
+	Imported {file}. The shortcuts are saved.	Đã nhập {file}. Các phím tắt đã được lưu.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} cũng là phím tắt của {command}: nó chờ phím thứ hai của hợp phím.
+	{key} is also used by {command} in the same context.	{key} cũng được {command} dùng trong cùng ngữ cảnh.
+	{key} was pressed, but no shortcut continues with that key	Đã nhấn {key}, nhưng không có phím tắt nào tiếp tục với phím đó
+	{count} shortcut condition(s) in your settings could not be read and are ignored	{count} điều kiện phím tắt trong cài đặt không đọc được và bị bỏ qua
+	and {count} more	và {count} mục nữa
+	Color: {name}	Màu: {name}
+	Red	Đỏ
+	Orange	Cam
+	Yellow	Vàng
+	Green	Xanh lá
+	Blue	Xanh dương
+	Violet	Tím
+	Gray	Xám
+	Add Condition	Thêm điều kiện
+	The shortcut works only while…	Phím tắt chỉ hoạt động khi…
+	Back	Quay lại
+	Is	Là
+	Is Not	Không phải
+
 # Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
 	Assign Shortcut…	Gán phím tắt…
 @id	settingsPage.contextMenus	Menu ngữ cảnh

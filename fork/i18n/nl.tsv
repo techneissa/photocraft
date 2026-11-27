@@ -20,6 +20,38 @@
 	{n} min ago	{n} min geleden
 	{n} h ago	{n} u geleden
 	Yesterday	Gisteren
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	Akkoorden en voorwaarden
+	Search commands, chords, conditions	Zoek opdrachten, akkoorden, voorwaarden
+	Export	Exporteren
+	Import	Importeren
+	Export Shortcuts as JSON…	Sneltoetsen exporteren als JSON…
+	Import Shortcuts from JSON…	Sneltoetsen importeren uit JSON…
+	A chord is two keys in a row; a condition limits where a command's keys work.	Een akkoord is twee toetsen na elkaar; een voorwaarde bepaalt waar de toetsen van een opdracht werken.
+	Press two keys…	Druk op twee toetsen…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	Klik en druk twee toetsen na elkaar in. Esc annuleert, ⌫ verwijdert het akkoord.
+	Always	Altijd
+	That is not a chord: press two keys in a row.	Dat is geen akkoord: druk twee toetsen na elkaar in.
+	Imported {file}. The shortcuts are saved.	{file} geïmporteerd. De sneltoetsen zijn bewaard.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} is ook de sneltoets van {command}: hij wacht op de tweede toets van het akkoord.
+	{key} is also used by {command} in the same context.	{key} wordt ook gebruikt door {command} in dezelfde context.
+	{key} was pressed, but no shortcut continues with that key	{key} is ingedrukt, maar geen sneltoets gaat verder met die toets
+	{count} shortcut condition(s) in your settings could not be read and are ignored	{count} sneltoetsvoorwaarde(n) in je instellingen konden niet worden gelezen en worden genegeerd
+	and {count} more	en {count} meer
+	Color: {name}	Kleur: {name}
+	Red	Rood
+	Orange	Oranje
+	Yellow	Geel
+	Green	Groen
+	Blue	Blauw
+	Violet	Violet
+	Gray	Grijs
+	Add Condition	Voorwaarde toevoegen
+	The shortcut works only while…	De sneltoets werkt alleen terwijl…
+	Back	Terug
+	Is	Is
+	Is Not	Is niet
+
 # Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
 	Assign Shortcut…	Sneltoets toewijzen…
 @id	settingsPage.contextMenus	Contextmenu's
