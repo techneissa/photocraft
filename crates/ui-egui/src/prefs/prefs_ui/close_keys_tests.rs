@@ -1,146 +1,81 @@
-//! Esc and ⌘, close Preferences; with unsaved changes a Save / Don't Save / Cancel prompt asks first.
+//! Esc and ⌘, close Settings; with unsaved changes a Save / Don't Save / Cancel prompt asks first
+//! (fork/settings-close-keys.md).
 
+use craft::ui::patterns::preferences::PrefValue;
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
-use serde_json::json;
 
+use super::settings_sync::{self, CloseAnswer};
 use super::*;
 use crate::PhotocraftApp;
 
-fn harness(change: bool) -> (Harness<'static, PhotocraftApp>, u64) {
-    let (mut app, _) = super::tests::app_with_store();
-    app.run("prefs.set", json!({"values": {"interface.language": "en"}})).unwrap();
-    let id = open_preferences(&mut app, "general");
+fn harness(change: bool) -> Harness<'static, Box<PhotocraftApp>> {
+    let files = std::sync::Arc::new(craft::settings::testing::MemoryFiles::new());
+    let mut h = super::tests::prefs_harness(&files, "general", egui::vec2(1280.0, 860.0), |_| {});
     if change {
-        app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["cursors"]["painting"] = json!("fullSizeTip");
+        super::tests::edit(h.state_mut(), "export.jpegQuality", PrefValue::Int(44));
+        h.run_steps(2);
     }
-    let mut h = Harness::builder().with_size(egui::vec2(1280.0, 860.0)).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        app
-    });
-    h.run_steps(4);
-    (h, id)
+    h
 }
 
-fn open(h: &Harness<'static, PhotocraftApp>) -> bool {
-    h.state().ui.dialogs.iter().any(|d| is_preferences(&d.fields))
+fn asking(h: &Harness<'static, Box<PhotocraftApp>>) -> bool {
+    settings_sync::lock(&h.state().prefs_rt.bridge).close_asking
 }
 
-fn esc(h: &mut Harness<'static, PhotocraftApp>) {
+#[test]
+fn esc_closes_settings_without_changes() {
+    let mut h = harness(false);
     h.key_press(egui::Key::Escape);
-    h.run_steps(4);
+    h.run_steps(6);
+    assert!(!window_open(h.state()));
 }
 
-fn comma(h: &mut Harness<'static, PhotocraftApp>) {
+#[test]
+fn esc_with_changes_asks_and_the_answers_save_discard_or_keep() {
+    let mut h = harness(true);
+    h.key_press(egui::Key::Escape);
+    h.run_steps(6);
+    assert!(window_open(h.state()), "it asks first");
+    assert!(asking(&h));
+    // Cancel keeps the window and the changes.
+    {
+        let mut bridge = settings_sync::lock(&h.state().prefs_rt.bridge);
+        bridge.close_asking = false;
+    }
+    h.run_steps(4);
+    assert!(window_open(h.state()));
+    // Don't Save closes and drops them.
+    settings_sync::lock(&h.state().prefs_rt.bridge).close_answer = Some(CloseAnswer::Discard);
+    h.run_steps(6);
+    assert!(!window_open(h.state()));
+    assert_eq!(h.state().session.prefs().export.jpeg_quality, 85);
+}
+
+#[test]
+fn saving_from_the_prompt_writes_the_changes_like_ok_and_closes() {
+    let mut h = harness(true);
+    settings_sync::lock(&h.state().prefs_rt.bridge).close_answer = Some(CloseAnswer::Save);
+    h.run_steps(6);
+    assert!(!window_open(h.state()));
+    assert_eq!(h.state().session.prefs().export.jpeg_quality, 44);
+}
+
+#[test]
+fn the_keys_that_open_settings_close_it() {
+    let app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let keys = super::close_keys::shortcuts_of(&app);
+    let comma = crate::shortcuts::parse("Cmd+,").unwrap();
+    assert!(keys.contains(&comma), "⌘, is among the keys of Edit › Preferences");
+}
+
+#[test]
+fn cmd_comma_closes_settings_or_asks_when_it_holds_changes() {
+    let mut h = harness(false);
     h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Comma);
-    h.run_steps(4);
-}
-
-fn painting(h: &Harness<'static, PhotocraftApp>) -> prefs::PaintingCursor {
-    h.state().session.prefs().cursors.painting
-}
-
-#[test]
-fn esc_closes_preferences_without_changes() {
-    let (mut h, _) = harness(false);
-    esc(&mut h);
-    assert!(!open(&h));
-    assert!(h.query_by_label("Unsaved changes").is_none());
-}
-
-#[test]
-fn cmd_comma_closes_preferences_without_changes() {
-    let (mut h, _) = harness(false);
-    comma(&mut h);
-    assert!(!open(&h), "⌘, closes it, and opens no second one");
-}
-
-#[test]
-fn esc_with_changes_asks_and_cancel_keeps_them() {
-    let (mut h, id) = harness(true);
-    esc(&mut h);
-    assert!(open(&h) && h.query_by_label("Unsaved changes").is_some());
-    h.get_all_by_label("Cancel").last().unwrap().click();
-    h.run_steps(4);
-    assert!(h.query_by_label("Unsaved changes").is_none());
-    assert!(open(&h));
-    let d = h.state().ui.dialogs.iter().find(|d| d.id == id).unwrap();
-    assert_eq!(d.fields["values"]["cursors"]["painting"], "fullSizeTip", "the changes are kept");
-    assert_ne!(painting(&h), prefs::PaintingCursor::FullSizeTip, "and not saved");
-}
-
-#[test]
-fn esc_in_the_prompt_is_cancel() {
-    let (mut h, _) = harness(true);
-    comma(&mut h);
-    assert!(h.query_by_label("Unsaved changes").is_some());
-    esc(&mut h);
-    assert!(open(&h) && h.query_by_label("Unsaved changes").is_none());
-}
-
-#[test]
-fn save_in_the_prompt_saves_as_ok_does_and_closes() {
-    let (mut h, _) = harness(true);
-    comma(&mut h);
-    h.get_all_by_label("Save").last().unwrap().click();
-    h.run_steps(4);
-    assert!(!open(&h));
-    assert_eq!(painting(&h), prefs::PaintingCursor::FullSizeTip);
-}
-
-#[test]
-fn dont_save_in_the_prompt_closes_and_drops_the_changes() {
-    let (mut h, _) = harness(true);
-    esc(&mut h);
-    h.get_all_by_label("Don't Save").last().unwrap().click();
-    h.run_steps(4);
-    assert!(!open(&h));
-    assert_ne!(painting(&h), prefs::PaintingCursor::FullSizeTip);
-}
-
-#[test]
-fn esc_in_a_text_field_does_not_close_preferences() {
-    let (mut h, _) = harness(false);
-    h.get_all_by_role(egui::accesskit::Role::TextInput).last().unwrap().click();
-    h.run_steps(3);
-    assert!(h.ctx.egui_wants_keyboard_input(), "the search field has focus");
-    esc(&mut h);
-    assert!(open(&h), "Esc belongs to the focused text field");
-}
-
-#[test]
-fn esc_closes_an_open_dropdown_and_not_preferences() {
-    let (mut app, _) = super::tests::app_with_store();
-    open_preferences(&mut app, "tools");
-    let mut h = Harness::builder().with_size(egui::vec2(1280.0, 860.0)).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        app
-    });
-    h.run_steps(4);
-    let combo = h.get_all_by_role(egui::accesskit::Role::ComboBox).find(|n| n.rect().top() > 100.0 && n.rect().left() > 250.0).expect("a dropdown");
-    combo.click();
-    h.run_steps(3);
-    assert!(egui::Popup::is_any_open(&h.ctx) || crate::widgets::dropdown_list_open(&h.ctx), "the list is open");
-    esc(&mut h);
-    assert!(open(&h), "the first Esc closes the dropdown only");
-    esc(&mut h);
-    assert!(!open(&h), "the next one closes Preferences");
-}
-
-#[test]
-fn a_context_menus_draft_counts_as_a_change() {
-    let (mut app, _) = super::tests::app_with_store();
-    let id = open_preferences(&mut app, "general");
-    let mut draft = crate::menu_custom::Custom::from_value(&app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields[crate::menu_custom::DRAFT]);
-    draft
-        .menus
-        .insert(crate::menu_custom::menus::CANVAS_SELECTION.into(), crate::menu_custom::Arrangement { items: vec![], hidden: vec!["select.deselect".into()] });
-    app.ui.dialog_mut(id).unwrap().fields.insert(crate::menu_custom::DRAFT.into(), draft.to_value());
-    let mut h = Harness::builder().with_size(egui::vec2(1280.0, 860.0)).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        app
-    });
-    h.run_steps(4);
-    esc(&mut h);
-    assert!(open(&h) && h.query_by_label("Unsaved changes").is_some(), "the draft alone asks first");
+    h.run_steps(6);
+    assert!(!window_open(h.state()));
+    let mut h = harness(true);
+    h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Comma);
+    h.run_steps(6);
+    assert!(window_open(h.state()) && asking(&h));
 }

@@ -34,4 +34,4 @@ cargo test -p photocraft-ui-egui --lib -- fork_update updates_ui
 
 ## After the craft UI merge (2026-11-27)
 
-Works: Help ▸ Check for Updates, the check at start and the window (craft-update's dialog) use the `custom-build` release; the official updater is never made. Rebuild: only the Settings › General row (`fork_update/ui.rs`).
+Works: Help ▸ Check for Updates, the check at start and the window use the `custom-build` release, and the Settings › General row (`fork_update/ui.rs`: button, one-line status, Update) shows beside Automatically Check for Updates. Rebuild: nothing.

@@ -76,6 +76,8 @@ pub mod fork_update;
 // fork: chords and When conditions in front of craft's keymap (fork/shortcut-upgrade.md).
 pub mod keybinds;
 
+// fork: Layer › Double Exposure, the shell's half (fork/double-exposure.md).
+mod double_exposure;
 // fork: context menus (fork/context-menu-editor.md, fork/context-menu-shortcuts.md).
 pub mod menu_custom;
 
@@ -84,18 +86,14 @@ pub mod menu_custom;
 // file that held them:
 // lib.rs:
 //   mod assign_shortcut;               // fork/assign-shortcut-palette.md
-//   mod double_exposure;               // fork/double-exposure.md
 //   mod open_as_layers;                // fork/open-as-layers.md
 //   mod place_photos;                  // fork/place-photos.md
 //   #[cfg(test)] mod mask_clipboard_tests; // fork/upstream-select-mask.md
 // dialogs.rs:        mod placement;                  // fork/windows-open-centred.md
 // dialogs/palette.rs: mod list; mod nav;           // fork/assign-shortcut-palette.md (frecency is back: fork/palette-frecency.md)
 // panels.rs:         pub(crate) mod title_bar_items; // fork/topbar-items.md
-//                    #[cfg(test)] mod brush_size_label_tests; // fork/settings-sync.md
-// prefs/prefs_ui.rs: mod ai_models;                  // fork/select-subject-ai.md, fork/birefnet-full.md
-//                    mod close_keys;                 // fork/settings-close-keys.md
-//                    mod settings_folder; mod settings_sync; // fork/settings-sync.md (settings_folder_web.rs on the web)
-//                    mod shortcut_target; mod shortcuts_backup; mod shortcuts_chord; mod shortcuts_when; // fork/shortcut-upgrade.md
+//                    #[cfg(test)] mod brush_size_label_tests; // fork/settings-sync.md (the brush chip is gone: craft draws the options bar)
+// prefs/prefs_ui.rs: mod shortcut_target; mod shortcuts_backup; mod shortcuts_chord; mod shortcuts_when; // fork/shortcut-upgrade.md
 //                    mod shortcuts_items; mod shortcuts_menus; mod shortcuts_record; mod shortcuts_rows;
 //                    mod shortcuts_search; mod shortcuts_window; // fork/shortcuts-window.md (and their *_tests, *_snapshots)
 // tools.rs:          pub(crate) mod transform_live;  // fork/transform-live-blend.md

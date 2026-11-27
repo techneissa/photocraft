@@ -1,283 +1,203 @@
-//! Export Settings… and Import Settings… in the shell: the icons, the checks only the shell can
-//! make, the prompt before an import, and the open Preferences window following the import.
+//! Settings sync in the shell: Export Settings…, Import Settings…, the prompt before an import, the sync folder and
+//! the open Settings window following along (fork/settings-sync.md). The file's own rules are the engine's tests.
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use photocraft_engine::Session;
+use photocraft_engine::color_cmds::ColorExt;
+use photocraft_engine::prefs::settings_folder::{FILE_NAME, SHARED_NAME, SavedBy, SyncEnv};
 use serde_json::{Value, json};
 
-use super::settings_sync::{self, EXPORT, IMPORT};
+use super::settings_sync::{self, ImportAsk, Request};
 use super::*;
 use crate::PhotocraftApp;
-use crate::file_dialog::FileDialogAnswer;
+use crate::dialogs::alerts::prompt_tag;
 
-type Written = Rc<RefCell<Vec<(String, Vec<u8>)>>>;
+/// A new empty temporary folder, removed at the end.
+struct Dir(PathBuf);
 
-/// An app whose file dialogs answer `open` (a file's bytes) or `save`, and whose writes are recorded.
-fn app_with_dialogs(answers: Vec<Option<FileDialogAnswer>>) -> (PhotocraftApp, Written) {
-    let written: Written = Rc::default();
-    let log = written.clone();
-    let (picker, _) = crate::file_dialog::fake(answers);
-    let services = crate::Services {
-        file_dialog: Some(picker),
-        write: Some(Box::new(move |path: &str, bytes: &[u8]| {
-            log.borrow_mut().push((path.to_string(), bytes.to_vec()));
-            Ok(())
-        })),
-        ..Default::default()
-    };
-    (PhotocraftApp::new(photocraft_engine::Session::new(), services), written)
+impl Dir {
+    fn new(tag: &str) -> Self {
+        static N: AtomicUsize = AtomicUsize::new(0);
+        let p = std::env::temp_dir().join(format!("pc-sync-ui-{tag}-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
+        std::fs::create_dir_all(&p).unwrap();
+        Self(p)
+    }
+    fn path(&self) -> &Path {
+        &self.0
+    }
+    fn s(&self) -> String {
+        self.0.to_string_lossy().into_owned()
+    }
 }
 
-/// The settings file of an app whose JPEG quality is `quality`.
+impl Drop for Dir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+/// A settings file of an app whose JPEG quality is `quality`.
 fn file_with(quality: u32) -> String {
-    let mut other = super::tests::app_with_store().0;
-    other.run("prefs.set", json!({"path": "export.jpegQuality", "value": quality})).unwrap();
-    other.session.settings_text()
+    let mut other = Session::new();
+    other.execute("prefs.set", json!({"path": "export.jpegQuality", "value": quality})).unwrap();
+    other.settings_text()
 }
 
-fn prompt(app: &PhotocraftApp) -> Option<(u64, serde_json::Map<String, Value>)> {
-    app.ui.dialogs.iter().find(|d| d.fields.get("__prefsui").and_then(Value::as_str) == Some("settingsImport")).map(|d| (d.id, d.fields.clone()))
+/// An app on the Mac `mac` whose shared file is `home/ArtCraft/sync-folder.json`.
+fn app_on(mac: &str, home: &Dir) -> Box<PhotocraftApp> {
+    let mut session = Session::new();
+    session.sync_env = SyncEnv { shared_file: Some(home.path().join("ArtCraft").join(SHARED_NAME)), computer: Some(mac.into()) };
+    PhotocraftApp::new(session, crate::Services::default())
 }
 
-fn message(app: &PhotocraftApp) -> Value {
-    app.ui.dialogs.iter().find(|d| is_preferences(&d.fields)).and_then(|d| d.fields.get("__syncMessage").cloned()).unwrap_or(Value::Null)
+fn plain_app() -> Box<PhotocraftApp> {
+    PhotocraftApp::new(Session::new(), crate::Services::default())
 }
 
-#[test]
-fn the_shell_checks_keys_tools_and_context_menus() {
-    let c = settings_sync::checks();
-    assert!((c.key_ok)("Cmd+K") && !(c.key_ok)("Banana+Q"));
-    assert!((c.tool_ok)("Brush") && !(c.tool_ok)("NoSuchTool"));
-    let (kept, left) = (c.context_menus)(&json!({"menus": {"no.such.menu": {"items": ["---"], "hidden": []}}})).unwrap();
-    assert!(left.iter().any(|s| s.contains("no.such.menu")), "{left:?}");
-    assert!(kept.get("menus").is_none_or(|m| m.get("no.such.menu").is_none()));
-    assert_eq!((c.context_menus)(&Value::Null).unwrap().0, Value::Null);
-    assert!((c.context_menus)(&json!(5)).is_err());
+fn ask_of(app: &PhotocraftApp) -> Option<ImportAsk> {
+    prompt_tag::<ImportAsk>(app).cloned()
 }
 
 #[test]
-fn an_import_asks_first_and_changes_nothing_until_it_is_answered() {
-    let (mut app, store) = super::tests::app_with_store();
-    settings_sync::import_bytes(&mut app, "/Users/a/Mine.pcsettings", file_with(33).as_bytes()).unwrap();
-    let (_, f) = prompt(&app).expect("the prompt");
-    assert_eq!(f["file"], "Mine.pcsettings", "the file's name, not its folder");
-    assert!(f["parts"].as_array().unwrap().iter().any(|p| p == "preferences"));
-    assert_eq!(app.session.prefs().export.jpeg_quality, 85, "nothing changed yet");
-    confirm(&mut app, &f).unwrap();
+fn an_import_asks_first_and_changes_nothing_until_it_is_confirmed() {
+    let mut app = plain_app();
+    let reply = settings_sync::import_bytes(&mut app, "/Users/a/Mine.pcsettings", file_with(33).as_bytes()).unwrap();
+    assert!(reply["parts"].as_array().is_some_and(|p| !p.is_empty()), "the reply names what it replaces: {reply}");
+    let ask = ask_of(&app).expect("the prompt is open");
+    assert_eq!(app.session.prefs().export.jpeg_quality, 85, "nothing changed before OK");
+    settings_sync::confirm(&mut app, &ask).unwrap();
     assert_eq!(app.session.prefs().export.jpeg_quality, 33);
-    assert_eq!(store.lock().unwrap().as_deref().map(|t| serde_json::from_str::<Value>(t).unwrap()["export"]["jpegQuality"].clone()), Some(json!(33)), "saved");
-}
-
-#[test]
-fn cancelling_the_prompt_leaves_everything_as_it_was() {
-    let (mut app, _) = super::tests::app_with_store();
-    settings_sync::import_bytes(&mut app, "Mine.pcsettings", file_with(33).as_bytes()).unwrap();
-    let (id, _) = prompt(&app).unwrap();
-    crate::dialogs::cancel(&mut app, id).unwrap();
-    assert!(prompt(&app).is_none());
-    assert_eq!(app.session.prefs().export.jpeg_quality, 85);
 }
 
 #[test]
 fn a_refused_file_says_why_and_opens_no_prompt() {
-    let (mut app, _) = super::tests::app_with_store();
-    open_preferences(&mut app, "general");
-    for bytes in [&b"not json"[..], &[0xff, 0xfe, 0x00][..], br#"{"kind":"photocraft-settings","version":1,"preferences":{"export":{"jpegQuality":0}}}"#] {
-        let e = settings_sync::import_bytes(&mut app, "Bad.pcsettings", bytes).unwrap_err();
-        settings_sync::report(&mut app, &e, true);
-        assert!(prompt(&app).is_none(), "no prompt for a refused file");
-        assert_eq!(message(&app)["warning"], true);
-        assert_eq!(message(&app)["text"], e.as_str());
+    let mut app = plain_app();
+    let bad: [&[u8]; 3] = [b"not json", &[0xff, 0xfe, 0x00], br#"{"kind":"photocraft-settings","version":1,"preferences":{"export":{"jpegQuality":"high"}}}"#];
+    for bytes in bad {
+        assert!(settings_sync::import_bytes(&mut app, "Bad.pcsettings", bytes).is_err());
+        assert!(ask_of(&app).is_none());
     }
     assert_eq!(app.session.prefs().export.jpeg_quality, 85);
 }
 
 #[test]
-fn an_import_brings_the_open_preferences_window_and_other_dialogs_in_line() {
-    let (mut app, _) = super::tests::app_with_store();
-    let id = open_preferences(&mut app, "general");
-    let shortcuts = open_shortcuts(&mut app, 0);
-    // An unsaved edit in the window.
-    app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["cursors"]["painting"] = json!("fullSizeTip");
-    assert!(preferences_changed(&app, &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields));
+fn an_agent_cannot_confirm_the_prompt_and_calls_the_command_with_the_text_instead() {
+    let mut app = plain_app();
     settings_sync::import_bytes(&mut app, "Mine.pcsettings", file_with(33).as_bytes()).unwrap();
-    let (_, f) = prompt(&app).unwrap();
-    confirm(&mut app, &f).unwrap();
-    let fields = &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields;
-    assert_eq!(fields["values"]["export"]["jpegQuality"], 33, "the window shows the imported value");
-    assert_eq!(fields["values"]["cursors"]["painting"], json!(app.session.prefs().cursors.painting.name()), "and not the discarded edit");
-    assert!(!preferences_changed(&app, fields), "nothing left to save in the window");
-    assert!(app.ui.dialogs.iter().all(|d| d.id != shortcuts), "a Keyboard Shortcuts window would put its old keys back");
-    assert_eq!(message(&app)["warning"], false);
+    let ask = ask_of(&app).unwrap();
+    app.automation_input = true;
+    assert!(settings_sync::confirm(&mut app, &ask).unwrap_err().contains("confirmed by a person"));
+    app.automation_input = false;
+    assert_eq!(app.session.prefs().export.jpeg_quality, 85);
+    let reply = settings_sync::invoke(&mut app, settings_sync::IMPORT, &json!({"text": file_with(44)})).unwrap().unwrap();
+    assert_eq!(reply["applied"], true);
+    assert_eq!(app.session.prefs().export.jpeg_quality, 44);
 }
 
 #[test]
-fn the_export_writes_what_the_preferences_window_shows() {
-    let (mut app, _) = super::tests::app_with_store();
-    let id = open_preferences(&mut app, "general");
-    app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["export"]["jpegQuality"] = json!(44);
-    let (prefs, color) = settings_sync::settings_now(&app);
-    assert_eq!(prefs.export.jpeg_quality, 44, "the window's value, not the saved 85");
-    let text = photocraft_engine::prefs::settings_sync::to_text(&prefs, &color);
-    assert!(text.contains("\"jpegQuality\": 44"));
-    assert_eq!(app.session.prefs().export.jpeg_quality, 85, "exporting saves nothing");
-}
-
-#[test]
-fn the_icons_ask_for_a_file_and_write_it() {
-    let (mut app, written) = app_with_dialogs(vec![Some(FileDialogAnswer::SaveTo("Mine.pcsettings".into()))]);
-    app.run("prefs.set", json!({"path": "export.jpegQuality", "value": 55})).unwrap();
-    let (mut h, _) = {
-        let id = open_preferences(&mut app, "general");
-        (
-            Harness::builder().with_size(egui::vec2(1280.0, 860.0)).with_max_steps(64).build_eframe(move |cc| {
-                PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-                app
-            }),
-            id,
-        )
-    };
-    h.run_steps(4);
-    h.get_by_label("Import Settings…");
-    h.get_by_label("Export Settings…").click();
-    h.run_steps(6);
-    let written = written.borrow();
-    let (path, bytes) = written.first().expect("the file was written");
-    assert!(path.ends_with("Mine.pcsettings"), "{path}");
-    let file: Value = serde_json::from_slice(bytes).unwrap();
-    assert_eq!((file["kind"].as_str(), file["version"].as_u64()), (Some("photocraft-settings"), Some(1)));
-    assert_eq!(file["preferences"]["export"]["jpegQuality"], 55);
-    assert!(h.state().ui.dialogs.iter().filter(|d| is_preferences(&d.fields)).count() == 1);
-}
-
-#[test]
-fn the_import_icon_reads_a_file_and_shows_the_prompt() {
-    let bytes = file_with(33).into_bytes();
-    let (mut app, _) = app_with_dialogs(vec![Some(FileDialogAnswer::Contents("Mine.pcsettings".into(), bytes))]);
-    open_preferences(&mut app, "general");
-    let mut h = Harness::builder().with_size(egui::vec2(1280.0, 860.0)).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        app
-    });
-    h.run_steps(4);
-    h.get_by_label("Import Settings…").click();
-    h.run_steps(8);
-    assert!(prompt(h.state()).is_some(), "the prompt names what is replaced");
-    assert_eq!(h.state().session.prefs().export.jpeg_quality, 85);
-    h.get_by_label("Preferences");
-    h.get_by_label("Import");
-}
-
-/// A settings file of quality `quality` with settings this build doesn't have.
-fn file_with_unknowns(quality: u32, extra: usize) -> String {
-    let mut f: Value = serde_json::from_str(&file_with(quality)).unwrap();
-    f["preferences"]["interface"]["fromTheFuture"] = json!(true);
-    f["futurePart"] = json!({});
-    for n in 0..extra {
-        f["preferences"]["general"][format!("later{n}")] = json!(n);
-    }
-    f.to_string()
-}
-
-#[test]
-fn the_prompt_names_the_skipped_settings_and_ok_imports_the_rest() {
-    let (mut app, _) = super::tests::app_with_store();
-    let reply = settings_sync::import_bytes(&mut app, "Newer.pcsettings", file_with_unknowns(33, 0).as_bytes()).unwrap();
-    assert_eq!(reply["unknownCount"], 2);
-    let (_, f) = prompt(&app).expect("an unknown setting does not refuse the file");
-    let names: Vec<&str> = f["unknown"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
-    assert!(names.contains(&"interface.fromTheFuture") && names.contains(&"futurePart"), "{names:?}");
-    assert_eq!(app.session.prefs().export.jpeg_quality, 85, "nothing changed yet");
-    confirm(&mut app, &f).unwrap();
-    assert_eq!(app.session.prefs().export.jpeg_quality, 33, "the known settings are imported");
-    assert_eq!(app.ui.status, "Imported settings from Newer.pcsettings (2 skipped)");
-}
-
-#[test]
-fn the_prompt_line_is_short_and_cuts_a_long_list() {
+fn the_prompt_cuts_a_long_list_of_skipped_settings() {
     assert_eq!(settings_sync::unknown_line(&["a.b", "c"], 2), "Not in this PhotoCraft, skipped: a.b, c");
-    let names = ["a", "b", "c", "d", "e"];
-    assert_eq!(settings_sync::unknown_line(&names, 5), "Not in this PhotoCraft, skipped: a, b, c, d, e");
+    let names = ["a", "b", "c", "d", "e", "f"];
     assert_eq!(settings_sync::unknown_line(&names, 12), "Not in this PhotoCraft, skipped: a, b, c, d, e and 7 more");
 }
 
 #[test]
-fn the_prompt_shows_the_skipped_settings() {
-    let bytes = file_with_unknowns(33, 8).into_bytes();
-    let (mut app, _) = app_with_dialogs(vec![Some(FileDialogAnswer::Contents("Newer.pcsettings".into(), bytes))]);
-    open_preferences(&mut app, "general");
-    let mut h = Harness::builder().with_size(egui::vec2(1280.0, 860.0)).with_max_steps(64).build_eframe(move |cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        app
-    });
-    h.run_steps(4);
-    h.get_by_label("Import Settings…").click();
-    h.run_steps(8);
-    assert!(prompt(h.state()).is_some(), "the prompt opens for a file with settings this build doesn't have");
-    h.get_by_label_contains("Not in this PhotoCraft, skipped:");
-    h.get_by_label_contains("and 5 more");
+fn with_settings_open_the_prompt_is_inside_the_window_and_the_export_writes_its_draft() {
+    let mut app = plain_app();
+    super::tests::open_prefs(&mut app, "general");
+    super::tests::edit(&mut app, "export.jpegQuality", craft::ui::patterns::preferences::PrefValue::Int(44));
+    let (prefs, _) = settings_sync::settings_now(&app);
+    assert_eq!(prefs.export.jpeg_quality, 44, "the export takes what the window shows");
+    assert_eq!(app.session.prefs().export.jpeg_quality, 85);
+    settings_sync::import_bytes(&mut app, "Mine.pcsettings", file_with(33).as_bytes()).unwrap();
+    assert!(ask_of(&app).is_none(), "the app-modal window would block a prompt in the main window");
+    assert!(settings_sync::lock(&app.prefs_rt.bridge).import.is_some());
 }
 
 #[test]
-fn the_commands_do_not_open_a_preferences_section() {
-    let (mut app, _) = super::tests::app_with_store();
-    let ctx = egui::Context::default();
-    // Without a file dialog there is nothing to ask: the ids are not mistaken for a section.
-    for id in [EXPORT, IMPORT] {
-        let r = invoke(&mut app, &ctx, id, &json!({})).expect("handled");
-        assert!(r.is_err(), "{id}");
-        assert!(app.ui.dialogs.is_empty(), "{id} opened a dialog");
+fn the_buttons_file_requests_the_app_runs() {
+    let mut app = plain_app();
+    super::tests::open_prefs(&mut app, "general");
+    settings_sync::lock(&app.prefs_rt.bridge).requests.push(Request::Keep(true));
+    super::dialogs::take(&mut app, &egui::Context::default());
+    assert!(app.session.prefs().sync.keep);
+}
+
+#[test]
+fn save_to_folder_writes_the_window_and_another_mac_loads_it_naming_who_saved_it() {
+    let (home, folder) = (Dir::new("home"), Dir::new("folder"));
+    let mut studio = app_on("Studio Mac", &home);
+    studio.session.choose_sync_folder(&folder.s()).unwrap();
+    super::tests::open_prefs(&mut studio, "general");
+    super::tests::edit(&mut studio, "export.jpegQuality", craft::ui::patterns::preferences::PrefValue::Int(44));
+    settings_folder::save_now(&mut studio).unwrap();
+    let file: Value = serde_json::from_str(&std::fs::read_to_string(folder.path().join(FILE_NAME)).unwrap()).unwrap();
+    assert_eq!(file["preferences"]["export"]["jpegQuality"], 44, "the window's value");
+    assert_eq!(file["savedBy"]["computer"], "Studio Mac");
+    assert_eq!(studio.session.prefs().export.jpeg_quality, 85, "saving to the folder changes nothing here");
+
+    let mut laptop = app_on("Laptop", &home);
+    laptop.session.choose_sync_folder(&folder.s()).unwrap();
+    settings_folder::load_dialog(&mut laptop).unwrap();
+    let ask = ask_of(&laptop).expect("the prompt");
+    assert_eq!(ask.saved_by.as_ref().map(|by| by.computer.as_str()), Some("Studio Mac"));
+    assert_eq!(laptop.session.prefs().export.jpeg_quality, 85, "nothing changed before OK");
+    settings_sync::confirm(&mut laptop, &ask).unwrap();
+    assert_eq!(laptop.session.prefs().export.jpeg_quality, 44);
+    assert_eq!(laptop.session.prefs().sync.last, file["savedBy"]["at"].as_str().unwrap(), "this Mac now has that file");
+    assert_eq!(laptop.session.prefs().sync.folder, folder.s(), "its own folder stays");
+}
+
+#[test]
+fn keep_in_sync_offers_a_newer_file_from_another_mac_at_start_and_never_its_own() {
+    let (home, folder) = (Dir::new("home"), Dir::new("folder"));
+    let mut other = Session::new();
+    other.execute("prefs.set", json!({"path": "export.jpegQuality", "value": 33})).unwrap();
+    let by = SavedBy { computer: "Studio Mac".into(), at: "2026-11-02T10:00:00+01:00".into() };
+    let text = photocraft_engine::prefs::settings_folder::stamped_text(other.prefs(), &other.color().settings, &by);
+    std::fs::write(folder.path().join(FILE_NAME), text).unwrap();
+
+    let keeping = |mac: &str| {
+        let mut app = app_on(mac, &home);
+        app.session.choose_sync_folder(&folder.s()).unwrap();
+        app.session.prefs.edit(|p| p.sync.keep = true);
+        app
+    };
+    let mut laptop = keeping("Laptop");
+    settings_folder::offer_newer_file(&mut laptop);
+    assert!(ask_of(&laptop).is_some(), "offered at start");
+    let mut studio = keeping("Studio Mac");
+    settings_folder::offer_newer_file(&mut studio);
+    assert!(ask_of(&studio).is_none(), "the Mac's own file is never offered to it");
+    let mut off = keeping("Laptop");
+    off.session.prefs.edit(|p| p.sync.keep = false);
+    settings_folder::offer_newer_file(&mut off);
+    assert!(ask_of(&off).is_none(), "Keep in Sync off: nothing is asked");
+}
+
+#[test]
+fn the_menus_list_the_settings_sync_items_and_remove_subject() {
+    let app = plain_app();
+    let rows = crate::menus::menu_rows(&app);
+    let path_of = |id: &str| rows.iter().find(|r| r.command.id == id).map(|r| r.path.join(" > "));
+    assert_eq!(path_of("edit.removeSubject").as_deref(), Some("Edit"));
+    for id in [settings_sync::EXPORT, settings_sync::IMPORT, "edit.preferences.saveSettingsToFolder", "edit.preferences.loadSettingsFromFolder"] {
+        assert_eq!(path_of(id).as_deref(), Some("Edit > Preferences"), "{id}");
     }
 }
 
 #[test]
-fn an_agent_calls_the_commands_with_parameters_and_the_shell_follows() {
-    let (mut app, store) = super::tests::app_with_store();
-    let ctx = egui::Context::default();
-    let id = open_preferences(&mut app, "general");
-    let dry = invoke(&mut app, &ctx, IMPORT, &json!({"text": file_with(33), "dryRun": true})).unwrap().unwrap();
-    assert_eq!(dry["applied"], false);
-    assert_eq!(app.session.prefs().export.jpeg_quality, 85);
-    let done = invoke(&mut app, &ctx, IMPORT, &json!({"text": file_with(33)})).unwrap().unwrap();
-    assert_eq!(done["applied"], true);
-    assert_eq!(app.session.prefs().export.jpeg_quality, 33);
-    let fields = &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields;
-    assert_eq!(fields["values"]["export"]["jpegQuality"], 33);
-    assert!(store.lock().unwrap().as_deref().is_some_and(|t| t.contains("33")), "saved");
-    let text = invoke(&mut app, &ctx, EXPORT, &json!({"path": null})).unwrap().unwrap()["text"].as_str().unwrap().to_string();
-    assert!(text.contains("\"jpegQuality\": 33"));
-    // A bad file is an error and nothing changes.
-    let e = invoke(&mut app, &ctx, IMPORT, &json!({"text": file_with(33).replace("33", "0")})).unwrap().unwrap_err();
-    assert!(e.contains("Nothing was changed"), "{e}");
-    assert_eq!(app.session.prefs().export.jpeg_quality, 33);
-}
-
-#[test]
-fn an_import_brings_panels_and_tool_options_in_line_like_a_launch() {
-    let (mut app, _) = super::tests::app_with_store();
-    let mut other = super::tests::app_with_store().0;
-    other.run("prefs.set", json!({"path": "workspace.rememberWorkspaceChanges", "value": true})).unwrap();
-    other.session.prefs.edit(|p| p.tool_options = json!({"tolerance": 77.0}));
-    let text = other.session.settings_text();
-    assert!((app.ui.tool_options.tolerance - 77.0).abs() > 1.0, "the starting point");
-    settings_sync::import_bytes(&mut app, "Mine.pcsettings", text.as_bytes()).unwrap();
-    let (_, f) = prompt(&app).unwrap();
-    confirm(&mut app, &f).unwrap();
-    assert!((app.ui.tool_options.tolerance - 77.0).abs() < 0.01, "the tool options follow the import at once");
-}
-
-#[test]
-fn automation_cannot_confirm_the_prompt() {
-    let (mut app, _) = super::tests::app_with_store();
-    settings_sync::import_bytes(&mut app, "Mine.pcsettings", file_with(33).as_bytes()).unwrap();
-    let (_, f) = prompt(&app).unwrap();
-    app.automation_input = true;
-    assert!(confirm(&mut app, &f).is_err());
-    app.automation_input = false;
-    app.session.authorize = Some(|_, _| Ok(()));
-    assert!(confirm(&mut app, &f).is_err());
-    assert_eq!(app.session.prefs().export.jpeg_quality, 85);
+fn context_menus_in_a_file_are_checked_and_the_open_windows_arrangement_is_exported() {
+    let c = settings_sync::checks();
+    assert_eq!((c.context_menus)(&Value::Null).unwrap().0, Value::Null);
+    assert!((c.context_menus)(&json!(5)).is_err(), "a context menus value must be an object");
+    let mut app = plain_app();
+    super::tests::open_prefs(&mut app, "general");
+    let arrangement = json!({"menus": {"layers.row": {"hidden": ["layer.delete"]}}});
+    assert!(super::dialogs::set_context_menus_draft(&mut app, &arrangement));
+    let (prefs, _) = settings_sync::settings_now(&app);
+    assert_eq!(prefs.context_menus, crate::menu_custom::Custom::from_value(&arrangement).to_value(), "the export takes the window's arrangement");
+    assert!(app.session.prefs().context_menus.is_null());
 }

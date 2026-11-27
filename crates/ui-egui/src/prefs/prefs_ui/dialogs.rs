@@ -37,6 +37,10 @@ type Doc = SettingsDocument<PrefPages, ()>;
 /// Shell front ends for Edit-menu commands invoked without parameters (dialogs, pickers).
 /// `None` when `id` isn't handled here.
 pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &Value) -> Option<Result<Value, String>> {
+    // fork: Settings sync (fork/settings-sync.md) takes its commands with or without parameters.
+    if let Some(result) = super::settings_sync::invoke(app, id, params).or_else(|| super::settings_folder::invoke(app, id, params)) {
+        return Some(result);
+    }
     let empty = params.as_object().is_none_or(|o| o.is_empty());
     if !empty {
         return None;
@@ -121,6 +125,10 @@ pub(crate) struct PrefsDialog {
     pick: Option<ColorRequest>,
     /// The edits Apply or OK made, until `take` writes them.
     edits: Vec<Edits>,
+    /// What the window and the app say to each other: requests, prompts (fork/settings-sync.md).
+    bridge: super::settings_sync::Shared,
+    /// The keys that close the window, as of the last `feed` (fork/settings-close-keys.md).
+    close_keys: Vec<egui::KeyboardShortcut>,
 }
 
 impl PrefsDialog {
@@ -145,8 +153,11 @@ impl PrefsDialog {
 
     /// Updates what the window reads of the app before a pass: the custom rows' facts, the saved values (an unedited row
     /// follows them; `Err` from the rebase keeps the document as it was) and the labels' language.
-    fn feed(&mut self, custom: PrefsCustom, saved: Option<(u64, PrefPages)>, host: &Host) {
+    fn feed(&mut self, mut custom: PrefsCustom, saved: Option<(u64, PrefPages)>, close_keys: Vec<egui::KeyboardShortcut>, host: &Host) {
+        // The folder the other ArtCraft apps use is read once, when the window opens.
+        custom.general.offered = self.custom.general.offered.take();
         self.custom = custom;
+        self.close_keys = close_keys;
         let Some(doc) = self.doc.as_mut() else { return };
         if let Some((rev, pages)) = saved {
             let _ = doc.rebase(pages);
@@ -178,6 +189,20 @@ impl StackDialog for PrefsDialog {
     fn show(&mut self, ui: &mut egui::Ui, _stack: &DialogStack) -> Option<DialogResult<PrefsAnswer>> {
         let doc = self.doc.take()?;
         let mut with_custom = doc.custom(self.custom.clone());
+        // fork: Esc and the Settings key close the window, asking first when it holds changes (fork/settings-close-keys.md).
+        let ctx = ui.ctx().clone();
+        let mut close_now = false;
+        let nested = with_custom.nested_open();
+        // Esc ends as the window's Cancel, which has already dropped the draft: keep it to give back (see `close_keys`).
+        let draft_then = (!nested && PreferencesDraft::differs(&with_custom)).then(|| with_custom.draft().to::<Value>()).flatten();
+        if !nested && super::close_keys::close_pressed(&ctx, &self.close_keys) {
+            if draft_then.is_some() {
+                super::settings_sync::lock(&self.bridge).close_asking = true;
+            } else {
+                close_now = true;
+            }
+        }
+        let clicked = ctx.input(|i| i.pointer.any_pressed() || i.pointer.any_released());
         // Relabeling the document covers its rows, but the framework draws its footer/title from Env.
         // Scope those words to the draft as well, without changing the main window's language.
         let words = Arc::clone(&self.words);
@@ -193,12 +218,35 @@ impl StackDialog for PrefsDialog {
                     .show(ui, &mut with_custom)
             },
         );
+        let mut closed = out.closed;
+        // Esc (not a click on Cancel or the close box) with changes: the window stays, and asks.
+        if let (Some(Closed::Cancel), Some(draft), false) = (closed, draft_then, clicked)
+            && with_custom.draft_mut().replace(&draft).is_ok()
+        {
+            closed = None;
+            super::settings_sync::lock(&self.bridge).close_asking = true;
+        }
+        if close_now {
+            with_custom.cancel();
+        }
         self.doc = Some(with_custom.custom(()));
         if let Some(request) = out.pick_color {
             self.pick = Some(request);
         }
         self.file_edits();
-        out.closed.map(|closed| match closed {
+        if close_now {
+            return Some(DialogResult::Cancel);
+        }
+        // The answer to the prompt that asked whether to save before closing.
+        let answer = super::settings_sync::lock(&self.bridge).close_answer.take();
+        match answer {
+            Some(super::settings_sync::CloseAnswer::Discard) => return Some(DialogResult::Cancel),
+            Some(super::settings_sync::CloseAnswer::Save) if self.apply().is_ok() => {
+                return Some(DialogResult::Ok(PrefsAnswer(std::mem::take(&mut self.edits))));
+            }
+            _ => {}
+        }
+        closed.map(|closed| match closed {
             Closed::Ok => DialogResult::Ok(PrefsAnswer(std::mem::take(&mut self.edits))),
             _ => DialogResult::Cancel,
         })
@@ -233,7 +281,12 @@ pub fn window_open(app: &PhotocraftApp) -> bool {
 
 /// Opens Edit › Preferences on `section` (`general` for an unknown one). With the window open only its page changes.
 pub fn open_preferences(app: &mut PhotocraftApp, section: &str) {
-    let section = if SECTIONS.iter().any(|(id, _)| *id == section) || section == crate::menu_custom::PAGE { section } else { "general" };
+    let section =
+        if SECTIONS.iter().any(|(id, _)| *id == section) || cfg!(not(target_arch = "wasm32")) && section == "aiModels" || section == crate::menu_custom::PAGE {
+            section
+        } else {
+            "general"
+        };
     if let Some(open) = app.framework.dialogs.get_mut::<PrefsDialog>() {
         open.state.selected = section.to_string();
         return;
@@ -245,11 +298,17 @@ pub fn open_preferences(app: &mut PhotocraftApp, section: &str) {
             return;
         }
     };
+    #[allow(unused_mut)]
     let mut pages: Vec<PageInfo> = StandardPage::ALL.into_iter().map(StandardPage::info).collect();
+    // fork: the models' downloads are not settings (fork/select-subject-ai.md).
+    #[cfg(not(target_arch = "wasm32"))]
+    pages.push(PageInfo::new(super::ai_models::PAGE, "AI Models"));
     // fork: the Context Menus page follows Interface.
     let after = pages.iter().position(|p| p.id == "interface").map_or(pages.len(), |i| i + 1);
     pages.insert(after, PageInfo::new(crate::menu_custom::PAGE, crate::menu_custom::PAGE_TITLE));
     let doc = doc.pages(pages).rules(rules(app.ctx())).custom_page(crate::menu_custom::PAGE);
+    #[cfg(not(target_arch = "wasm32"))]
+    let doc = doc.custom_page(super::ai_models::PAGE);
     // Agents reach the desktop app only; the web build shows the settings it had before as rows.
     #[cfg(not(target_arch = "wasm32"))]
     let doc = doc.custom_page(super::custom_rows::AGENTS_PAGE);
@@ -258,10 +317,29 @@ pub fn open_preferences(app: &mut PhotocraftApp, section: &str) {
     doc.relabel(&host);
     let mut state = PreferencesState::default();
     state.selected = section.to_string();
-    let custom = PrefsCustom::new(app, false);
+    let mut custom = PrefsCustom::new(app, false);
+    // fork: the folder the other ArtCraft apps use, read once (fork/settings-sync.md).
+    #[cfg(not(target_arch = "wasm32"))]
+    if custom.general.folder.is_empty() {
+        custom.general.offered = app.session.offered_sync_folder();
+    }
+    let bridge = std::sync::Arc::clone(&app.prefs_rt.bridge);
+    super::settings_sync::lock(&bridge).message = None;
+    let close_keys = super::close_keys::shortcuts_of(app);
     let saved_rev = app.session.prefs.rev();
     let words = Arc::new(Words::from_i18n(Arc::clone(crate::i18n::framework_i18n()), host.lang()));
-    app.framework.dialogs.open(PrefsDialog { doc: Some(doc), state, saved_rev, labels: host.lang(), words, custom, pick: None, edits: Vec::new() });
+    app.framework.dialogs.open(PrefsDialog {
+        doc: Some(doc),
+        state,
+        saved_rev,
+        labels: host.lang(),
+        words,
+        custom,
+        pick: None,
+        edits: Vec::new(),
+        bridge,
+        close_keys,
+    });
 }
 
 /// The language the draft's `interface.language` names, as the code stored in the draft.
@@ -315,8 +393,9 @@ pub(crate) fn feed(app: &mut PhotocraftApp) {
     let rev = app.session.prefs.rev();
     let saved = (rev != shown_rev).then(|| (rev, PrefPages::of(app.session.prefs())));
     let host = Arc::clone(app.framework.host());
+    let close_keys = super::close_keys::shortcuts_of(app);
     if let Some(dialog) = app.framework.dialogs.get_mut::<PrefsDialog>() {
-        dialog.feed(custom, saved, &host);
+        dialog.feed(custom, saved, close_keys, &host);
     }
 }
 
@@ -355,6 +434,7 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
             crate::menu_custom::Ask::Import => crate::menu_custom::backup::import(app),
         }
     }
+    take_requests(app);
 }
 
 /// The arrangement the open window's Context Menus page edits (JSON); `None` when the window is closed.
@@ -368,6 +448,26 @@ pub(crate) fn set_context_menus_draft(app: &mut PhotocraftApp, value: &Value) ->
     let Some(doc) = app.framework.dialogs.get_mut::<PrefsDialog>().and_then(|d| d.doc.as_mut()) else { return false };
     doc.draft_mut().set(crate::menu_custom::KEY, &crate::menu_custom::to_text(value));
     true
+}
+
+/// Does what the window's buttons and prompts asked for (fork/settings-sync.md).
+fn take_requests(app: &mut PhotocraftApp) {
+    let (requests, confirmed) = {
+        let mut bridge = super::settings_sync::lock(&app.prefs_rt.bridge);
+        (std::mem::take(&mut bridge.requests), bridge.import_confirmed.take())
+    };
+    for request in requests {
+        super::settings_sync::run(app, request);
+    }
+    if let Some(ask) = confirmed {
+        let result = super::settings_sync::confirm(app, &ask);
+        crate::dialogs::alerts::report(app, result);
+    }
+}
+
+/// The values the open window's draft shows, page by page; `None` when it is closed.
+pub(super) fn draft_values(app: &PhotocraftApp) -> Option<Value> {
+    app.framework.dialogs.get::<PrefsDialog>()?.doc.as_ref()?.draft().to::<Value>()
 }
 
 /// Applies the open window's draft as its Apply button does and keeps the window open. `Err` when it is closed, a

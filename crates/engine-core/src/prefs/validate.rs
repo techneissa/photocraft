@@ -44,8 +44,6 @@ pub const HIDDEN_UNTIL_IMPLEMENTED: &[&str] = &[
     "plugIns.allowScriptsToConnect",
     "type.textEngine",
     "enhancedControls.scrubbySliderAcceleration",
-    // fork: the Layers panel button awaits its rebuild on the craft UI (fork/double-exposure.md).
-    "interface.showDoubleExposureButton",
 ];
 
 /// Is the preference at `path` (`"section.key"`) hidden from the Preferences dialog?

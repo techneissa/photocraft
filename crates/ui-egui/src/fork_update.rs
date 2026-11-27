@@ -7,7 +7,7 @@
 //! compare API whether its commit is ahead of the app's own ([`route::own_commit`]).
 //!
 //! Since the official interface moved onto the craft UI, the window is craft-update's check dialog
-//! ([`dialog`]); the Settings row (`ui.rs`) awaits its rebuild on the craft UI.
+//! ([`dialog`]); the Settings row is `ui.rs`.
 
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, TryRecvError, channel};
@@ -20,8 +20,7 @@ mod dialog;
 mod github;
 pub mod release;
 mod route;
-// fork: awaiting rebuild on craft UI, see fork/fork-update-check.md (the Settings › General row).
-// mod ui;
+mod ui;
 
 pub use release::Outcome;
 
@@ -87,8 +86,6 @@ enum Origin {
     /// Help › Check for Updates…: the window always opens.
     Menu,
     /// The button in Settings: the answer shows beside the button.
-    // fork: the Settings row awaits its rebuild on the craft UI (fork/fork-update-check.md).
-    #[cfg_attr(not(test), allow(dead_code))]
     Settings,
 }
 
@@ -242,6 +239,7 @@ pub(crate) fn update(app: &mut PhotocraftApp) {
 }
 
 pub(crate) use dialog::show;
+pub(crate) use ui::{Click, run as run_settings, settings_row};
 
 // fork: awaiting rebuild on craft UI, see fork/fork-update-check.md (pictures of the Settings row and the old window).
 // #[cfg(test)]

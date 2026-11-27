@@ -255,6 +255,8 @@ impl PhotocraftApp {
         app.framework.move_memories(&mut app.session);
         // After the saved preferences, which say whether the set was already offered.
         kys_import::offer(&mut app);
+        // Keep in Sync: a newer settings file from another Mac is offered (fork/settings-sync.md).
+        prefs_ui::offer_newer_sync_file(&mut app);
         // File › Scripts › Script Events Manager: "Start Application".
         photocraft_engine::automate_cmds::fire_event(&mut app.session, "startApplication");
         Box::new(app)
@@ -272,6 +274,8 @@ impl eframe::App for PhotocraftApp {
         if let Err(err) = tool_memory::save_on_exit(self) {
             log::warn!("Preferences: could not save the final tool state: {err}");
         }
+        // Keep in Sync: save to the sync folder (fork/settings-sync.md).
+        prefs_ui::save_sync_on_exit(self);
         #[cfg(not(target_arch = "wasm32"))]
         self.close_control();
         if let Some(at_exit) = self.services.at_exit.take() {
