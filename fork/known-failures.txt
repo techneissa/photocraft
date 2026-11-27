@@ -11,6 +11,3 @@ scorecard::tests::staleness_check_and_determinism
 # Mac-only fork code: CI's Linux software GPU cannot render to Rgba32Float, which the live transform
 # preview uses (fork/transform-live-blend.md). Passes on the Mac (2026-11-02).
 live::tests::live_pipeline_builds
-# Mac-only: macOS reserves these system keys; on Linux the key is not reserved. Both pass on the Mac (2026-11-02).
-prefs::prefs_ui::shortcuts_upgrade_tests::escape_cancels_a_chord_and_a_reserved_key_is_refused
-prefs::prefs_ui::shortcuts_window_tests::a_reserved_key_is_refused_with_a_reason

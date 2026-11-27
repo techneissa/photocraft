@@ -35,7 +35,21 @@ impl Focus {
         }
         let function = matches!(
             k,
-            Key::F1 | Key::F2 | Key::F3 | Key::F4 | Key::F5 | Key::F6 | Key::F7 | Key::F8 | Key::F9 | Key::F10 | Key::F11 | Key::F12 | Key::F13 | Key::F14 | Key::F15
+            Key::F1
+                | Key::F2
+                | Key::F3
+                | Key::F4
+                | Key::F5
+                | Key::F6
+                | Key::F7
+                | Key::F8
+                | Key::F9
+                | Key::F10
+                | Key::F11
+                | Key::F12
+                | Key::F13
+                | Key::F14
+                | Key::F15
         );
         let navigation = matches!(
             k,
@@ -57,8 +71,9 @@ impl Focus {
             Focus::Widget => sc.modifiers.command || !navigation,
             Focus::DeletingWidget => sc.modifiers.command || !(navigation || matches!(k, Key::Backspace | Key::Delete)),
             Focus::Text => {
-                let text_edit =
-                    !sc.modifiers.alt && matches!(k, Key::A | Key::C | Key::X | Key::V | Key::Z | Key::Y) || navigation || matches!(k, Key::Backspace | Key::Delete);
+                let text_edit = !sc.modifiers.alt && matches!(k, Key::A | Key::C | Key::X | Key::V | Key::Z | Key::Y)
+                    || navigation
+                    || matches!(k, Key::Backspace | Key::Delete);
                 function || (sc.modifiers.command && !text_edit)
             }
         }
@@ -93,7 +108,8 @@ pub fn key_matches(sc: &KeyboardShortcut, key: Key, mods: Modifiers) -> bool {
         return false;
     }
     // Typing `+` (or another shifted symbol) may need ⇧ on this layout: don't require it absent.
-    let shifted_symbol = matches!(key, Key::Plus | Key::Colon | Key::OpenCurlyBracket | Key::CloseCurlyBracket | Key::Questionmark | Key::Pipe | Key::Exclamationmark);
+    let shifted_symbol =
+        matches!(key, Key::Plus | Key::Colon | Key::OpenCurlyBracket | Key::CloseCurlyBracket | Key::Questionmark | Key::Pipe | Key::Exclamationmark);
     let shift_ok = mods.shift == sc.modifiers.shift || (shifted_symbol && !sc.modifiers.shift);
     mods.alt == sc.modifiers.alt && shift_ok && mods.cmd_ctrl_matches(sc.modifiers)
 }

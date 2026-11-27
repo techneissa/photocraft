@@ -58,6 +58,8 @@ mod fields;
 mod presets;
 mod save;
 pub(crate) mod shortcuts;
+mod shortcuts_chords;
+mod shortcuts_menus;
 mod startup;
 
 // PLAN: assumed top-w18's appearance file keeps `display_scale` and `selected_theme` and exports `theme_menu`.
@@ -70,7 +72,7 @@ pub(crate) use dialogs::{feed, take as take_window};
 pub(crate) use presets::{PRESETS_FAMILY, take as take_presets};
 pub(crate) use save::save_preferences;
 pub use save::{autosave_now, tick};
-pub use shortcuts::{open as open_shortcuts, recording, shortcuts_open, show as show_shortcuts};
+pub use shortcuts::{open as open_shortcuts, open_shortcuts_for, recording, shortcuts_open, show as show_shortcuts};
 pub use startup::load;
 pub(crate) use startup::{on_recovery_event, remember_rulers};
 
@@ -85,6 +87,10 @@ mod recovery_tests;
 mod shortcut_capture_tests;
 #[cfg(test)]
 mod shortcut_set_tests;
+#[cfg(test)]
+mod shortcuts_chords_tests;
+#[cfg(test)]
+mod shortcuts_snapshots;
 
 #[cfg(test)]
 mod tests;

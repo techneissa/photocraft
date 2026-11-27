@@ -92,9 +92,6 @@ pub mod keybinds;
 // prefs/prefs_ui.rs: mod ai_models;                  // fork/select-subject-ai.md, fork/birefnet-full.md
 //                    mod close_keys;                 // fork/settings-close-keys.md
 //                    mod settings_folder; mod settings_sync; // fork/settings-sync.md (settings_folder_web.rs on the web)
-//                    mod shortcut_target; mod shortcuts_backup; mod shortcuts_chord; mod shortcuts_when; // fork/shortcut-upgrade.md
-//                    mod shortcuts_items; mod shortcuts_menus; mod shortcuts_record; mod shortcuts_rows;
-//                    mod shortcuts_search; mod shortcuts_window; // fork/shortcuts-window.md (and their *_tests, *_snapshots)
 // tools.rs:          pub(super) mod sam3_ui;         // fork/sam3-click-select.md, fork/sam3-box-subject.md
 //                    pub(crate) mod transform_live;  // fork/transform-live-blend.md
 // widgets.rs (now gone): mod dropdown_search;        // fork/dropdown-search.md (widgets/dropdown_search.rs)

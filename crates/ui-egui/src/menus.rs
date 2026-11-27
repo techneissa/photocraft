@@ -27,6 +27,8 @@ pub use bar::menu_bar;
 pub use invoke::invoke;
 pub(crate) use invoke::{invoke_unguarded, panel_alias};
 pub use items::{MenuModel, base_rows, is_live, menu_rows, model, row};
+// fork: the Menus tab's colour dots paint the tints (fork/shortcuts-window.md).
+pub(crate) use items::menu_tint;
 #[cfg(test)]
 pub(crate) use items::{fresh_bar, model_id};
 pub use state::is_enabled;

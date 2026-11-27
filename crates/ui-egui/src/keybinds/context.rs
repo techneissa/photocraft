@@ -2,9 +2,9 @@
 
 use photocraft_doc::LayerContent;
 
+use super::focus::Focus;
 use super::when::{Context, keys};
 use crate::PhotocraftApp;
-use super::focus::Focus;
 
 /// The value of `tool` for the tool in use: the part of its shortcut id after `tools.select.`.
 fn tool_value(app: &PhotocraftApp) -> usize {

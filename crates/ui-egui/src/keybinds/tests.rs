@@ -286,7 +286,7 @@ fn typing_frame(app: &mut PhotocraftApp, time: f64, events: Vec<Event>, text: &m
     eframe::App::raw_input_hook(app, &ctx, &mut raw);
     let seen = raw.clone();
     crate::app::framework::keys_pass(app, &ctx, raw, |ui| {
-        let r = ui.add(egui::TextEdit::singleline(text).id(egui::Id::new("pc-test-text")));
+        let r = ui.add(egui::TextEdit::singleline(text).id(egui::Id::unique("pc-test-text")));
         r.request_focus();
     });
     seen

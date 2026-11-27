@@ -24,7 +24,9 @@ impl PrefsStore {
         let sections = self.values.sections.clone();
         self.rev += 1;
         let result = f(&mut self.values);
-        if (&before.0, &before.1, &before.2, &before.3) != (&self.values.shortcuts, &self.values.alternate_shortcuts, &self.values.toolbar, &self.values.shortcut_when) {
+        if (&before.0, &before.1, &before.2, &before.3)
+            != (&self.values.shortcuts, &self.values.alternate_shortcuts, &self.values.toolbar, &self.values.shortcut_when)
+        {
             self.catalog_rev = self.catalog_rev.wrapping_add(1);
         }
         for key in sections.keys().chain(self.values.sections.keys()).collect::<std::collections::BTreeSet<_>>() {

@@ -34,6 +34,16 @@ pub struct State {
     pub fired: Vec<String>,
 }
 
+/// Where the Chords and Conditions tab says it is recording a chord (read by the key layer).
+pub(crate) fn recording_id() -> egui::Id {
+    egui::Id::unique("fork-chord-recording")
+}
+
+/// Where the key layer leaves the presses the recording takes: `Vec<(egui::Key, egui::Modifiers)>`.
+pub(crate) fn captured_id() -> egui::Id {
+    egui::Id::unique("fork-chord-captured")
+}
+
 /// Takes the keys of every command with a When condition out of craft's keymap `overrides`: the key layer
 /// ([`runtime`]) runs such a command when its condition holds, and when it does not the key goes to whatever else has it.
 pub(crate) fn unbind_gated(app: &crate::PhotocraftApp, overrides: &mut craft::keymap::Overrides) {

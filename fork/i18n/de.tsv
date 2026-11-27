@@ -14,3 +14,29 @@
 	Confirm remove	Entfernen bestätigen
 	subject segmentation (BiRefNet-lite)	Motivsegmentierung (BiRefNet-lite)
 	inpainting (LaMa)	Bildauffüllung (LaMa)
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	Akkorde und Bedingungen
+	Search commands, chords, conditions	Befehle, Akkorde, Bedingungen suchen
+	Export	Exportieren
+	Import	Importieren
+	Export Shortcuts as JSON…	Tastenkürzel als JSON exportieren…
+	Import Shortcuts from JSON…	Tastenkürzel aus JSON importieren…
+	A chord is two keys in a row, like ⌘K then C. A condition decides where a command's keys work, like tool == brush && hasSelection.	Ein Akkord sind zwei Tasten nacheinander, z. B. ⌘K, dann C. Eine Bedingung legt fest, wo die Tasten eines Befehls gelten, z. B. tool == brush && hasSelection.
+	Press two keys…	Zwei Tasten drücken…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	Klicken und zwei Tasten nacheinander drücken. Esc bricht ab, ⌫ entfernt den Akkord.
+	Always	Immer
+	That is not a chord: press two keys in a row.	Das ist kein Akkord: zwei Tasten nacheinander drücken.
+	Imported {file}. The shortcuts are saved.	{file} importiert. Die Tastenkürzel sind gespeichert.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} ist auch das Kürzel von {command}: es wartet auf die zweite Taste des Akkords.
+	{key} is also used by {command} in the same context.	{key} wird auch von {command} im selben Kontext verwendet.
+	{key} was pressed, but no shortcut continues with that key	{key} wurde gedrückt, aber kein Kürzel geht mit dieser Taste weiter
+	{count} shortcut condition(s) in your settings could not be read and are ignored	{count} Kürzelbedingung(en) in den Einstellungen konnten nicht gelesen werden und werden ignoriert
+	and {count} more	und {count} weitere
+	Color: {name}	Farbe: {name}
+	Red	Rot
+	Orange	Orange
+	Yellow	Gelb
+	Green	Grün
+	Blue	Blau
+	Violet	Violett
+	Gray	Grau

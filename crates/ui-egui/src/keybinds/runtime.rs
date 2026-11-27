@@ -69,15 +69,30 @@ enum Taken {
 /// Takes the key presses of this frame's raw input that the layer owns (call from `raw_input_hook`, after the
 /// clipboard keys became presses). The commands they fire wait in `app.keybinds.fired`.
 pub fn filter(app: &mut PhotocraftApp, ctx: &egui::Context, raw: &mut egui::RawInput) {
+    if crate::prefs_ui::shortcuts_open(app) {
+        // The shortcut recorders take every key; the Chords and Conditions tab's gets the presses and nothing runs.
+        app.keybinds.pending = None;
+        if ctx.data(|d| d.get_temp::<bool>(super::recording_id())).unwrap_or(false) {
+            let mut taken: Vec<(Key, Modifiers)> = Vec::new();
+            raw.events.retain(|e| match e {
+                Event::Key { key, pressed: true, repeat: false, modifiers, .. } if !is_modifier_key(*key) => {
+                    taken.push((*key, *modifiers));
+                    false
+                }
+                Event::Key { pressed: true, .. } | Event::Text(_) => false,
+                _ => true,
+            });
+            if !taken.is_empty() {
+                ctx.data_mut(|d| d.get_temp_mut_or_default::<Vec<(Key, Modifiers)>>(super::captured_id()).extend(taken));
+                ctx.request_repaint();
+            }
+        }
+        return;
+    }
     let prefs = app.session.prefs();
     let idle = app.keybinds.pending.is_none() && prefs.chords.is_empty() && prefs.shortcut_when.is_empty();
     let pressed = |e: &Event| matches!(e, Event::Key { pressed: true, repeat: false, key, .. } if !is_modifier_key(*key));
     if idle || (app.keybinds.pending.is_none() && !raw.events.iter().any(pressed)) {
-        return;
-    }
-    if crate::prefs_ui::shortcuts_open(app) {
-        // The shortcut recorder takes every key.
-        app.keybinds.pending = None;
         return;
     }
     let now = raw.time.unwrap_or_else(|| ctx.input(|i| i.time));
