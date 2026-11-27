@@ -13,3 +13,7 @@
 	Move up	ზევით გადატანა
 	Move down	ქვევით გადატანა
 	Search commands	ბრძანებების ძებნა
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	გახსნა ფენებად…
+	Place Photo	ფოტოს განთავსება
+	Duplicated to {document}	დუბლირებულია დოკუმენტში {document}

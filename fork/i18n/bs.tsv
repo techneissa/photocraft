@@ -18,3 +18,7 @@
 	Move up	Pomjeri gore
 	Move down	Pomjeri dolje
 	Search commands	Traži naredbe
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Otvori kao slojeve…
+	Place Photo	Postavi fotografiju
+	Duplicated to {document}	Duplicirano u {document}

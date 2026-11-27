@@ -91,6 +91,8 @@ struct LayersFacts<'a> {
     mask_target: bool,
     vector_mask_target: bool,
     link_enabled: bool,
+    /// fork: the Place Photo footer button (icon, tooltip, enabled), fork/place-photos.md.
+    place_photo: (&'static str, String, bool),
     #[memo_props(hash = "a plain model id")]
     hovered: Option<LayerId>,
     working_text: Option<u64>,
@@ -125,6 +127,7 @@ pub(crate) fn model(
         mask_target: app.ui.mask_target,
         vector_mask_target: app.ui.vector_mask_target,
         link_enabled: app.session.is_enabled("layer.linkLayers"),
+        place_photo: crate::place_photos::footer_button(app),
         hovered: app.canvas_hover_layer,
         working_text: working_text(app),
         missing: app.session.missing_links_revision(),
@@ -178,6 +181,7 @@ pub(crate) struct PhotoLayers {
     mask_target: bool,
     vector_mask_target: bool,
     link_enabled: bool,
+    place_photo: (&'static str, String, bool),
     hovered: Option<LayerId>,
     /// A Type Mask session's working text, which the panel never lists.
     working_text: Option<u64>,
@@ -211,6 +215,7 @@ impl PhotoLayers {
             mask_target: ui.mask_target,
             vector_mask_target: ui.vector_mask_target,
             link_enabled: app.session.is_enabled("layer.linkLayers"),
+            place_photo: crate::place_photos::footer_button(app),
             hovered: app.canvas_hover_layer,
             working_text: working_text(app),
             empty,
@@ -520,6 +525,8 @@ impl LayerTree for PhotoLayers {
             styles.extend(crate::layer_style::KINDS.iter().map(|&(kind, label)| Entry::new(kind.to_string(), format!("{}…", tl!(label)))));
             (adjustments, styles)
         });
+        // fork: the Place Photo button (fork/place-photos.md).
+        footer.more.push(self.place_photo.clone());
         footer.adjustment_menu = adjustments;
         footer.style_menu = styles;
         footer

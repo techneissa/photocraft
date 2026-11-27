@@ -30,3 +30,7 @@
 	Move up	上移
 	Move down	下移
 	Search commands	搜索命令
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	作为图层打开…
+	Place Photo	置入照片
+	Duplicated to {document}	已复制到 {document}

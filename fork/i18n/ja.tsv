@@ -30,3 +30,7 @@
 	Move up	上へ移動
 	Move down	下へ移動
 	Search commands	コマンドを検索
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	レイヤーとして開く…
+	Place Photo	写真を配置
+	Duplicated to {document}	{document} に複製しました

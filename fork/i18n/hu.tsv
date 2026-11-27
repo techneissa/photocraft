@@ -24,3 +24,7 @@
 	Move up	Mozgatás felfelé
 	Move down	Mozgatás lefelé
 	Search commands	Parancsok keresése
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Megnyitás rétegekként…
+	Place Photo	Fénykép elhelyezése
+	Duplicated to {document}	Duplikálva ide: {document}

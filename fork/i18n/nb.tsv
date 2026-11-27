@@ -13,3 +13,7 @@
 	Move up	Flytt opp
 	Move down	Flytt ned
 	Search commands	Søk i kommandoer
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Åpne som lag…
+	Place Photo	Plasser bilde
+	Duplicated to {document}	Duplisert til {document}

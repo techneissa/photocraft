@@ -13,3 +13,7 @@
 	Move up	மேலே நகர்த்து
 	Move down	கீழே நகர்த்து
 	Search commands	கட்டளைகளைத் தேடு
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	அடுக்குகளாகத் திற…
+	Place Photo	புகைப்படத்தை வை
+	Duplicated to {document}	{document} இல் நகலெடுக்கப்பட்டது

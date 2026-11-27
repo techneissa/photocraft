@@ -532,6 +532,8 @@ fn footer(app: &mut PhotocraftApp, picked: Option<crate::smart_ui::FilterDrag>, 
                 None => actions.push((cmd.into(), json!({}))),
             }
         }
+        // fork: the footer's first extra button is Place Photo (fork/place-photos.md); null params open its picker.
+        LayersFooterAction::More(0) => actions.push((crate::place_photos::COMMAND.into(), Value::Null)),
         LayersFooterAction::Adjustment(id) => actions.push((id, json!({}))),
         LayersFooterAction::Style(kind) => {
             crate::layer_style::open(app, (!kind.is_empty()).then_some(kind.as_str()));

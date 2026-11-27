@@ -30,3 +30,7 @@
 	Move up	Monter
 	Move down	Descendre
 	Search commands	Rechercher des commandes
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Ouvrir comme calques…
+	Place Photo	Placer une photo
+	Duplicated to {document}	Dupliqué vers {document}

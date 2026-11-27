@@ -65,3 +65,7 @@
 	Move up	Flytta upp
 	Move down	Flytta ned
 	Search commands	Sök kommandon
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Öppna som lager…
+	Place Photo	Placera foto
+	Duplicated to {document}	Duplicerad till {document}

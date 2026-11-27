@@ -2,7 +2,7 @@
 
 ## What it does
 
-File ▸ Place Embedded… on ⇧⌘P (Place Linked unchanged) and takes several photos at once: the picker is a multi-select, one photo is placed as before, two or more are queued like a multi-file canvas drop (each its own layer, Free Transform in turn, ↩ applies, Esc takes back, a photo that fails is reported and skipped); an icon-only "Place Photo" button in the Layers-panel footer next to Double Exposure (greyed like the menu item, tooltip shows the key in effect)
+File ▸ Place Embedded… on ⇧⌘P (Place Linked unchanged), and an icon-only "Place Photo" button in the Layers-panel footer (greyed like the menu item, tooltip shows the key in effect; with Double Exposure back it sits next to it). Taking several photos at once is official now (`file_dialog::pick_files_bytes`, `place_picked`; official PRs #14107, #14110), so the fork's own multi-select picker is gone
 
 ## Branch
 
@@ -10,22 +10,23 @@ File ▸ Place Embedded… on ⇧⌘P (Place Linked unchanged) and takes several
 
 ## Own files
 
-`crates/ui-egui/src/place_photos.rs` and `place_photos/tests.rs`, `assets/icons/place-photo.svg`
+`crates/ui-egui/src/place_photos.rs` (the button's description and the command), `assets/icons/place-photo.svg`
 
 ## Hooks in official files
 
-- engine-core `cmd/file_cmds.rs` (`file.placeEmbedded` default key `Cmd+Shift+P`)
-- ui-egui `lib.rs` (module), `menu_catalog.rs` (the key), `menus/view_cmds/dialogs.rs` (3 lines: Place Embedded without params → `place_photos::pick`), `file_open.rs` (`DropPlace::Path` and its arm in `place_next_dropped`), `file_dialog.rs` (`read_picked` made `pub(crate)`; `place_photos` passes `usize::MAX` for main's size cap), `panels/layers.rs` (1 line: the button), `icon_data.rs` (icon), `file_dialog/tests.rs` (the Place Embedded test expects a multi-select)
+- engine-core `cmd/file_cmds.rs` (`file.placeEmbedded` default key `Cmd+Shift+P`), ui-egui `menu_catalog.rs` (the key)
+- ui-egui `lib.rs` (module), `panels/layers_tree.rs` (`place_photo` in the model and its facts; `footer()` pushes it onto `LayersFooterState::more`), `panels/layers_events.rs` (`LayersFooterAction::More(0)` runs Place Embedded with null params, which opens the picker), `icon_data.rs` (icon)
+- craft-libs fork copy, patch 8 ([craft-libs.md](craft-libs.md)): the footer's `more` buttons
 - `ATTRIBUTION.md` (icon row; `place-photo.svg` in the Lucide row's exceptions)
 
 ## Tests
 
-`place_photos` in ui-egui
+None of its own: the multi-photo picker is the official one and has official tests (`file_dialog`); the button is wiring.
 
 ```bash
-cargo test -p photocraft-ui-egui --lib -- place_photos file_dialog
+cargo test -p photocraft-ui-egui --lib -- file_dialog icons::
 ```
 
 ## After the craft UI merge (2026-11-27)
 
-Partly works: ⇧⌘P is Place Embedded (engine); several photos at once and the Layers panel button are gone. Rebuild: multi-file Place and the Place Photo button on the craft UI (`place_photos.rs`).
+Rebuilt on the craft UI (`feat/step2-layers-transform`): the Place Photo button is back through patch 8; several photos at once come from the official code, so `place_photos.rs` shrank to the button and its tests went (they tested the fork's own picker).

@@ -164,3 +164,33 @@ fn a_command_shortcut_closes_the_open_blend_list_and_runs() {
     assert!(!list_open(&h), "and closes the list");
     assert_eq!(active_blend(&h), BlendMode::Normal, "the mode is unchanged");
 }
+
+/// The Blend Mode box's own "Blend Mode" tooltip, when one shows.
+fn box_tooltip(h: &Harness<'_, Box<PhotocraftApp>>) -> bool {
+    h.query_all_by_role(Role::Tooltip)
+        .any(|n| n.accesskit_node().label().as_deref() == Some("Blend Mode") || n.query_all_by_label("Blend Mode").next().is_some())
+}
+
+/// The list is window-tall, so the box's hover tooltip would cover its first row (Normal): the tooltip waits until the
+/// list is closed.
+#[test]
+fn an_open_blend_list_hides_the_boxs_tooltip() {
+    let mut h = harness(64, 64);
+    let select = h
+        .query_all_by_role(Role::ComboBox)
+        .filter(|n| n.accesskit_node().label().as_deref() == Some("Blend Mode"))
+        .map(|n| n.rect())
+        .max_by(|a, b| a.top().total_cmp(&b.top()))
+        .expect("the Layers panel's Blend Mode select");
+    h.event(egui::Event::PointerMoved(select.center()));
+    h.run_steps(60);
+    assert!(box_tooltip(&h), "closed, resting on the box shows its tooltip");
+    open_list(&mut h);
+    // Away over the list and back on the box: the press that opened the list no longer holds the tooltip back.
+    h.event(egui::Event::PointerMoved(select.center() + egui::vec2(0.0, 200.0)));
+    h.run_steps(3);
+    h.event(egui::Event::PointerMoved(select.center()));
+    h.run_steps(60);
+    assert!(list_open(&h), "the list is still open");
+    assert!(!box_tooltip(&h), "open, the box shows no tooltip over its list");
+}

@@ -23,3 +23,7 @@
 	Move up	نقل لأعلى
 	Move down	نقل لأسفل
 	Search commands	البحث في الأوامر
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	فتح كطبقات…
+	Place Photo	وضع صورة
+	Duplicated to {document}	تم النسخ إلى {document}
