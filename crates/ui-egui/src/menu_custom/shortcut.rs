@@ -29,7 +29,7 @@ pub fn entry<T>(app: &PhotocraftApp, entry: Entry<T>, id: &str) -> Entry<T> {
 }
 
 /// Per-frame upkeep (`app::framework`): the word of the Assign Shortcut… item that the tool rail, the Layers footer and
-/// the Paths panel's row menu offer on a right click (craft-libs patch 9, `fork/craft-libs.md`).
+/// the Paths panel's row menu offer on a right click (craft-libs patch 12, `fork/craft-libs.md`).
 pub fn sync(ctx: &egui::Context) {
     craft::ui::menu::set_row_action_label(ctx, Some(tl!("Assign Shortcut…").to_string()));
 }

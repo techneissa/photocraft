@@ -564,6 +564,11 @@ impl LayerTree for PhotoLayers {
         };
         let mask = crate::layer_menu_ui::mask_button_command(active, self.doc().selection.is_some(), false).unwrap_or_default();
         footer.commands = [delete, "layer.new.layer", "layer.new.group", "", mask, "", "layer.linkLayers"].map(String::from).to_vec();
+        // The buttons after Link Layers: Double Exposure while shown, then Place Photo (as [`more_commands`]).
+        if self.double_exposure.is_some() {
+            footer.commands.push(crate::double_exposure::COMMAND.to_string());
+        }
+        footer.commands.push(crate::place_photos::COMMAND.to_string());
         footer
     }
 
