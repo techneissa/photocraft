@@ -39,7 +39,7 @@ fn scroll(h: &Harness<'_, PhotocraftApp>) -> f32 {
 }
 
 fn hits(h: &Harness<'_, PhotocraftApp>, q: &str) -> Vec<Hit> {
-    all_hits(h.state(), q, &[], crate::i18n::Lang::EN)
+    all_hits(h.state(), q, &[], &Default::default(), 0, crate::i18n::Lang::EN)
 }
 
 fn press(h: &mut Harness<'_, PhotocraftApp>, key: Key) {
@@ -184,7 +184,7 @@ fn set_keys(app: &mut PhotocraftApp, zoom: &str, undo: &str) {
 }
 
 fn hits_for(app: &PhotocraftApp, q: &str) -> Vec<Hit> {
-    all_hits(app, q, &[], crate::i18n::Lang::EN)
+    all_hits(app, q, &[], &Default::default(), 0, crate::i18n::Lang::EN)
 }
 
 #[test]
