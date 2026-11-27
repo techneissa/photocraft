@@ -32,7 +32,39 @@ pub fn step_text(step: &KeyboardShortcut) -> String {
     if step.modifiers.shift {
         s.push_str("Shift+");
     }
-    let name = crate::prefs_ui::shortcut_text(step.logical_key, egui::Modifiers::NONE).unwrap_or_default();
+    let name = shortcut_text(step.logical_key, egui::Modifiers::NONE).unwrap_or_default();
     s.push_str(&name);
     pretty(&s)
+}
+
+/// Text of a key press for the shortcut editor (`Cmd+Shift+K`), `None` for bare modifiers.
+pub fn shortcut_text(key: egui::Key, m: egui::Modifiers) -> Option<String> {
+    if super::focus::is_modifier_key(key) {
+        return None;
+    }
+    let mut parts = Vec::new();
+    if m.command || m.mac_cmd {
+        parts.push("Cmd".to_string());
+    }
+    if m.ctrl && !m.command {
+        parts.push("Ctrl".into());
+    }
+    if m.alt {
+        parts.push("Alt".into());
+    }
+    if m.shift {
+        parts.push("Shift".into());
+    }
+    let name = match key {
+        egui::Key::Equals => "=",
+        egui::Key::Minus => "-",
+        egui::Key::OpenBracket => "[",
+        egui::Key::CloseBracket => "]",
+        egui::Key::Semicolon => ";",
+        egui::Key::Quote => "'",
+        egui::Key::Plus => "",
+        k => k.name(),
+    };
+    parts.push(name.to_string());
+    photocraft_engine::prefs::normalize_shortcut(&parts.join("+"))
 }

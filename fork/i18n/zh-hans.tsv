@@ -14,3 +14,55 @@
 	Confirm remove	确认移除
 	subject segmentation (BiRefNet-lite)	主体分割 (BiRefNet-lite)
 	inpainting (LaMa)	图像修复 (LaMa)
+# Home recent files (fork/home-recent-grid.md)
+	Recent files on Home	主页上的最近文件
+	Just now	刚刚
+	{n} min ago	{n} 分钟前
+	{n} h ago	{n} 小时前
+	Yesterday	昨天
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	和弦与条件
+	Search commands, chords, conditions	搜索命令、和弦、条件
+	Export	导出
+	Import	导入
+	Export Shortcuts as JSON…	将快捷键导出为 JSON…
+	Import Shortcuts from JSON…	从 JSON 导入快捷键…
+	A chord is two keys in a row; a condition limits where a command's keys work.	和弦是连续按下的两个键；条件限定命令的按键在哪里生效。
+	Press two keys…	请按两个键…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	点击后连续按两个键。Esc 取消，⌫ 删除和弦。
+	Always	始终
+	That is not a chord: press two keys in a row.	这不是和弦：请连续按两个键。
+	Imported {file}. The shortcuts are saved.	已导入 {file}。快捷键已保存。
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} 也是 {command} 的快捷键：它会等待和弦的第二个键。
+	{key} is also used by {command} in the same context.	{key} 在相同情境下也被 {command} 使用。
+	{key} was pressed, but no shortcut continues with that key	已按下 {key}，但没有快捷键以该键继续
+	{count} shortcut condition(s) in your settings could not be read and are ignored	设置中有 {count} 个快捷键条件无法读取，已被忽略
+	and {count} more	另有 {count} 个
+	Color: {name}	颜色：{name}
+	Red	红色
+	Orange	橙色
+	Yellow	黄色
+	Green	绿色
+	Blue	蓝色
+	Violet	紫色
+	Gray	灰色
+	Add Condition	添加条件
+	The shortcut works only while…	快捷键仅在以下情况生效…
+	Back	返回
+	Is	是
+	Is Not	不是
+
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	指定快捷键…
+@id	settingsPage.contextMenus	上下文菜单
+	Context Menus	上下文菜单
+	Take out of the menu	从菜单中移除
+	Add to the menu	添加到菜单
+	Add Separator	添加分隔线
+	Move up	上移
+	Move down	下移
+	Search commands	搜索命令
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	作为图层打开…
+	Place Photo	置入照片
+	Duplicated to {document}	已复制到 {document}

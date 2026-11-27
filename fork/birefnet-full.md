@@ -16,17 +16,17 @@ Measured 2026-11-03 on this Mac (48 GB, Metal, release build, `/usr/bin/time -l`
 
 ## Own files
 
-`crates/birefnet/` (the copy: `blocks.rs`, `combine.rs`, `deform.rs`, `image.rs`, `model.rs`, `params.rs`, `swin.rs`, `weights.rs`; ours: `lib.rs` and `run.rs` edited, `INPUT_SIDE`, `matte_with`), `crates/ml/src/segment_full.rs`, engine `cmd/subject_full.rs` and `cmd/subject_full/tests.rs`, `crates/engine/examples/select_subject_model_order.rs`
+`crates/birefnet/` (the copy: `blocks.rs`, `combine.rs`, `deform.rs`, `image.rs`, `model.rs`, `params.rs`, `swin.rs`, `weights.rs`; ours: `lib.rs` and `run.rs` edited, `INPUT_SIDE`, `matte_with`), `crates/ml/src/segment_full.rs`, engine-core `cmd/subject_full.rs` and `cmd/subject_full/tests.rs`, `crates/engine/examples/select_subject_model_order.rs`
 
 ## Hooks in official files
 
-`Cargo.toml`, `Cargo.lock`, `xtask/src/layers.rs` (`birefnet` before `ml` in L4); `crates/ml` (`Cargo.toml`, `lib.rs`, `store.rs` (`Model::Birefnet`), `ram.rs`, `segment.rs` (`refine_edges` is `pub(crate)`), `migrate.rs`, `examples/try_models.rs`); engine `cmd.rs` (mod line), `cmd/smartselect_cmds.rs` (`find_subject_region`, `model_subject_with`, the cache's `model_available` is a pair) and its `tests.rs`; ui-egui `prefs/prefs_ui/ai_models.rs` (`title`, `powers`); `apps/photocraft-cli` (`args.rs`, `models.rs`); `docs/ml.md`, `ATTRIBUTION.md`, `NOTICE`
+`Cargo.toml`, `Cargo.lock`, `xtask/src/layers.rs` (`birefnet` before `ml` in L4); `crates/ml` (`Cargo.toml`, `lib.rs`, `store.rs` (`Model::Birefnet`), `ram.rs`, `segment.rs` (`refine_edges` is `pub(crate)`), `migrate.rs`, `examples/try_models.rs`); engine-core `cmd.rs` (mod line), `cmd/smartselect_cmds.rs` (`find_subject_region`, `model_subject_with`, the cache's `model_available` is a pair) and its `tests.rs`; ui-egui `prefs/prefs_ui/ai_models.rs` (`title`, `powers`); `apps/photocraft-cli` (`args.rs`, `models.rs`); `docs/ml.md`, `ATTRIBUTION.md`, `NOTICE`
 
 ## Tests
 
 ```bash
 cargo test -p photocraft-birefnet -p photocraft-ml --lib
-cargo test -p photocraft-engine --lib -- subject_full full_model full_birefnet subject_cache_invalidates
+cargo test -p photocraft-engine-core --lib -- subject_full full_model full_birefnet subject_cache_invalidates
 cargo test -p photocraft-ui-egui --lib -- ai_models
 cargo test -p photocraft-cli -- models
 # real model, by hand (15 GB): cargo run --release -p photocraft-ml --example try_models -- segment-full photo.jpg matte.png
@@ -36,3 +36,7 @@ cargo test -p photocraft-cli -- models
 ## When upstream merges
 
 `crates/birefnet` is ours and does not clash. If upstream adds its own full BiRefNet, keep the shared file `birefnet/model.safetensors`; the `Model::ALL` order is `Birefnet`, `BirefnetLite`, `Lama`, `Sam3`.
+
+## After the craft UI merge (2026-11-27)
+
+Works: the Full BiRefNet row is on Settings › AI Models (see [select-subject-ai.md](select-subject-ai.md)). Rebuild: nothing.

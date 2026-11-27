@@ -28,3 +28,7 @@ ui-egui `dialogs::placement`
 ```bash
 cargo test -p photocraft-ui-egui --lib placement
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Compiled out, awaiting rebuild: nothing; craft's dialog host places windows its own way. Rebuild: check craft's placement; redo centring and remembered places only if needed (`dialogs/placement.rs`).

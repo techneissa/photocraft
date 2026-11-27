@@ -3,17 +3,22 @@
 //! (its frecency); each typed text keeps the command picked for it. The history lives in
 //! `Preferences::palette_history`, so it survives a restart.
 //!
-//! - An empty search lists the commands run most often and most recently first.
-//! - A typed search: text match first. Past use adds less than [`CLEARLY_BETTER`] scaled points,
-//!   so among matches that are about as good, the one run more often goes first.
-//! - A command picked for a typed text goes first when that text, or its start, is typed again.
+//! craft's `CommandPalette` ranks by how well the text matches first and uses `uses` only to order
+//! matches that are equally good; so a clearly better text match still wins over past use. The
+//! other two parts ride on two hooks of the techneissa/craft-libs fork (fork/craft-libs.md):
+//!
+//! - An empty search lists the commands run most often and most recently first ([`History::recents`]).
+//! - A typed search: among matches as good as each other, the one run more often goes first
+//!   ([`History::uses`]).
+//! - A command picked for a typed text goes first when that text, or its start, is typed again
+//!   ([`History::learned`], with the text from `PaletteOutput::query`).
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::nav::Hit;
+use craft::ui::runtime::commands::CommandRef;
 
 /// Commands remembered; past this the one with the lowest frecency is forgotten.
 const MAX_COMMANDS: usize = 300;
@@ -23,17 +28,6 @@ const MAX_PICKS: usize = 200;
 const MAX_TEXT: usize = 64;
 /// A use counts half as much after a week.
 const HALF_LIFE_SECS: f64 = 7.0 * 24.0 * 3600.0;
-/// Text scores are multiplied by this before past use is added, so use can order matches that
-/// score the same without changing the order of matches that don't.
-const SCALE: i32 = 100;
-/// A text match this many points better (about one more letter in a row, which scores 8) always
-/// wins over past use: the use bonus stays below `CLEARLY_BETTER * SCALE`.
-pub(super) const CLEARLY_BETTER: i32 = 7;
-/// What a pick for the typed text adds: above every text score (an exact name scores 1000).
-const PICK: i32 = 1_000_000 * SCALE;
-/// The empty search's used commands, above every unused one.
-const USED: i32 = 1_000_000;
-
 /// One command's use: how often and when last (Unix seconds).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 struct Use {
@@ -108,7 +102,7 @@ impl History {
     }
 
     /// The command picked for `text` or for a text it starts (the newest such pick).
-    fn pick(&self, text: &str) -> Option<&str> {
+    pub(super) fn learned(&self, text: &str) -> Option<&str> {
         let k = key(text);
         if k.is_empty() {
             return None;
@@ -116,33 +110,25 @@ impl History {
         self.picks.range(k.clone()..).take_while(|(t, _)| t.starts_with(&k)).max_by_key(|(_, p)| p.at).map(|(_, p)| p.id.as_str())
     }
 
-    /// What past use adds to a typed match of `id`: 0 for a command never run, growing with its
-    /// frecency and never reaching [`CLEARLY_BETTER`] scaled points.
-    fn use_bonus(&self, id: &str, now: i64) -> i32 {
-        let f = self.frecency(id, now);
-        let most = f64::from(CLEARLY_BETTER * SCALE - 1);
-        (most * f / (f + 1.0)) as i32
+    /// How often `id` was run lately, for craft's ranking of equally good matches (it grades `ilog2(n + 1)`, so
+    /// one use and ten uses differ, ten and eleven barely): its frecency rounded. 0 for a command never run or
+    /// not run for months.
+    pub(super) fn uses(&self, id: &str, now: i64) -> u32 {
+        self.frecency(id, now).round() as u32
     }
 
-    /// Order `hits` for the search `text` at `now`; the caller then sorts them ([`super::nav::rank`]).
-    pub(super) fn apply(&self, text: &str, now: i64, hits: &mut [Hit]) {
-        if text.trim().is_empty() {
-            let mut used: Vec<(f64, &str)> = self.uses.keys().map(|id| (self.frecency(id, now), id.as_str())).collect();
-            used.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(b.1)));
-            for h in hits.iter_mut() {
-                if let Some(i) = used.iter().position(|(_, id)| *id == h.1) {
-                    h.0 = USED - i as i32;
-                }
-            }
-            return;
-        }
-        let picked = self.pick(text);
-        for h in hits.iter_mut() {
-            h.0 = h.0.saturating_mul(SCALE).saturating_add(self.use_bonus(&h.1, now));
-            if picked == Some(h.1.as_str()) {
-                h.0 = h.0.saturating_add(PICK);
+    /// The commands for an empty search: those run before, most often and most recently first, then
+    /// `session`'s (this session's, newest first) that are not among them.
+    pub(super) fn recents(&self, session: &[CommandRef], now: i64) -> Vec<CommandRef> {
+        let mut used: Vec<(f64, &str)> = self.uses.keys().map(|id| (self.frecency(id, now), id.as_str())).collect();
+        used.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(b.1)));
+        let mut list: Vec<CommandRef> = used.into_iter().map(|(_, id)| CommandRef::new(id)).collect();
+        for command in session {
+            if !list.contains(command) {
+                list.push(command.clone());
             }
         }
+        list
     }
 }
 

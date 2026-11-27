@@ -1,0 +1,39 @@
+# craft-libs fork copy
+
+## What it does
+
+PhotoCraft takes the craft interface framework from [storytold/craft-libs](https://github.com/storytold/craft-libs). A few fork features need a small change inside it that upstream does not have. Those changes live on the branch `photocraft-fork` of [techneissa/craft-libs](https://github.com/techneissa/craft-libs) (a fork of the official repo), and every craft-libs dependency in `Cargo.toml` (the workspace file, `crates/engine-core/Cargo.toml`, `crates/ipp/Cargo.toml`) points there at one `rev`, so Cargo sees one source. Without the patches nothing else differs: the branch is the official rev plus the commits below.
+
+## Branch
+
+`photocraft-fork` in `techneissa/craft-libs`, started from official `a46af76c7c74dd8dd375d694baaef00d5ae836a2`. One small commit per patch; each change in code carries a `// fork: photocraft-fork, "<name>"` comment, so `git grep "fork: photocraft-fork"` lists them all.
+
+## Patches
+
+| # | Commit subject | Where | Needed by |
+|---|---|---|---|
+| 1 | dropdown lists may take the whole window height | `ui-contract` `overlay/props.rs`: `DROPDOWN_SHARE` height 0.4 → 1.0 (one line) | [blend-list.md](blend-list.md): blend lists show as many rows as the room above or below the box holds; the placement code still picks the larger side |
+| 2 | the wheel over a blend mode select steps the mode only when the app allows it | `ui-contract` `entry.rs` (`Entry::wheel_by_setting`), `ui-patterns` `blend_keys.rs` (`blend_entries` marks its entries), `ui-widgets` `pickers/select.rs` (`set_wheel_steps_blend_modes`, `wheel_steps_blend_modes`; a `Select` over marked entries leaves the wheel alone while the setting is off; default on, so upstream behaviour is unchanged) | [blend-list.md](blend-list.md): "Scroll Wheel Changes Blend Mode" |
+| 3 | the command palette reports the typed text of a pick and puts a learned command first | `ui-patterns` `panels/palette.rs`: `PaletteOutput::query`, `CommandPalette::learned` (a command that goes first among the matches) | [palette-frecency.md](palette-frecency.md): the command picked for a typed text |
+| 4 | tone histograms scale to the tallest level between the two ends and draw one column per level | `imaging` `ui/histogram/paint.rs`: `tone_top` takes the interior peak (edge peak only when nothing is between), `tone_mesh` draws a column per bin | [levels-histogram.md](levels-histogram.md) |
+| 5 | Select and Mask: Refine Hair button, Protect Subject box and a Refine Hair edit the app can turn on | `imaging` `ui/select_mask`: `SelectMaskEdit::RefineHair`, `RefineHairControl` and `RefineHairEvent`, `SelectMaskBar::hair` (the button, its Stop while a run waits, the box), `SelectMaskWorkspace::refine_hair`, `SelectMaskEvent::RefineHair`, three words in `words.rs`; without `refine_hair(Some(..))` the bar keeps the official disabled button | [refine-hair.md](refine-hair.md) |
+| 6 | menu rows carry shortcut text and a right-click item; palette rows get the same item; Paths panel menu rows take shortcut text | `ui-contract` `entry.rs` (`Entry::shortcut`, `Entry::row_action`), `ui-widgets` `menu/popup.rs` (`entry_rows` shows both; `take_row_action`), `ui-patterns` `panels/palette.rs` (`CommandPalette::row_action`, `PaletteOutput::row_action`), `draw` `ui/paths/{panel,menu}.rs` (`PathsPanel::shortcut`). Two commits | [context-menu-shortcuts.md](context-menu-shortcuts.md), [assign-shortcut-palette.md](assign-shortcut-palette.md) |
+| 7 | the Layers footer takes one more button | `layers` `ui/tree.rs` (`LayersFooterState::extra`: icon, tooltip, enabled), `ui/panel/footer.rs` (`LayersFooterAction::Extra`, the button after Link Layers) | Superseded by patch 9: PhotoCraft no longer uses the `extra` slot (Double Exposure is the first `more` button); kept in the branch, not reverted |
+| 8 | shortcut table: Remove Shortcut on a right-click, the clashing command on the clash mark | `menu` `shortcuts/rows.rs` (`Row::clashes_with`), `shortcuts/view/table.rs` (a context menu with Remove Shortcut that clears the row's keys, a tooltip on the clash mark), `shortcuts/words.rs` (`remove_shortcut`, `shares_a_shortcut_with`); English only: craft's own dialog words have no translations in craft-i18n | [shortcuts-window.md](shortcuts-window.md) |
+| 9 | the Layers footer takes more buttons | `layers` `ui/panel/footer.rs` (`LayersFooterAction::More(i)`), `ui/tree.rs` (`LayersFooterState::more`: further buttons after `extra`, or after Link Layers when there is no `extra`) | [double-exposure.md](double-exposure.md) (Double Exposure) and [place-photos.md](place-photos.md) (Place Photo): the Layers panel buttons |
+| 10 | an open popup hides its component's tooltip | `ui-contract` `contract/tooltip.rs` (`run`: no hover for the tooltip while `overlay::popup_shown` for the component; one line) | [blend-list.md](blend-list.md): the "Blend Mode" tooltip would cover the first row of the window-tall list |
+| 11 | every long select can search without asking | `ui-widgets` `pickers/select.rs` (`auto_search_from`, `set_auto_search_from`: the app says from how many entries a `Select` is searchable; `Select::searches`; a searchable select takes letters typed on its closed box into the field and keeps the lead on the first match), `pickers/search.rs` (`seed`, the opening query); unset, nothing changes | [dropdown-search.md](dropdown-search.md) |
+| 12 | right-click item on rail tools, footer buttons and Paths rows | `ui-widgets` `menu/popup.rs` (`set_row_action_label`, `row_action_label`, `put_row_action`, `context_row_action`: a one-row context menu that reports its tag through `take_row_action`), `ui-panels` `rails/flyout.rs` (a flyout row and a button without a flyout offer it on a right click; the button's own popup "assign", with `CONTEXT_CLICK`), `layers` `ui/tree.rs` + `ui/panel/footer.rs` (`LayersFooterState::commands`), `draw` `ui/paths/{panel,menu}.rs` (`PathsPanel::assign`) | [assign-shortcut-palette.md](assign-shortcut-palette.md) |
+
+## Move to a new upstream rev
+
+1. In a clone of `techneissa/craft-libs`: `git fetch origin` (the official repo), `git switch photocraft-fork`.
+2. `git rebase <new official rev>`. Each patch is a few lines in a different file, so a clash is a moved line: keep the official change and put the patch back.
+3. Build the crates you touched: `cargo check -p craft-ui-contract -p craft-ui-widgets -p craft-ui-patterns`.
+4. `git push --force-with-lease fork photocraft-fork` (a rebased branch; nobody else works on it).
+5. In PhotoCraft, set every craft-libs `rev` in `Cargo.toml`, `crates/engine-core/Cargo.toml` and `crates/ipp/Cargo.toml` to the new head of `photocraft-fork`, and `cargo update -w`.
+6. When the official rev has the change (or an equivalent), drop its commit during the rebase and its row above, and the fork code that used it. When no patch is left, point the dependencies back at `storytold/craft-libs` and delete this file.
+
+## Tests
+
+None of its own: the patches are used by [blend-list.md](blend-list.md), [place-photos.md](place-photos.md), [palette-frecency.md](palette-frecency.md), [levels-histogram.md](levels-histogram.md), [refine-hair.md](refine-hair.md), [context-menu-shortcuts.md](context-menu-shortcuts.md), [dropdown-search.md](dropdown-search.md) (patch 11) and [assign-shortcut-palette.md](assign-shortcut-palette.md) (patch 12), whose tests cover them (patch 8: `shortcuts_more` in [shortcuts-window.md](shortcuts-window.md)).

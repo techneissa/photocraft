@@ -17,18 +17,22 @@ Export Settings… / Import Settings… move all settings to another Mac in one 
 
 ## Own files
 
-engine `prefs/settings_sync.rs` + `settings_sync/tests.rs`, `prefs/settings_folder.rs` (`SyncPrefs`, every target) + `settings_folder/native.rs` + `settings_folder/tests.rs` (the folder, file, clock and commands, not on wasm); ui-egui `prefs/prefs_ui/settings_sync.rs` + `settings_sync_tests.rs`, `prefs/prefs_ui/settings_folder.rs` + `settings_folder_tests.rs`, `panels/brush_size_label_tests.rs`
+engine-core `prefs/settings_sync.rs` + `settings_sync/tests.rs`, `prefs/settings_folder.rs` (`SyncPrefs`, every target) + `settings_folder/native.rs` + `settings_folder/tests.rs` (the folder, file, clock and commands, not on wasm); ui-egui `prefs/prefs_ui/settings_sync.rs` + `settings_sync_tests.rs`, `prefs/prefs_ui/settings_folder.rs` + `settings_folder_tests.rs`, `panels/brush_size_label_tests.rs`
 
 ## Hooks in official files
 
-engine `Cargo.toml` (`chrono` with `clock`, for the Mac's time zone), `lib.rs` (`Session::settings_checks`, `Session::sync_env`, not on wasm), `prefs.rs` (`mod settings_sync`, `mod settings_folder`, the field `sync`), `prefs/cmds.rs` (two specs added, then two more, not on wasm), `shortcut_sets.rs` (`validate` is `pub(crate)`); automation `workspace.rs` (+ test: the two commands with `path` are refused for agents; `sync.*` in `prefs.set` is refused, the two folder commands are allowed); ui-egui `app.rs` (the offer at start, the save on quit), `prefs/prefs_ui.rs` (mods, two re-exports), `prefs_ui/dialogs.rs` (route, OK on the prompt), `prefs_ui/fields.rs` (icons beside the search field, the Sync Folder row, prompt body), `dialogs.rs` (OK reads Import), `menus/items.rs` (menu order, four items), `panels.rs` (test mod), `panels/brush_controls.rs` (brush size text 2 pt higher, preview 1 pt higher)
+engine-core `Cargo.toml` (`chrono` with `clock`, for the Mac's time zone), `lib.rs` (`Session::settings_checks`, `Session::sync_env`, not on wasm), `prefs.rs` (`mod settings_sync`, `mod settings_folder`, the field `sync`), `prefs/cmds.rs` (two specs added, then two more, not on wasm), `shortcut_sets.rs` (`validate` is `pub(crate)`); automation `workspace.rs` (+ test: the two commands with `path` are refused for agents; `sync.*` in `prefs.set` is refused, the two folder commands are allowed); ui-egui `app.rs` (the offer at start, the save on quit), `prefs/prefs_ui.rs` (mods, two re-exports), `prefs_ui/dialogs.rs` (route, OK on the prompt), `prefs_ui/fields.rs` (icons beside the search field, the Sync Folder row, prompt body), `dialogs.rs` (OK reads Import), `menus/items.rs` (menu order, four items), `panels.rs` (test mod), `panels/brush_controls.rs` (brush size text 2 pt higher, preview 1 pt higher)
 
 ## Tests
 
-engine `settings_sync settings_folder`, automation `automation_rejects_ambient_path`, ui-egui `settings_sync settings_folder brush_size_label`
+engine-core `settings_sync settings_folder`, automation `automation_rejects_ambient_path`, ui-egui `settings_sync settings_folder brush_size_label`
 
 ```bash
-cargo test -p photocraft-engine --lib -- settings_sync settings_folder
+cargo test -p photocraft-engine-core --lib -- settings_sync settings_folder
 cargo test -p photocraft-ui-egui --lib -- settings_sync settings_folder brush_size_label
 cargo test -p photocraft-automation --lib -- automation_rejects_ambient_path
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Works: Settings › General ends with Export Settings… / Import Settings… and the Sync Folder block (`prefs_ui/general_row.rs`, hung on the page's last row); the buttons file requests in a bridge (`settings_sync::Bridge`) and `dialogs::take` runs them. The import prompt shows inside the window while it is open (it is app-modal) and on the dialog host otherwise. Edit ▸ Preferences lists the four commands. The offer at start and the save on quit are in `app.rs`. The file's Context Menus part is checked with `menu_custom::backup` (`settings_sync::context_menus_check`), and an export takes the open window's arrangement (`dialogs::context_menus_draft`). Gone with the old window: the draft replacement after an import (the window's unedited rows follow the saved values). `panels/brush_size_label_tests.rs` stays compiled out: the brush chip it measures is gone (craft draws the options bar). Rebuild: nothing for the Settings side.

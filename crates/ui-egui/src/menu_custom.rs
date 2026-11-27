@@ -96,42 +96,56 @@ pub fn store(app: &mut PhotocraftApp, custom: &Custom) {
     }
 }
 
-/// The Preferences dialog's field holding the arrangement being edited: the page works on this
-/// draft, and OK or Apply saves it ([`commit`]); Cancel drops it, so nothing reaches the
-/// preferences or the disk.
-pub const DRAFT: &str = "__contextMenus";
+/// The key of the Context Menus page's value in the Preferences window's document: the arrangement as JSON text,
+/// empty when nothing is arranged (a TOML table holds no null). The page works on this draft, and OK or Apply
+/// saves it (`prefs_ui` `write_edits`, through [`store`]); Cancel drops it, so nothing reaches the preferences.
+pub const KEY: &str = "contextMenus.arrangement";
 
-/// The open Preferences dialog's draft, when one is open.
-fn draft_mut(app: &mut PhotocraftApp) -> Option<&mut Value> {
-    app.ui.dialogs.iter_mut().find(|d| crate::prefs_ui::is_preferences(&d.fields)).and_then(|d| d.fields.get_mut(DRAFT))
+/// What a button of the page asks the app to do once the window's pass is over.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ask {
+    Export,
+    Import,
 }
 
-/// What the page shows: the open Preferences dialog's draft, else what is saved.
-pub fn current(app: &mut PhotocraftApp) -> Custom {
-    match draft_mut(app) {
-        Some(draft) => Custom::from_value(draft),
+/// The asks the page made this pass, shared by the copies of the window's custom rows.
+#[derive(Clone, Debug, Default)]
+pub struct Asks(std::sync::Arc<std::sync::Mutex<Vec<Ask>>>);
+
+impl Asks {
+    pub fn push(&self, ask: Ask) {
+        if let Ok(mut asks) = self.0.lock() {
+            asks.push(ask);
+        }
+    }
+
+    pub fn take(&self) -> Vec<Ask> {
+        self.0.lock().map(|mut asks| std::mem::take(&mut *asks)).unwrap_or_default()
+    }
+}
+
+/// The arrangement as the draft keeps it (text) and back.
+pub fn to_text(value: &Value) -> String {
+    if value.is_null() { String::new() } else { value.to_string() }
+}
+
+pub fn from_text(text: &str) -> Value {
+    serde_json::from_str(text).unwrap_or(Value::Null)
+}
+
+/// What the page shows: the open Preferences window's draft, else what is saved.
+pub fn current(app: &PhotocraftApp) -> Custom {
+    match crate::prefs_ui::context_menus_draft(app) {
+        Some(draft) => Custom::from_value(&draft),
         None => load(app),
     }
 }
 
-/// Make `custom` the arrangement being edited (the saved one when no Preferences dialog is open).
+/// Make `custom` the arrangement being edited (the saved one when no Preferences window is open).
 pub fn set_current(app: &mut PhotocraftApp, custom: &Custom) {
-    match draft_mut(app) {
-        Some(draft) => *draft = custom.to_value(),
-        None => store(app, custom),
+    if !crate::prefs_ui::set_context_menus_draft(app, &custom.to_value()) {
+        store(app, custom);
     }
-}
-
-/// OK or Apply on Preferences: the draft in `fields` becomes the saved arrangement.
-pub fn commit(app: &mut PhotocraftApp, fields: &serde_json::Map<String, Value>) {
-    if let Some(draft) = fields.get(DRAFT) {
-        store(app, &Custom::from_value(draft));
-    }
-}
-
-/// Does the draft in `fields` differ from what is saved?
-pub fn changed(app: &PhotocraftApp, fields: &serde_json::Map<String, Value>) -> bool {
-    fields.get(DRAFT).is_some_and(|draft| Custom::from_value(draft) != load(app))
 }
 
 /// The rows of menu `key` as arranged in `saved` (the preferences' value), over `default`, the

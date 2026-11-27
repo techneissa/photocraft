@@ -40,3 +40,95 @@
 	Preparing SAM 3 for this image… (Esc stops it)	Förbereder SAM 3 för den här bilden… (Esc avbryter)
 	SAM 3 is ready	SAM 3 är redo
 	SAM 3 stopped, Classic selects for now	SAM 3 stoppades, Klassisk markerar tills vidare
+# Home recent files (fork/home-recent-grid.md)
+	Recent files on Home	Senaste filer på Hem
+	Just now	Nyss
+	{n} min ago	{n} min sedan
+	{n} h ago	{n} tim sedan
+	Yesterday	Igår
+# Settings pages rebuilt on the craft UI: AI Models, Settings sync, close keys, Double Exposure (fork/settings-sync.md and others)
+	 ({n} skipped)	 ({n} hoppades över)
+	Could not write {path}: {e}	Kunde inte skriva {path}: {e}
+	Export Settings…	Exportera inställningar…
+	Exported settings to {path}	Inställningar exporterade till {path}
+	Import Settings…	Importera inställningar…
+	Imported settings from {file}	Inställningar importerade från {file}
+	Imported settings, but could not save them: {e}	Inställningarna importerades men kunde inte sparas: {e}
+	Keep in Sync	Håll synkroniserad
+	Load from Folder	Läs in från mapp
+	None chosen	Ingen vald
+	Not available on this computer	Finns inte på den här datorn
+	Not in this PhotoCraft, skipped: {names}	Finns inte i den här PhotoCraft, hoppades över: {names}
+	Not in this PhotoCraft, skipped: {names} and {n} more	Finns inte i den här PhotoCraft, hoppades över: {names} och {n} till
+	Remove for Every ArtCraft App?	Ta bort för alla ArtCraft-appar?
+	Replace these settings with those in {file}?	Ersätta de här inställningarna med dem i {file}?
+	Save to Folder	Spara i mapp
+	Save your changes to Preferences before closing?	Spara ändringarna i inställningarna innan du stänger?
+	Saved on {computer}, {when}	Sparades på {computer}, {when}
+	Saved settings to {path}	Inställningar sparade i {path}
+	Spelling Dictionary	Stavningsordlista
+	Sync Folder	Synkmapp
+	This isn't a PhotoCraft settings file: it is too big	Det här är ingen PhotoCraft-inställningsfil: den är för stor
+	This isn't a PhotoCraft settings file: it isn't text	Det här är ingen PhotoCraft-inställningsfil: den är inte text
+	Tool Options and View Settings	Verktygsalternativ och visningsinställningar
+	Use This Folder	Använd den här mappen
+	Workspaces and Panels	Arbetsytor och paneler
+	{n} skipped: {first}	{n} hoppades över: {first}
+	Lock the Background Layer	Lås bakgrundslagret
+	Double Exposure button	Dubbelexponering-knapp
+	Double Exposure	Dubbelexponering
+	Context Menus	Snabbmenyer
+# Refine Hair and Protect Subject in Select and Mask (fork/refine-hair.md)
+	Stop Refine Hair	Stoppa Förfina hår
+	Protect Subject	Skydda motivet
+	Needs SAM 3 (Preferences › AI Models)	Kräver SAM 3 (Inställningar › AI-modeller)
+	Preparing SAM 3 for this image… (Esc closes Select and Mask)	Förbereder SAM 3 för den här bilden… (Esc stänger Markera och maskera)
+	Refine Hair is waiting for SAM 3 (Stop Refine Hair first)	Förfina hår väntar på SAM 3 (stoppa Förfina hår först)
+	Refine Hair stopped	Förfina hår stoppades
+	Refine Hair ran without Protect Subject	Förfina hår kördes utan Skydda motivet
+	SAM 3 isn't ready, Refine Hair ran without Protect Subject	SAM 3 är inte redo, Förfina hår kördes utan Skydda motivet
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	Ackord och villkor
+	Search commands, chords, conditions	Sök kommandon, ackord, villkor
+	Export	Exportera
+	Import	Importera
+	Export Shortcuts as JSON…	Exportera kortkommandon som JSON…
+	Import Shortcuts from JSON…	Importera kortkommandon från JSON…
+	A chord is two keys in a row; a condition limits where a command's keys work.	Ett ackord är två tangenter i rad; ett villkor begränsar var ett kommandos tangenter fungerar.
+	Press two keys…	Tryck två tangenter…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	Klicka och tryck två tangenter i rad. Esc avbryter, ⌫ tar bort ackordet.
+	Always	Alltid
+	That is not a chord: press two keys in a row.	Det är inget ackord: tryck två tangenter i rad.
+	Imported {file}. The shortcuts are saved.	{file} importerades. Kortkommandona är sparade.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} är också kortkommandot för {command}: det väntar på ackordets andra tangent.
+	{key} is also used by {command} in the same context.	{key} används också av {command} i samma sammanhang.
+	{key} was pressed, but no shortcut continues with that key	{key} trycktes, men inget kortkommando fortsätter med den tangenten
+	{count} shortcut condition(s) in your settings could not be read and are ignored	{count} kortkommandovillkor i dina inställningar kunde inte läsas och ignoreras
+	and {count} more	och {count} till
+	Color: {name}	Färg: {name}
+	Red	Röd
+	Orange	Orange
+	Yellow	Gul
+	Green	Grön
+	Blue	Blå
+	Violet	Violett
+	Gray	Grå
+	Add Condition	Lägg till villkor
+	The shortcut works only while…	Kortkommandot fungerar bara medan…
+	Back	Tillbaka
+	Is	Är
+	Is Not	Är inte
+
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Tilldela kortkommando…
+@id	settingsPage.contextMenus	Snabbmenyer
+	Take out of the menu	Ta bort från menyn
+	Add to the menu	Lägg till i menyn
+	Add Separator	Lägg till avgränsare
+	Move up	Flytta upp
+	Move down	Flytta ned
+	Search commands	Sök kommandon
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Öppna som lager…
+	Place Photo	Placera foto
+	Duplicated to {document}	Duplicerad till {document}

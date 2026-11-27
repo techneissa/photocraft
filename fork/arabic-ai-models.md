@@ -23,3 +23,7 @@ ui-egui `i18n/ar.tsv` (13 lines appended)
 ```bash
 cargo test -p photocraft-ui-egui --lib -- ai_models
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Works: the Arabic rows (and the Swedish ones) are in `fork/i18n/ar.tsv` and `sv.tsv`, with the new text of the rebuilt pages. Rebuild: nothing.

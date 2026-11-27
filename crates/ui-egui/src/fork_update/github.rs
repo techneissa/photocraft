@@ -22,13 +22,13 @@ pub struct Github;
 
 impl Fetch for Github {
     fn get(&self, url: &str) -> Result<Reply, String> {
-        use craft_update::http::Fetched;
-        let http = craft_update::Http::new("PhotoCraft/Update")?;
+        use craft::update::http::Fetched;
+        let http = craft::update::Http::new("PhotoCraft/Update")?;
         match http.get_api(url, None).map_err(friendly)? {
             Fetched::Body { text, .. } => Ok(Reply::Body(text)),
             Fetched::NotFound => Ok(Reply::NotFound),
             Fetched::RateLimited { reset } => {
-                let minutes = reset.map(|at| u64::try_from(at.saturating_sub(craft_update::now()).max(0)).unwrap_or(0).div_ceil(60));
+                let minutes = reset.map(|at| u64::try_from(at.saturating_sub(craft::update::now()).max(0)).unwrap_or(0).div_ceil(60));
                 Ok(Reply::RateLimited { minutes })
             }
             Fetched::NotModified => Err("GitHub sent an answer this check did not ask for.".into()),

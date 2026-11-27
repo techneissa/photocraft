@@ -5,6 +5,9 @@
 //!
 //! The check reads the `custom-build` release of the fork ([`release::REPO`]) and asks GitHub's
 //! compare API whether its commit is ahead of the app's own ([`route::own_commit`]).
+//!
+//! Since the official interface moved onto the craft UI, the window is craft-update's check dialog
+//! ([`dialog`]); the Settings row is `ui.rs`.
 
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, TryRecvError, channel};
@@ -13,6 +16,7 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 
+mod dialog;
 mod github;
 pub mod release;
 mod route;
@@ -25,6 +29,13 @@ use github::{Fetch, Github};
 /// The official update check never runs in this fork's build. `false` would give the official
 /// check back (its own tests run with it off).
 pub const OFFICIAL_CHECK_OFF: bool = true;
+
+/// Whether a new app hands the update check to this module: always in the app, never in the
+/// official check's own tests (`updates_ui`), which run it with the switch off. The tests of this
+/// module turn it on ([`Runtime::with_parts`]), with every outside part faked.
+pub(crate) const fn official_off_default() -> bool {
+    OFFICIAL_CHECK_OFF && !cfg!(test)
+}
 
 /// What the check says, as shown to the user.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -102,13 +113,26 @@ pub(crate) struct Runtime {
     started: bool,
     pending: Option<(Pending, Origin)>,
     parts: Parts,
+    /// The commit of the build a check found ready ([`Outcome::Ready`]).
+    built: Option<String>,
+    /// The check window on the craft dialog host, while it is open ([`dialog`]).
+    dialog: Option<craft::ui::dialog::DialogId>,
 }
 
 impl Default for Runtime {
     fn default() -> Self {
         // The official check's own tests (`updates_ui`) run with the switch off; the tests of this
         // module turn it on (`Runtime::with_parts`), with every outside part faked.
-        Self { state: State::Idle, official_off: OFFICIAL_CHECK_OFF && !cfg!(test), open: false, started: false, pending: None, parts: Parts::default() }
+        Self {
+            state: State::Idle,
+            official_off: official_off_default(),
+            open: false,
+            started: false,
+            pending: None,
+            parts: Parts::default(),
+            built: None,
+            dialog: None,
+        }
     }
 }
 
@@ -146,6 +170,10 @@ fn start(app: &mut PhotocraftApp, origin: Origin) {
 /// Take a finished answer: the state, and whether the window opens.
 fn finish(app: &mut PhotocraftApp, origin: Origin, result: Result<Outcome, String>) {
     let rt = &mut app.fork_update_rt;
+    rt.built = match &result {
+        Ok(Outcome::Ready(commit)) => Some(commit.clone()),
+        _ => None,
+    };
     rt.state = match result {
         Ok(Outcome::UpToDate) => State::UpToDate,
         Ok(Outcome::Ready(_)) => State::Ready,
@@ -186,7 +214,7 @@ pub(crate) fn check(app: &mut PhotocraftApp, _ctx: &egui::Context, params: Value
 }
 
 /// Every frame (through `updates_ui::tick`): take an answer, and check once at start.
-pub(crate) fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
+pub(crate) fn tick(app: &mut PhotocraftApp) {
     poll(app);
     if !app.fork_update_rt.started {
         app.fork_update_rt.started = true;
@@ -195,7 +223,7 @@ pub(crate) fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
     }
     if app.fork_update_rt.state == State::Checking {
-        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        app.ctx().request_repaint_after(std::time::Duration::from_millis(100));
     }
 }
 
@@ -210,9 +238,11 @@ pub(crate) fn update(app: &mut PhotocraftApp) {
     };
 }
 
-pub(crate) use ui::{row_matches, settings_row, show};
+pub(crate) use dialog::show;
+pub(crate) use ui::{Click, run as run_settings, settings_row};
 
-#[cfg(test)]
-mod snapshots;
+// fork: awaiting rebuild on craft UI, see fork/fork-update-check.md (pictures of the Settings row and the old window).
+// #[cfg(test)]
+// mod snapshots;
 #[cfg(test)]
 mod tests;

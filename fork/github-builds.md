@@ -21,8 +21,9 @@ the whole workspace.
 
 It runs on ten machines at once (`--part 1/10` to `10/10`; the plan is `fork/affected.py`, printed by
 `python3 -I fork/affected.py --full --summary`). Machine 1 runs only fmt, clippy, layers and the web check. Machine 2
-tests the packages above the engine (app, CLI, automation, web), machines 3 and 4 the other packages, 5 and 6 the
-engine's tests in halves (the first also runs panic_hunt), 7 to 10 ui-egui's tests in quarters. Compiling is most of a
+tests the packages above engine-core (the top crate `engine` with panic_hunt, engine-paint, engine-vector, app, CLI,
+automation, web), machines 3 and 4 the other packages, 5 and 6 engine-core's tests in halves, 7 to 10 ui-egui's tests
+in quarters (the engine split of the 2026-11-27 official merge; the engine weights are estimates until a run measures them). Compiling is most of a
 machine's time, so a package's tests are split only where they are long. Each machine runs its own doc tests.
 The dependency cache is saved by one machine per cache name, and GitHub drops a cache unused for 7 days: the first run
 after a quiet week or a large official merge compiles everything and is the slow one.

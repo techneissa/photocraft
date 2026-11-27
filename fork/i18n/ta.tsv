@@ -3,3 +3,49 @@
 	AI Models	AI மாதிரிகள்
 	subject segmentation (BiRefNet-lite)	பொருள் பிரிப்பு (BiRefNet-lite)
 	inpainting (LaMa)	இடைவெளி நிரப்புதல் (LaMa)
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	நாண்கள் மற்றும் நிபந்தனைகள்
+	Search commands, chords, conditions	கட்டளைகள், நாண்கள், நிபந்தனைகளைத் தேடு
+	Export	ஏற்றுமதி
+	Import	இறக்குமதி
+	Export Shortcuts as JSON…	குறுக்குவழிகளை JSON ஆக ஏற்றுமதி செய்…
+	Import Shortcuts from JSON…	JSON இலிருந்து குறுக்குவழிகளை இறக்குமதி செய்…
+	A chord is two keys in a row; a condition limits where a command's keys work.	நாண் என்பது தொடர்ச்சியாக அழுத்தும் இரு விசைகள்; நிபந்தனை, கட்டளையின் விசைகள் எங்கே செயல்படும் என்பதை வரையறுக்கும்.
+	Press two keys…	இரண்டு விசைகளை அழுத்தவும்…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	கிளிக் செய்து, தொடர்ச்சியாக இரண்டு விசைகளை அழுத்தவும். Esc ரத்து செய்யும், ⌫ நாணை அகற்றும்.
+	Always	எப்போதும்
+	That is not a chord: press two keys in a row.	இது நாண் அல்ல: தொடர்ச்சியாக இரண்டு விசைகளை அழுத்தவும்.
+	Imported {file}. The shortcuts are saved.	{file} இறக்குமதி செய்யப்பட்டது. குறுக்குவழிகள் சேமிக்கப்பட்டன.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} என்பது {command} இன் குறுக்குவழியும் ஆகும்: அது நாணின் இரண்டாவது விசைக்காகக் காத்திருக்கும்.
+	{key} is also used by {command} in the same context.	அதே சூழலில் {command} உம் {key} ஐப் பயன்படுத்துகிறது.
+	{key} was pressed, but no shortcut continues with that key	{key} அழுத்தப்பட்டது, ஆனால் அந்த விசையுடன் தொடரும் குறுக்குவழி எதுவும் இல்லை
+	{count} shortcut condition(s) in your settings could not be read and are ignored	அமைப்புகளில் {count} குறுக்குவழி நிபந்தனைகளைப் படிக்க முடியவில்லை; அவை புறக்கணிக்கப்படும்
+	and {count} more	மேலும் {count}
+	Color: {name}	நிறம்: {name}
+	Red	சிவப்பு
+	Orange	ஆரஞ்சு
+	Yellow	மஞ்சள்
+	Green	பச்சை
+	Blue	நீலம்
+	Violet	ஊதா
+	Gray	சாம்பல்
+	Add Condition	நிபந்தனையைச் சேர்
+	The shortcut works only while…	குறுக்குவழி இந்த நேரத்தில் மட்டுமே செயல்படும்…
+	Back	பின்
+	Is	ஆகும்
+	Is Not	அல்ல
+
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	குறுக்குவழி ஒதுக்கு…
+@id	settingsPage.contextMenus	சூழல் மெனுக்கள்
+	Context Menus	சூழல் மெனுக்கள்
+	Take out of the menu	மெனுவிலிருந்து நீக்கு
+	Add to the menu	மெனுவில் சேர்
+	Add Separator	பிரிப்பானைச் சேர்
+	Move up	மேலே நகர்த்து
+	Move down	கீழே நகர்த்து
+	Search commands	கட்டளைகளைத் தேடு
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	அடுக்குகளாகத் திற…
+	Place Photo	புகைப்படத்தை வை
+	Duplicated to {document}	{document} இல் நகலெடுக்கப்பட்டது

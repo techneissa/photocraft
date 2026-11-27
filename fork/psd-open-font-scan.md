@@ -23,3 +23,7 @@ PSD opens no longer stall on the font scan (upstream issue #9624): fontique regi
 ```bash
 cargo test -p photocraft-text --lib -- big_collection
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Works: big font collections register from memory (`crates/text`). Rebuild: nothing.

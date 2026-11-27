@@ -3,3 +3,49 @@
 	AI Models	ხელოვნური ინტელექტის მოდელები
 	subject segmentation (BiRefNet-lite)	ობიექტის სეგმენტაცია (BiRefNet-lite)
 	inpainting (LaMa)	არეების შევსება (LaMa)
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	აკორდები და პირობები
+	Search commands, chords, conditions	ბრძანებების, აკორდების, პირობების ძებნა
+	Export	ექსპორტი
+	Import	იმპორტი
+	Export Shortcuts as JSON…	მალსახმობების ექსპორტი JSON-ად…
+	Import Shortcuts from JSON…	მალსახმობების იმპორტი JSON-იდან…
+	A chord is two keys in a row; a condition limits where a command's keys work.	აკორდი ზედიზედ დაჭერილი ორი ღილაკია; პირობა ზღუდავს, სად მუშაობს ბრძანების ღილაკები.
+	Press two keys…	დააჭირეთ ორ ღილაკს…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	დააწკაპუნეთ, შემდეგ ზედიზედ დააჭირეთ ორ ღილაკს. Esc აუქმებს, ⌫ შლის აკორდს.
+	Always	ყოველთვის
+	That is not a chord: press two keys in a row.	ეს აკორდი არ არის: ზედიზედ დააჭირეთ ორ ღილაკს.
+	Imported {file}. The shortcuts are saved.	{file} შემოტანილია. მალსახმობები შენახულია.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} არის {command}-ის მალსახმობიც: ელოდება აკორდის მეორე ღილაკს.
+	{key} is also used by {command} in the same context.	{key}-ს იმავე კონტექსტში {command}-იც იყენებს.
+	{key} was pressed, but no shortcut continues with that key	დაჭერილია {key}, მაგრამ ამ ღილაკით არცერთი მალსახმობი არ გრძელდება
+	{count} shortcut condition(s) in your settings could not be read and are ignored	პარამეტრებში {count} მალსახმობის პირობა ვერ წაიკითხა და იგნორირებულია
+	and {count} more	და კიდევ {count}
+	Color: {name}	ფერი: {name}
+	Red	წითელი
+	Orange	ნარინჯისფერი
+	Yellow	ყვითელი
+	Green	მწვანე
+	Blue	ლურჯი
+	Violet	იისფერი
+	Gray	ნაცრისფერი
+	Add Condition	პირობის დამატება
+	The shortcut works only while…	მალსახმობი მუშაობს მხოლოდ მაშინ, როცა…
+	Back	უკან
+	Is	არის
+	Is Not	არ არის
+
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	მალსახმობის მინიჭება…
+@id	settingsPage.contextMenus	კონტექსტური მენიუები
+	Context Menus	კონტექსტური მენიუები
+	Take out of the menu	მენიუდან ამოღება
+	Add to the menu	მენიუში დამატება
+	Add Separator	გამყოფის დამატება
+	Move up	ზევით გადატანა
+	Move down	ქვევით გადატანა
+	Search commands	ბრძანებების ძებნა
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	გახსნა ფენებად…
+	Place Photo	ფოტოს განთავსება
+	Duplicated to {document}	დუბლირებულია დოკუმენტში {document}

@@ -1,104 +1,104 @@
 //! The Curves dialog's black point and white point sliders under the graph, and its Show Clipping
 //! checkbox. The sliders move the curve's first and last point along the input axis, as
 //! Photoshop's do; Alt-dragging one (or dragging one with Show Clipping on) shows what the curve
-//! clips on the canvas (`levels_clipping.rs`, `curves_clipping.rs`).
-use super::{Color32, Edit, EditorCx, Rect, Sense, Stroke, Tokens, pos2, widgets};
+//! clips on the canvas (`levels_clipping.rs`, `curves_clipping.rs`). The framework's Curves panel has
+//! neither, so the host draws them in a row of its own under the panel (fork/levels-curves-clipping.md).
+use craft::behavior::{EditEvents, Mixed};
+use craft::imaging::ui::adjust::{LevelsClip, ToneCurves};
+use craft::imaging::ui::curve::{Curve, CurveRules};
+use craft::ui::choice::Checkbox;
+use craft::ui::contract::{Bind, Props, Show};
+use craft::ui::value_drag::{Order, Thumb, ThumbRow};
 
-/// Which end slider is held in the Curves editor rooted at `mem` (0 black point, 1 white point).
-fn drag_id(mem: egui::Id) -> egui::Id {
-    mem.with("curves-point-drag")
+use super::AdjustValue;
+
+/// Whole levels, as the panel's own rules (`curves_panel.rs`).
+const RULES: CurveRules = CurveRules::new(255.0, 16);
+
+/// The input of the first and last point of `curve` (black point, white point); `None` for a drawn curve.
+pub(super) fn ends(curve: &Curve) -> Option<[f64; 2]> {
+    let points = curve.points()?;
+    Some([f64::from(points.first()?[0]), f64::from(points.last()?[0])])
 }
 
-fn show_clipping_id(mem: egui::Id) -> egui::Id {
-    mem.with("curves-show-clipping")
+/// `curve` with its first point's input at `black` and its last at `white` (whole levels, each strictly between its
+/// neighbours' inputs); the outputs and the corner flags stay.
+pub(super) fn with_ends(curve: &Curve, [black, white]: [f64; 2]) -> Curve {
+    let Some(points) = curve.points() else { return curve.clone() };
+    let mut points = points.to_vec();
+    let corners: Vec<bool> = (0..points.len()).map(|i| curve.is_corner(i)).collect();
+    if let Some(last) = points.len().checked_sub(1) {
+        let (first_out, last_out) = (points[0][1], points[last][1]);
+        RULES.move_to(&mut points, 0, [black as f32, first_out]);
+        RULES.move_to(&mut points, last, [white as f32, last_out]);
+    }
+    Curve::from_parts(points, corners)
 }
 
-/// The end slider being dragged in the editor rooted at `mem`, as of its last frame.
-pub(crate) fn curves_drag(ctx: &egui::Context, mem: egui::Id) -> Option<u8> {
-    ctx.data(|d| d.get_temp::<Option<u8>>(drag_id(mem))).flatten()
+/// The clipping display of a drag on thumb `thumb` (0 black point, 1 white point): while Alt is held, or Show Clipping
+/// is on.
+pub(super) fn clip_of(thumb: usize, alt: bool, show: bool) -> Option<LevelsClip> {
+    (alt || show).then_some(if thumb == 0 { LevelsClip::Shadows } else { LevelsClip::Highlights })
 }
 
-/// Whether the Show Clipping checkbox of the editor rooted at `mem` is on.
-pub(crate) fn show_clipping(ctx: &egui::Context, mem: egui::Id) -> bool {
-    ctx.data(|d| d.get_temp::<bool>(show_clipping_id(mem))).unwrap_or(false)
+/// What [`point_row`] reports.
+pub(super) struct PointRow {
+    /// The edits of the sliders, as dialog values.
+    pub edit: EditEvents<AdjustValue>,
+    /// The clipping display the sliders ask for now.
+    pub clipping: Option<LevelsClip>,
 }
 
-/// Mirror the Show Clipping checkbox into the dialog's `__showClipping` field and back, so the
-/// control channel can set it: a value that differs from the last one mirrored wins.
-pub(crate) fn sync_show_clipping(ctx: &egui::Context, mem: egui::Id, fields: &mut serde_json::Map<String, serde_json::Value>) {
-    let last_id = mem.with("curves-show-clipping-last");
-    let last: Option<bool> = ctx.data(|d| d.get_temp(last_id));
-    let field = fields.get("__showClipping").and_then(serde_json::Value::as_bool);
-    let on = match field {
-        Some(f) if Some(f) != last => {
-            ctx.data_mut(|d| d.insert_temp(show_clipping_id(mem), f));
-            f
+/// The black point and white point sliders and the Show Clipping checkbox for the `channel` curve of `curves`. A drag
+/// is written into `curves` as it goes. Shows nothing for a drawn curve (pencil mode has no points).
+pub(super) fn point_row(ui: &mut egui::Ui, curves: &mut ToneCurves, channel: usize) -> PointRow {
+    let mut row = PointRow { edit: EditEvents::new(), clipping: None };
+    let Some(current) = curves.curves.get(channel).and_then(ends) else { return row };
+    let id = ui.make_persistent_id("curves-show-clipping");
+    let mut show = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
+    if Checkbox::new(Bind::bound(&mut show)).label(tl!("Show Clipping")).show(ui).value().is_some() {
+        ui.data_mut(|d| d.insert_temp(id, show));
+    }
+    let thumbs = [
+        Thumb::new(tl!("Black Point")).order(Order::between(None, Some(1), 1.0)).alt_reports(),
+        Thumb::new(tl!("White Point")).order(Order::between(Some(0), None, 1.0)).alt_reports(),
+    ];
+    let out = ThumbRow::new(Bind::given(current.map(Mixed::Same)), 0.0..=255.0).step(1.0).thumbs(thumbs).show(ui);
+    let base = curves.clone();
+    let lift = |pair: [Mixed<f64>; 2]| {
+        let [Mixed::Same(black), Mixed::Same(white)] = pair else { return AdjustValue::Curves { curves: base.clone() } };
+        let mut next = base.clone();
+        if let Some(slot) = next.curves.get_mut(channel) {
+            *slot = with_ends(slot, [black, white]);
         }
-        _ => show_clipping(ctx, mem),
+        AdjustValue::Curves { curves: next }
     };
-    if field != Some(on) {
-        fields.insert("__showClipping".into(), serde_json::Value::Bool(on));
+    for event in out.edit.events.iter() {
+        if let Some(AdjustValue::Curves { curves: landed }) = event.clone().map(lift).landed() {
+            *curves = landed.clone();
+        }
     }
-    ctx.data_mut(|d| d.insert_temp(last_id, on));
+    row.edit = out.edit.events.map(lift);
+    row.clipping = out.held.and_then(|held| clip_of(held.thumb, held.mods.alt, show));
+    row
 }
 
-/// Where the slider strip sits under a graph (the gradient bar is above it).
-pub(crate) fn strip(graph: Rect) -> Rect {
-    Rect::from_min_max(pos2(graph.left() - 6.0, graph.bottom() + 12.0), pos2(graph.right() + 6.0, graph.bottom() + 24.0))
-}
-
-/// A triangular handle pointing up at the gradient bar.
-fn handle(p: &egui::Painter, x: f32, y: f32, fill: Color32, stroke: Color32) {
-    p.add(egui::Shape::convex_polygon(vec![pos2(x, y), pos2(x + 5.5, y + 9.0), pos2(x - 5.5, y + 9.0)], fill, Stroke::new(1.0, stroke)));
-}
-
-/// The black point and white point sliders under the graph: they sit at the first and last point
-/// of `pts` and move its input. Returns what the drag changed.
-pub(super) fn point_sliders(ui: &mut egui::Ui, cx: &EditorCx, graph: Rect, pts: &mut [[f32; 2]]) -> (bool, Edit) {
-    let t = Tokens::get(ui.ctx());
-    let mut e = Edit::default();
-    let mut changed = false;
-    let Some((first, last)) = pts.first().copied().zip(pts.last().copied()) else { return (false, e) };
-    if !graph.is_finite() || graph.width() <= 0.0 {
-        return (false, e);
-    }
-    let bar = strip(graph);
-    let resp = ui.interact(bar, cx.mem.with("curves-point-strip"), Sense::click_and_drag());
-    let xpos = |val: f32| graph.left() + val / 255.0 * graph.width();
-    let xval = |x: f32| ((x - graph.left()) / graph.width() * 255.0).clamp(0.0, 255.0);
-    let id = drag_id(cx.mem);
-    let mut which: Option<u8> = ui.data(|d| d.get_temp(id)).flatten();
-    if resp.is_pointer_button_down_on()
-        && ui.input(|i| i.pointer.primary_pressed())
-        && let Some(pos) = ui.input(|i| i.pointer.press_origin())
-    {
-        which = super::levels::nearest(&[xpos(first[0]), xpos(last[0])], pos.x);
-    }
-    if resp.is_pointer_button_down_on()
-        && let (Some(k), Some(pos)) = (which, ui.input(|i| i.pointer.interact_pos()))
-    {
-        let (i, old) = if k == 0 { (0, first) } else { (pts.len() - 1, last) };
-        changed = crate::point_curve::move_to(pts, i, [xval(pos.x), old[1]]);
-    }
-    if which.is_some() && !resp.is_pointer_button_down_on() {
-        which = None;
-        e.commit = true;
-    }
-    ui.data_mut(|d| d.insert_temp(id, which));
-    let p = ui.painter_at(bar.expand(2.0));
-    let (first, last) = (pts.first().copied().unwrap_or(first), pts.last().copied().unwrap_or(last));
-    handle(&p, xpos(first[0]), bar.top() - 1.0, Color32::BLACK, t.text_dim);
-    handle(&p, xpos(last[0]), bar.top() - 1.0, Color32::WHITE, t.text_dim);
-    (changed, e)
-}
-
-/// The Show Clipping checkbox under the graph: with it on, dragging a point slider shows the
-/// clipping display without Alt.
-pub(super) fn show_clipping_row(ui: &mut egui::Ui, cx: &EditorCx) {
-    let id = show_clipping_id(cx.mem);
-    let mut on = show_clipping(ui.ctx(), cx.mem);
-    ui.add_space(2.0);
-    if widgets::checkbox(ui, &mut on, tl!("Show Clipping")).changed() {
-        ui.data_mut(|d| d.insert_temp(id, on));
+#[cfg(test)]
+mod tests {
+    /// The sliders move the first and last point along the input axis and keep their outputs; a drag in the
+    /// framework's point rules stays strictly between neighbours.
+    #[test]
+    fn with_ends_moves_only_the_end_inputs() {
+        use super::*;
+        let curve = Curve::smooth(vec![[0.0, 10.0], [128.0, 140.0], [255.0, 250.0]]);
+        let moved = with_ends(&curve, [30.0, 220.0]);
+        assert_eq!(moved.points().unwrap(), &[[30.0, 10.0], [128.0, 140.0], [220.0, 250.0]]);
+        assert_eq!(ends(&moved), Some([30.0, 220.0]));
+        let squeezed = with_ends(&curve, [200.0, 100.0]);
+        let p = squeezed.points().unwrap();
+        assert!(p[0][0] < p[1][0] && p[1][0] < p[2][0], "{p:?}");
+        assert_eq!(clip_of(0, true, false), Some(LevelsClip::Shadows));
+        assert_eq!(clip_of(1, false, true), Some(LevelsClip::Highlights));
+        assert_eq!(clip_of(1, false, false), None);
     }
 }

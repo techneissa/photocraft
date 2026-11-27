@@ -1,7 +1,8 @@
 use super::display::{canvas_display, display_doc, display_image};
 use super::strokes::live_stroke;
-use super::textures::{effect_reach, ensure_texture};
-use super::{Document, PhotocraftApp, Rect, TextureOptions};
+use super::textures::effect_reach;
+use super::{Document, PhotocraftApp, Rect};
+use egui::TextureOptions;
 
 /// Longest side of the Navigator panel's image (about twice the panel's width, for HiDPI).
 pub const NAVIGATOR_SIDE: u32 = 512;
@@ -11,9 +12,6 @@ pub(crate) type NavigatorCache = (std::sync::Weak<Document>, u64, u64, egui::Tex
 
 /// How long adjustment-dialog settings must stay unchanged before the navigator shows them.
 const NAVIGATOR_SETTLE_MS: f64 = 200.0;
-
-/// The least time between two Navigator pictures while a Free Transform or Warp box moves.
-const NAVIGATOR_LIVE_MS: f64 = 100.0;
 
 /// While a Move or Patch drag or a live paint stroke is under way, the navigator keeps its image
 /// of document `idx` and catches up on release: each step of the drag is a new preview, and a
@@ -40,10 +38,7 @@ pub fn navigator_gpu_view(app: &PhotocraftApp, idx: usize, rect: Rect, ctx: &egu
         zoom: rect.width() / w as f32,
         center: [w as f32 / 2.0, h as f32 / 2.0],
         rotation: 0.0,
-        shadow: false,
-        pixel_grid: false,
         view_key: egui::Id::unique(("pc-navigator", ctx.viewport_id(), idx)).value(),
-        offset: [0.0, 0.0],
         ..params
     })
 }
@@ -69,23 +64,20 @@ pub fn navigator_waits_for_gpu(app: &PhotocraftApp, idx: usize, ctx: &egui::Cont
         return false;
     }
     ctx.data_mut(|d| d.insert_temp(key, waited + 1));
-    ctx.request_repaint();
+    craft::ui::runtime::frame::request_repaint(ctx);
     true
 }
 
 pub fn navigator_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize) -> Option<egui::TextureId> {
-    if app.gpu.is_none() {
-        return ensure_texture(app, ctx, idx, app.session.color.main_display).map(|(t, _)| t);
-    }
     // Keyed by the document snapshot, not its revision: selecting a layer changes no pixels.
     let (snapshot, id, revision, damage_from, last_damage) =
         app.session.documents().get(idx).map(|st| (std::sync::Arc::downgrade(&st.doc), st.doc.id, st.revision, st.damage_from(), st.last_damage))?;
-    let (doc, raw_key) = display_doc(app, idx);
-    // The display depends on the document's profile and mode, which a live transform keeps, so
-    // the cache check below needs none of the transform's CPU work (the moving pixels are drawn
-    // only when the picture has to change, see `navigator_picture`).
+    let (doc, preview_key) = display_doc(app, idx);
+    let raw_key = preview_key;
     let (display, display_key) = canvas_display(app, &doc, None);
-    let preview_key = raw_key ^ display_key;
+    // A tile that fails to read and recovers keeps the snapshot and its revision: the picture and its partial updates
+    // follow the scratch read-error generation too (`crate::scratch_reads`).
+    let preview_key = crate::scratch_reads::with(preview_key ^ display_key);
     let cached = app.navigator_textures.get(&id).cloned();
     if let Some((r, p, _, t)) = &cached
         && r.ptr_eq(&snapshot)
@@ -104,30 +96,16 @@ pub fn navigator_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
         && r.ptr_eq(&snapshot)
         && crate::adjust_preview::settling(app, NAVIGATOR_SETTLE_MS)
     {
-        ctx.request_repaint_after(std::time::Duration::from_millis(NAVIGATOR_SETTLE_MS as u64));
+        craft::ui::runtime::frame::request_repaint_after(ctx, NAVIGATOR_SETTLE_MS / 1000.0);
         return Some(t.id());
     }
     let t0 = crate::gpu_canvas::now_ms();
-    // A live transform makes a new picture per mesh: at most one every NAVIGATOR_LIVE_MS while
-    // the box moves, the last mesh drawn once it stops.
-    if let Some((_, _, _, t)) = &cached
-        && crate::transform_live::is_live_key(raw_key)
-    {
-        let stamp = egui::Id::unique(("navigator-live", id.0));
-        let wait = ctx.data(|d| d.get_temp::<f64>(stamp)).map_or(0.0, |last| NAVIGATOR_LIVE_MS - (t0 - last));
-        if wait > 0.0 {
-            ctx.request_repaint_after(std::time::Duration::from_millis(wait.ceil() as u64));
-            return Some(t.id());
-        }
-        ctx.data_mut(|d| d.insert_temp(stamp, t0));
-    }
     // One edit (or command) since the cached image, with the area it changed: update just that part (nothing
     // for a rename, a selection or a new empty layer). A thumbnail composite of the whole
     // document on every edit cost a full-resolution CPU composite on the UI thread.
     let size = photocraft_compose::thumbnail_size(&doc, NAVIGATOR_SIDE);
     if let Some((_, p, rev, t)) = &cached
         && *p == preview_key
-        && !crate::transform_live::is_live_key(raw_key)
         && (damage_from..revision).contains(rev)
         && let Some(d) = last_damage
         && t.size() == [size.0 as usize, size.1 as usize]
@@ -144,7 +122,12 @@ pub fn navigator_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
         app.navigator_textures.insert(id, (snapshot, preview_key, revision, t.clone()));
         return Some(t.id());
     }
-    let image = display_image(display.as_deref(), &navigator_picture(app, doc, raw_key));
+    // A transform box's moving pixels in place: drawn on a scaled-down copy of a large document, else on the CPU.
+    let buffer = match crate::transform_live::navigator_buffer(app, &doc, raw_key, NAVIGATOR_SIDE) {
+        Some(buffer) => buffer,
+        None => photocraft_compose::thumbnail_buffer(&crate::transform_live::cpu_doc(app, doc.clone(), raw_key), NAVIGATOR_SIDE),
+    };
+    let image = display_image(display.as_deref(), &buffer);
     let tex = match cached {
         Some((_, _, _, mut t)) => {
             t.set(image, TextureOptions::LINEAR);
@@ -155,17 +138,4 @@ pub fn navigator_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
     app.perf.span("navigator", crate::gpu_canvas::now_ms() - t0);
     app.navigator_textures.insert(id, (snapshot, preview_key, revision, tex.clone()));
     Some(tex.id())
-}
-
-/// The Navigator's picture of `doc` shown under preview `key`. A live transform's moving pixels
-/// are drawn on a scaled-down copy (`transform_live::navigator_buffer`); only a document too
-/// small for that, or not a faithful reduction, pays for the full-size CPU composite of
-/// `transform_live::cpu_doc`.
-fn navigator_picture(app: &mut PhotocraftApp, doc: std::sync::Arc<Document>, key: u64) -> photocraft_compose::Buffer {
-    if crate::transform_live::is_live_key(key)
-        && let Some(buf) = crate::transform_live::navigator_buffer(app, &doc, key, NAVIGATOR_SIDE)
-    {
-        return buf;
-    }
-    photocraft_compose::thumbnail_buffer(&crate::transform_live::cpu_doc(app, doc, key), NAVIGATOR_SIDE)
 }

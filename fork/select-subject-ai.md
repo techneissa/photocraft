@@ -10,21 +10,25 @@ AI Select Subject and Remove Subject: upstream PR #8231 taken early (a real merg
 
 ## Own files
 
-from the PR: `crates/ml/` (fork adds `ram.rs`), `crates/engine/src/cmd/remove_subject_cmds.rs`, `apps/photocraft-cli/src/models.rs`, `crates/ui-egui/src/prefs/prefs_ui/ai_models.rs`, `docs/ml.md`, `docs/remove-subject.md`; fork: `crates/engine/examples/select_subject_quickmask.rs`; `crates/ml/src/inpaint.rs` now calls `photocraft-lama` (see [lama.md](lama.md))
+from the PR: `crates/ml/` (fork adds `ram.rs`), `crates/engine-core/src/cmd/remove_subject_cmds.rs`, `apps/photocraft-cli/src/models.rs`, `crates/ui-egui/src/prefs/prefs_ui/ai_models.rs`, `docs/ml.md`, `docs/remove-subject.md`; fork: `crates/engine/examples/select_subject_quickmask.rs`; `crates/ml/src/inpaint.rs` now calls `photocraft-lama` (see [lama.md](lama.md))
 
 ## Hooks in official files
 
-engine `cmd.rs`, `lib.rs`, `cmd/smartselect_cmds.rs` (finder chain, job, cache, notes), `cmd/cutout_cmds.rs`, `cmd/smartselect_macos.rs`, `prefs.rs` (`SubjectEngine::Model`); ui-egui `jobs_ui.rs`, `tools/retouch_ui.rs`, `panels/options_bar.rs`, `prefs/prefs_ui.rs` + `save.rs`, `dialogs.rs`, `fields.rs`, `tests.rs`, 20 `i18n/*.tsv`; CLI `args.rs`, `lib.rs`; `Cargo.toml` (workspace, engine, ui-egui, CLI), `Cargo.lock`, `xtask/src/layers.rs` (`ml`), `ATTRIBUTION.md`, `docs/gaps.md`, `docs/parity-checklist.md`
+engine-core `cmd.rs`, `lib.rs`, `cmd/smartselect_cmds.rs` (finder chain, job, cache, notes), `cmd/cutout_cmds.rs`, `cmd/smartselect_macos.rs`, `prefs.rs` (`SubjectEngine::Model`); ui-egui `jobs_ui.rs`, `tools/retouch_ui.rs`, `panels/options_bar.rs`, `prefs/prefs_ui.rs` + `save.rs`, `dialogs.rs`, `fields.rs`, `tests.rs`, 20 `i18n/*.tsv`; CLI `args.rs`, `lib.rs`; `Cargo.toml` (workspace, engine, ui-egui, CLI), `Cargo.lock`, `xtask/src/layers.rs` (`ml`), `ATTRIBUTION.md`, `docs/gaps.md`, `docs/parity-checklist.md`
 
 ## Tests
 
-`cargo test -p photocraft-ml`, engine `smartselect cutout remove_subject`, ui-egui `retouch_ui prefs_ui jobs_ui`
+`cargo test -p photocraft-ml`, engine-core `smartselect cutout remove_subject`, ui-egui `retouch_ui prefs_ui jobs_ui`
 
 ```bash
-cargo test -p photocraft-engine --lib -- smartselect cutout remove_subject
+cargo test -p photocraft-engine-core --lib -- smartselect cutout remove_subject
 cargo test -p photocraft-ml
 ```
 
 ## When upstream merges
 
 **When upstream merges #8231:** by merge commit, git sees it as merged; if squashed, expect conflicts in `smartselect_cmds.rs`, `cutout_cmds.rs`, `remove_subject_cmds.rs`, `ml/backend.rs`: keep upstream where it matches, re-apply the engine choice and the plan freeing. The merge commit `00f8aa768` does not name `jobs_ui.rs` (a `select.subject` result arm), the rewritten `smartselect_macos.rs` (`step`), `prefs_ui/fields.rs` (~90 lines: section list re-indent, AI Models line), nor `Cargo.lock`'s `itertools` 0.10.5 → 0.13/0.14/0.15 and `winsafe` `crates/ml/src/store.rs`, `install.rs` and `backend.rs` are rewritten by `feat/shared-models` (a model is a folder of `ModelFile`s, `model_location`, `install_dir`, `Source`): if #8231 lands as is, keep the fork's version of those three files and of `inpaint.rs` (it no longer uses the ONNX LaMa), `lib.rs`'s `pub use store::{…}` line, `ai_models.rs` (`found`, `place`) and `models.rs` (`list`).
+
+## After the craft UI merge (2026-11-27)
+
+Works: Settings › AI Models is a page of the craft Settings window (`prefs_ui/ai_models.rs`, drawn by `custom_rows.rs` as a custom page): the Select Subject and Object Selection engine choices, the macOS Vision row and one row per model (state, Download, Remove). The two engine rows are hidden on the Tools page. Downloads live in `Runtime::ai_models` (shared with the window), so closing the window leaves them running. Edit ▸ Remove Subject is in the menu (`menus/items.rs`, after Content-Aware Fill). Rebuild: nothing.

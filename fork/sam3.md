@@ -10,7 +10,7 @@ SAM 3 (Segment Anything with Concepts) in pure Rust on candle, Metal on the Mac:
 
 ## Own files
 
-`crates/sam3/` (`src/service.rs` + tests, `tests/real_model.rs`, `examples/sam3_probe.rs`, README)
+`crates/sam3/` (`src/service.rs` + tests, `tests/it/real_model.rs`, `examples/sam3_probe.rs`, README)
 
 ## Hooks in official files
 
@@ -23,5 +23,9 @@ SAM 3 (Segment Anything with Concepts) in pure Rust on candle, Metal on the Mac:
 ```bash
 cargo test -p photocraft-sam3 --lib
 cargo test -p photocraft-ml --lib
-# real model, by hand: cargo test -p photocraft-sam3 --release --test real_model -- --ignored --nocapture
+# real model, by hand: cargo test -p photocraft-sam3 --release --test it real_model -- --ignored --nocapture
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Works: the crate and its engine commands. Rebuild: nothing (no UI by design).

@@ -13,3 +13,96 @@
 	Confirm remove	تأكيد الإزالة
 	subject segmentation (BiRefNet-lite)	تجزئة الموضوع (BiRefNet-lite)
 	inpainting (LaMa)	ملء الصورة (LaMa)
+# Settings pages rebuilt on the craft UI: AI Models, Settings sync, close keys, Double Exposure (fork/settings-sync.md and others)
+	 ({n} skipped)	 (تم تخطي {n})
+	Could not write {path}: {e}	تعذّرت كتابة {path}: {e}
+	Export Settings…	تصدير الإعدادات…
+	Exported settings to {path}	تم تصدير الإعدادات إلى {path}
+	Import Settings…	استيراد الإعدادات…
+	Import Settings	استيراد الإعدادات
+	Imported settings from {file}	تم استيراد الإعدادات من {file}
+	Imported settings, but could not save them: {e}	تم استيراد الإعدادات لكن تعذّر حفظها: {e}
+	Keep in Sync	إبقاء المزامنة
+	Load from Folder	تحميل من المجلد
+	None chosen	لم يتم اختيار مجلد
+	Not available on this computer	غير متوفر على هذا الكمبيوتر
+	Not in this PhotoCraft, skipped: {names}	غير موجودة في هذا PhotoCraft، تم تخطيها: {names}
+	Not in this PhotoCraft, skipped: {names} and {n} more	غير موجودة في هذا PhotoCraft، تم تخطيها: {names} و{n} أخرى
+	Remove for Every ArtCraft App?	الإزالة من كل تطبيقات ArtCraft؟
+	Replace these settings with those in {file}?	استبدال هذه الإعدادات بالموجودة في {file}؟
+	Save to Folder	حفظ في المجلد
+	Save your changes to Preferences before closing?	هل تريد حفظ تغييراتك على التفضيلات قبل الإغلاق؟
+	Saved on {computer}, {when}	تم الحفظ على {computer}، {when}
+	Saved settings to {path}	تم حفظ الإعدادات في {path}
+	Spelling Dictionary	قاموس الإملاء
+	Sync Folder	مجلد المزامنة
+	This isn't a PhotoCraft settings file: it is too big	هذا ليس ملف إعدادات PhotoCraft: إنه كبير جدًا
+	This isn't a PhotoCraft settings file: it isn't text	هذا ليس ملف إعدادات PhotoCraft: ليس نصًا
+	Tool Options and View Settings	خيارات الأدوات وإعدادات العرض
+	Use This Folder	استخدام هذا المجلد
+	Workspaces and Panels	مساحات العمل واللوحات
+	{n} skipped: {first}	تم تخطي {n}: {first}
+	Lock the Background Layer	قفل طبقة الخلفية
+	Double Exposure button	زر التعريض المزدوج
+	Double Exposure	التعريض المزدوج
+	Context Menus	القوائم السياقية
+	Check for Updates	التحقق من وجود تحديثات
+	Color Settings	إعدادات الألوان
+	Custom Folder	مجلد مخصص
+	Folder: {folder}	المجلد: {folder}
+	Found in: {place}	موجود في: {place}
+	No public download. Put these files in the folder below:	لا يوجد تنزيل عام. ضع هذه الملفات في المجلد أدناه:
+	Object Selection Engine	محرك تحديد الكائنات
+	Old PhotoCraft Folder (read only)	مجلد PhotoCraft القديم (للقراءة فقط)
+	Remove Subject	إزالة العنصر
+	Select Subject Engine	محرك تحديد العنصر
+	Selection by click or by text	التحديد بالنقر أو بالنص
+	Shared Folder	مجلد مشترك
+	The models folder	مجلد النماذج
+	macOS (Apple Vision, Mac only)	macOS (Apple Vision، لأجهزة Mac فقط)
+	Built in	مدمج
+# Keyboard shortcut upgrade and Menus colours (fork/shortcut-upgrade.md, fork/shortcuts-window.md)
+	Chords and Conditions	الأوتار والشروط
+	Search commands, chords, conditions	ابحث عن الأوامر والأوتار والشروط
+	Export	تصدير
+	Import	استيراد
+	Export Shortcuts as JSON…	تصدير الاختصارات بصيغة JSON…
+	Import Shortcuts from JSON…	استيراد الاختصارات من JSON…
+	A chord is two keys in a row; a condition limits where a command's keys work.	الوتر هو مفتاحان متتاليان؛ والشرط يحدّد أين تعمل مفاتيح الأمر.
+	Press two keys…	اضغط مفتاحين…
+	Click, then press two keys in a row. Esc cancels, ⌫ removes the chord.	انقر ثم اضغط مفتاحين متتاليين. Esc يلغي، و⌫ يزيل الوتر.
+	Always	دائمًا
+	That is not a chord: press two keys in a row.	هذا ليس وترًا: اضغط مفتاحين متتاليين.
+	Imported {file}. The shortcuts are saved.	تم استيراد {file}. حُفظت الاختصارات.
+	{key} is also the shortcut of {command}: it waits for the chord's second key.	{key} هو أيضًا اختصار {command}: ينتظر المفتاح الثاني للوتر.
+	{key} is also used by {command} in the same context.	{key} يستخدمه {command} أيضًا في السياق نفسه.
+	{key} was pressed, but no shortcut continues with that key	تم الضغط على {key}، لكن لا يوجد اختصار يتابع بهذا المفتاح
+	{count} shortcut condition(s) in your settings could not be read and are ignored	تعذّرت قراءة {count} من شروط الاختصارات في الإعدادات وسيتم تجاهلها
+	and {count} more	و{count} أخرى
+	Color: {name}	اللون: {name}
+	Red	أحمر
+	Orange	برتقالي
+	Yellow	أصفر
+	Green	أخضر
+	Blue	أزرق
+	Violet	بنفسجي
+	Gray	رمادي
+	Add Condition	إضافة شرط
+	The shortcut works only while…	يعمل الاختصار فقط عندما…
+	Back	رجوع
+	Is	يساوي
+	Is Not	لا يساوي
+
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	تعيين اختصار…
+@id	settingsPage.contextMenus	القوائم السياقية
+	Take out of the menu	إزالة من القائمة
+	Add to the menu	إضافة إلى القائمة
+	Add Separator	إضافة فاصل
+	Move up	نقل لأعلى
+	Move down	نقل لأسفل
+	Search commands	البحث في الأوامر
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	فتح كطبقات…
+	Place Photo	وضع صورة
+	Duplicated to {document}	تم النسخ إلى {document}

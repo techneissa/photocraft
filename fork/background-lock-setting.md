@@ -14,7 +14,7 @@ Settings › General › Lock the Background Layer, off by default. Off, an open
 
 ## Hooks in official files
 
-io `lib.rs` (`mod` line, `ImportOptions::lock_background`, two `apply` calls for flat and raw imports), engine `prefs.rs` (`general.lockBackgroundLayer`), `jobs.rs` (`import_options` passes it), `cmd/file_cmds/open.rs` (`file.openAs` reads with the user's import options), `cmd/file_cmds/tests.rs` (1 test appended), ui-egui `prefs/prefs_ui/fields.rs` (the label)
+io `lib.rs` (`mod` line, `ImportOptions::lock_background`, two `apply` calls for flat and raw imports), engine-core `prefs.rs` (`general.lockBackgroundLayer`), `jobs.rs` (`import_options` passes it), `cmd/file_cmds/open.rs` (`file.openAs` reads with the user's import options), `cmd/file_cmds/tests.rs` (1 test appended), ui-egui `prefs/prefs_ui/fields.rs` (the label)
 
 ## Tests
 
@@ -22,5 +22,9 @@ io `lib.rs` (`mod` line, `ImportOptions::lock_background`, two `apply` calls for
 
 ```bash
 cargo test -p photocraft-io --lib fork_background_lock
-cargo test -p photocraft-engine --lib lock_background_layer_setting
+cargo test -p photocraft-engine-core --lib lock_background_layer_setting
 ```
+
+## After the craft UI merge (2026-11-27)
+
+Works: Settings › General › Lock the Background Layer (off by default; label in `fields.rs`). Rebuild: nothing.

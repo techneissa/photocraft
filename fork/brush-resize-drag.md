@@ -7,19 +7,22 @@ Control+Option+drag with a painting tool (on a Mac; Control+Alt elsewhere) chang
 - It begins on the press, not once egui calls the movement a drag (about 6 points later); the brush stood still until then, and the first stretch was lost.
 - The diameter and hardness move by the pointer's travel and are held at their limits (1 px, the maximum, 0 %, 100 %). Before, they were set from the pointer's distance to where the drag began, so dragging far past a limit (left of the start, or beyond the maximum) and turning back changed nothing until the pointer had retraced the whole overshoot.
 
-Photoshop's look: the brush circle (it stays where the drag began) is filled with a translucent red overlay (Preferences › Cursors › Brush Preview colour, about 50 %) that is solid to the edge for a hard brush and fades out for a soft one; the outline stays; a small dark rounded label beside the pointer reads `Diameter: 120 px`, and `Hardness: 50%` (`Opacity:` with "Vary Round Brush Hardness on HUD" off) once the hardness is being changed.
+Photoshop's look: the brush circle (it stays where the drag began) is filled with a translucent red overlay (Preferences › Cursors › Brush Preview colour, about 50 %) that is solid to the edge for a hard brush and fades out for a soft one; the outline stays; a small dark rounded label beside the pointer always shows Diameter, Hardness and Opacity together (the official label; the fork's earlier label showed Hardness only once it changed).
 
 ## Branch
 
-`fix/brush-resize-drag`
+`feat/step2-brush-resize` (on the craft UI, from `step2/official-merge`)
 
 ## Own files
 
-`crates/ui-egui/src/tools/brush_resize/press.rs`, `look.rs`, `drag_tests.rs`
+`crates/ui-egui/src/tools/brush_resize/press.rs` (the stand-in pointer and its test), `look.rs` (the label rows and the overlay alpha), `drag_tests.rs`
 
 ## Hooks in official files
 
-`tools/brush_resize.rs` (`Resize` keeps the unrounded brush and the last pointer position, `travel` replaces `resized` in `update`, `draw` calls `look`, `mod` lines), `canvas.rs` (three calls in `handle_canvas_tool_stroke`: begin on press and skip egui's drag start and click, feed moves while the button is down, end on release); official test `tools/brush_resize/tests.rs` (the overlay's alpha 110 → 128)
+- `tools/brush_resize.rs`: `PaintResize` keeps `held: Option<press::Held>`; `press` creates it, `drag` and `release` pass the framework's `track` / `finish` the stand-in position, `cancel` drops it; `hud` takes the brush and shows `look::rows`; the preview tint alpha is `look::OVERLAY_ALPHA` (128, was 110); `mod look; mod press; mod drag_tests` lines.
+- `canvas/paint_tool.rs`: the `hud` call passes the brush.
+- No change to storytold/craft-libs. The framework's `BrushResize` sets the values from the pointer's distance to the press, clamped, so turning back after an overshoot waits for the retrace. `Held` moves a stand-in pointer by the real pointer's travel inside the box where both values are within their limits, and gives that to `track`: the framework's own rule, so the preview, the rounding and the readout stay its.
+- Begin-on-press and the red falloff preview (solid hard, fading soft) are the official ones now.
 
 ## Tests
 
@@ -29,4 +32,8 @@ Photoshop's look: the brush circle (it stays where the drag began) is filled wit
 cargo test -p photocraft-ui-egui --lib -- brush_resize
 ```
 
-**Official merge of 2026-11-27:** the official HUD shows Diameter, Hardness and Opacity in three rows (`brush_hud_rate_tests.rs`). The fork keeps Photoshop's label: that official test checks the fork's lines instead, and `readout_label` stays only for its own test. The hardness rate and the opacity rate (`OPACITY_TRAVEL`) are the official ones; `travel` takes the scaled vertical movement.
+`drag_tests` turns back after passing the diameter limit and after passing the hardness limit through the real canvas; both fail without `Held` (checked by passing the pointer through). `press::tests` checks the stand-in's limits and zoom.
+
+## After the craft UI merge (2026-11-27)
+
+Rebuilt on the craft UI. Compiled out, awaiting rebuild: nothing.

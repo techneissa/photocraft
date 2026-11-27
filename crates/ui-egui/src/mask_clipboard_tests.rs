@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 type Os = Arc<Mutex<Option<(u32, u32, Vec<u8>)>>>;
 
-fn app(os: &Os) -> (PhotocraftApp, LayerId) {
+fn app(os: &Os) -> (Box<PhotocraftApp>, LayerId) {
     let (a, b) = (os.clone(), os.clone());
     let mut app = PhotocraftApp::new(
         photocraft_engine::Session::new(),

@@ -18,15 +18,16 @@ none
 
 ## Hooks in official files
 
-engine `cmd/layer_copy_cmds.rs` (9 lines in `copy_to_document`; from the PRs: +5, +17), `cmd/edit_cmds.rs` (PR #10008: `linked_sources_to_land`; paste-side mask move removed); tests in `layer_copy_cmds/tests.rs`, ui-egui `dialogs/duplicate_layer_ui.rs` (2 tests; the status note: 12 lines in `confirm`, 1 test)
+engine-core `cmd/layer_copy_cmds.rs` (9 lines in `copy_to_document`; from the PRs: +5, +17), `cmd/edit_cmds.rs` (PR #10008: `linked_sources_to_land`; paste-side mask move removed); tests in `layer_copy_cmds/tests.rs`, ui-egui `dialogs/duplicate_layer_ui.rs` (2 tests; the status note: 12 lines in `confirm`, 1 test)
 
 ## Tests
 
-engine `layer_copy_cmds smart_clipboard_sources edit_cmds clipboard`, ui-egui `duplicate_layer_ui`
+engine-core `layer_copy_cmds smart_clipboard_sources edit_cmds clipboard`, ui-egui `duplicate_layer_ui`
 
 ```bash
-cargo test -p photocraft-engine --lib -- distort_cmds lens_cmds channel_cmds targeting vp_cmds edit_cmds clipboard
-cargo test -p photocraft-engine --lib -- layer_copy_cmds
+cargo test -p photocraft-engine-core --lib -- distort_cmds lens_cmds channel_cmds targeting vp_cmds edit_cmds clipboard
+cargo test -p photocraft-engine-core --lib -- layer_copy_cmds
+cargo test -p photocraft-engine --test it -- paint_in_layer_copy_cmds
 cargo test -p photocraft-engine --test it -- smart_clipboard_sources
 cargo test -p photocraft-ui-egui --lib -- duplicate_layer_ui
 ```
@@ -34,3 +35,7 @@ cargo test -p photocraft-ui-egui --lib -- duplicate_layer_ui
 ## When upstream merges
 
 **When upstream merges #9844:** main's paste moved unlinked masks itself (`translate_unlinked_paste_masks` in `edit_cmds.rs`), #9844 moves them in `translate_copies`, which paste also calls; the fork dropped main's paste-side function so masks move once: keep exactly one of the two (`clipboard_tests` `…_once` catches a double move)
+
+## After the craft UI merge (2026-11-27)
+
+Works again (`feat/step2-layers-transform`): the engine checks (busy destination, PRs #9715 #9684 #10008) and the "Duplicated to …" note, now in `duplicate_layer_ui.rs` `duplicate` (OK of craft's Duplicate Layer dialog; 12 lines). Test `ok_says_which_document_received_the_copy` (current document, another document, a new document).
