@@ -68,6 +68,34 @@ pub struct PerspSession {
     /// The planes, the mode and the undo steps.
     pub warp: PerspectiveSession,
     textures: PreviewTextures,
+    /// The layer composited in its place through the planes' map (`transform_live`).
+    pub(crate) live: Option<crate::transform_live::LiveSession>,
+}
+
+impl PerspSession {
+    /// Where the planes put each point of the layer: the engine's map in Warp mode, the layer where it is in Layout.
+    fn through(&self) -> impl Fn(Point) -> Point + use<> {
+        let algo = to_algo(self.warp.planes());
+        let map = (self.warp.mode() == PlaneMode::Warp).then(|| PerspectiveMap::new(&algo)).flatten();
+        move |p: Point| match &map {
+            Some(m) => {
+                let (x, y) = m.map(p.x, p.y);
+                Point::new(x, y)
+            }
+            None => p,
+        }
+    }
+
+    /// What the planes are now, for the live preview.
+    pub(crate) fn live_key(&self) -> String {
+        format!("{:?}{:?}", self.warp.mode(), self.warp.planes())
+    }
+
+    /// The grid carrying the layer's pixels, as the preview draws it.
+    pub(crate) fn live_mesh(&self) -> photocraft_compose::live::LiveMesh {
+        let through = self.through();
+        crate::transform_live::mesh_of(&PreviewMap::function(doc_rect(self.bounds), PreviewQuality::PLANE_CELLS, &through), doc_rect(self.bounds))
+    }
 }
 
 impl PerspSession {
@@ -99,6 +127,7 @@ pub fn begin(app: &mut PhotocraftApp, _ctx: &egui::Context, command: &str) -> Re
     }
     let opacity = l.opacity * l.fill_opacity;
     let preview_doc = crate::distort_ui::without_layer(&st.doc, layer);
+    let live = crate::transform_live::LiveSession::start(&st.doc, st.revision, layer, Some(&surface), None);
     let image = crate::distort_ui::surface_image(&surface, bounds, 2048);
     let document = st.doc.id;
     let key = app.ui.alloc_id();
@@ -113,6 +142,7 @@ pub fn begin(app: &mut PhotocraftApp, _ctx: &egui::Context, command: &str) -> Re
         bounds,
         warp: PerspectiveSession::new(doc_rect(bounds)),
         textures,
+        live,
     });
     app.ui.status = tl!("Perspective Warp: draw planes along the image's perspective, then switch to Warp").into();
     Ok(())
@@ -159,20 +189,15 @@ pub fn canvas(app: &mut PhotocraftApp, ui: &mut egui::Ui, at: egui::Rect) {
     let Some(size) = app.session.active().map(|st| [st.doc.size.width, st.doc.size.height]) else { return };
     let Some(s) = app.distort.perspective.as_ref() else { return };
     // Layout leaves the picture where it is; Warp pushes it through the engine's map of the planes.
-    let algo = to_algo(s.warp.planes());
-    let map = (s.warp.mode() == PlaneMode::Warp).then(|| PerspectiveMap::new(&algo)).flatten();
-    let through = |p: Point| match &map {
-        Some(m) => {
-            let (x, y) = m.map(p.x, p.y);
-            Point::new(x, y)
-        }
-        None => p,
-    };
-    TransformPreview::new("Moving layer", &s.textures)
-        .map(PreviewMap::function(doc_rect(s.bounds), PreviewQuality::PLANE_CELLS, &through))
-        .opacity(s.opacity)
-        .clip(size)
-        .show_at(ui, at);
+    // A live preview is composited on the canvas in the layer's place: only the planes are drawn here.
+    if s.live.is_none() {
+        let through = s.through();
+        TransformPreview::new("Moving layer", &s.textures)
+            .map(PreviewMap::function(doc_rect(s.bounds), PreviewQuality::PLANE_CELLS, &through))
+            .opacity(s.opacity)
+            .clip(size)
+            .show_at(ui, at);
+    }
     let output = PerspectiveWarp::new("Planes", Bind::given(s.warp.planes().to_vec()), s.warp.mode(), s.warp.generation()).show_at(ui, at);
     if let Some(s) = app.distort.perspective.as_mut() {
         for edit in output.edits() {

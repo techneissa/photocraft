@@ -101,7 +101,6 @@ mod place_photos;
 // prefs/prefs_ui.rs: mod shortcut_target; mod shortcuts_backup; mod shortcuts_chord; mod shortcuts_when; // fork/shortcut-upgrade.md
 //                    mod shortcuts_items; mod shortcuts_menus; mod shortcuts_record; mod shortcuts_rows;
 //                    mod shortcuts_search; mod shortcuts_window; // fork/shortcuts-window.md (and their *_tests, *_snapshots)
-// tools.rs:          pub(crate) mod transform_live;  // fork/transform-live-blend.md
 // widgets/dropdown_search.rs (the old widget; replaced by dropdown_search.rs on craft's Select: fork/dropdown-search.md)
 // fork_update.rs:    mod ui; mod snapshots;          // fork/fork-update-check.md (the Settings row)
 
@@ -335,6 +334,7 @@ pub use tools::stroke_trail;
 pub use tools::symmetry_ui;
 use tools::tool_reset;
 pub use tools::transform_fx;
+pub(crate) use tools::transform_live;
 pub use tools::transform_task_bar;
 pub use tools::transform_tool;
 use tools::type_box_preview;

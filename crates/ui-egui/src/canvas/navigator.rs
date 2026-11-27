@@ -73,6 +73,7 @@ pub fn navigator_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
     let (snapshot, id, revision, damage_from, last_damage) =
         app.session.documents().get(idx).map(|st| (std::sync::Arc::downgrade(&st.doc), st.doc.id, st.revision, st.damage_from(), st.last_damage))?;
     let (doc, preview_key) = display_doc(app, idx);
+    let raw_key = preview_key;
     let (display, display_key) = canvas_display(app, &doc, None);
     // A tile that fails to read and recovers keeps the snapshot and its revision: the picture and its partial updates
     // follow the scratch read-error generation too (`crate::scratch_reads`).
@@ -121,7 +122,12 @@ pub fn navigator_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
         app.navigator_textures.insert(id, (snapshot, preview_key, revision, t.clone()));
         return Some(t.id());
     }
-    let image = display_image(display.as_deref(), &photocraft_compose::thumbnail_buffer(&doc, NAVIGATOR_SIDE));
+    // A transform box's moving pixels in place: drawn on a scaled-down copy of a large document, else on the CPU.
+    let buffer = match crate::transform_live::navigator_buffer(app, &doc, raw_key, NAVIGATOR_SIDE) {
+        Some(buffer) => buffer,
+        None => photocraft_compose::thumbnail_buffer(&crate::transform_live::cpu_doc(app, doc.clone(), raw_key), NAVIGATOR_SIDE),
+    };
+    let image = display_image(display.as_deref(), &buffer);
     let tex = match cached {
         Some((_, _, _, mut t)) => {
             t.set(image, TextureOptions::LINEAR);

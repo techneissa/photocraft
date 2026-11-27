@@ -152,6 +152,11 @@ fn show_preview(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &m
     if crate::frame_tool::frame_transform(t) {
         return Vec::new();
     }
+    // A layer's box composited in the layer's place (`transform_live`): the canvas already shows the moving pixels, with
+    // the layers above them, so there is nothing to draw over it.
+    if pv.live.is_some() && pv.content_aware.is_none() {
+        return Vec::new();
+    }
     // Painted in place after this mark, then taken out for the picture slot.
     let mark = PaintSlot::reserve(ui.painter());
     let display = preview_display(app, ui.ctx());
