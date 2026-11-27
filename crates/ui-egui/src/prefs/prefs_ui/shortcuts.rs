@@ -6,7 +6,7 @@
 //! a change; OK writes the preferences once ([`save_keys`], then the menus), and the runtime's
 //! keymap follows the new shortcut preferences (`shortcut_dispatch::overrides`).
 //!
-//! The Toolbar tab is not here: Edit › Toolbar opens the toolbar drawer.
+//! Edit › Toolbar still opens the toolbar drawer; the Toolbar tab here edits the hidden tools (`open(app, 2)`).
 
 use photocraft_engine::actions_cmds::ActionsExt;
 use std::collections::{BTreeMap, BTreeSet};
@@ -44,6 +44,8 @@ pub(crate) struct ShortcutsSession {
     pub(crate) menus: MenusDraft,
     /// The Chords and Conditions tab's draft (fork/shortcut-upgrade.md).
     pub(crate) chords: super::shortcuts_chords::ChordDraft,
+    /// The Toolbar tab's draft: the hidden tools.
+    pub(crate) toolbar: Vec<String>,
     /// The text of a set to review on the next pass, taken by that pass alone: a second pass of
     /// the same frame finds nothing to review.
     pub(crate) pending_import: Option<String>,
@@ -115,18 +117,23 @@ pub(crate) fn kys_text(name: &str, bytes: &[u8]) -> Result<String, String> {
     std::str::from_utf8(bytes).map(str::to_owned).map_err(|_| format!("{name}: not a keyboard shortcut set (.kys): not UTF-8"))
 }
 
-/// Opens the dialog (when it is not open) on tab `tab`: 0 Keyboard Shortcuts, 1 Menus.
+/// Opens the dialog (when it is not open) on tab `tab`: 0 Keyboard Shortcuts, 1 Menus, 2 Toolbar.
 pub fn open(app: &mut PhotocraftApp, tab: u64) {
     if app.prefs_rt.shortcuts.is_some() {
         return;
     }
     let prefs = app.session.prefs();
     let session = ShortcutsSession {
-        state: if tab == 1 { DialogState::new().with_tab("menus") } else { DialogState::new() },
+        state: match tab {
+            1 => DialogState::new().with_tab("menus"),
+            2 => DialogState::new().with_tab("toolbar"),
+            _ => DialogState::new(),
+        },
         profiles: profiles_of(prefs),
         keymap: draft_keymap(app),
         menus: MenusDraft::of(&prefs.menus),
         chords: super::shortcuts_chords::ChordDraft::of(app),
+        toolbar: prefs.toolbar.hidden.clone(),
         pending_import: None,
         remembered: ImportAnswers::default(),
     };
@@ -217,19 +224,22 @@ fn pass(app: &mut PhotocraftApp, ui: &mut egui::Ui, press_ok: bool) {
     let rows = crate::menus::base_rows(app);
     let options = options();
     let builtins = builtins();
-    let ShortcutsSession { state, profiles, keymap, menus, chords, pending_import, remembered } = &mut session;
+    let ShortcutsSession { state, profiles, keymap, menus, chords, toolbar, pending_import, remembered } = &mut session;
     if let Some(text) = pending_import.take() {
         review(ui, state, dialog(keymap, profiles, &builtins, &options), &text, remembered);
     }
     if press_ok {
         dialog(keymap, profiles, &builtins, &options).ok(ui, state);
     }
-    let mut tabs = [super::shortcuts_chords::tab(chords), menus_tab(&rows, menus)];
+    let mut tabs = [super::shortcuts_chords::tab(chords), menus_tab(&rows, menus), super::shortcuts_toolbar::tab(toolbar)];
     let output = dialog(keymap, profiles, &builtins, &options).tabs(&mut tabs).show(ui, state);
     drop(tabs);
     match output.outcome {
         Some(Outcome::Ok) => {
-            if let Err(e) = save_keys_with(app, keymap, profiles, (&chords.chords, &chords.whens)).and_then(|_| save_menus(app, menus)) {
+            if let Err(e) = save_keys_with(app, keymap, profiles, (&chords.chords, &chords.whens))
+                .and_then(|_| save_menus(app, menus))
+                .and_then(|_| save_toolbar(app, toolbar))
+            {
                 app.ui.status = crate::i18n::fmt(tl!("The keyboard shortcuts were not saved: {error}"), &[("error", &e)]);
                 app.ui.status_error = true;
             }
@@ -340,6 +350,14 @@ pub(crate) fn save_keys_with(
 fn save_menus(app: &mut PhotocraftApp, menus: &MenusDraft) -> Result<Value, String> {
     let call = json!({"values": {"menus": {"hidden": menus.hidden, "colors": menus.colors}}});
     app.run("prefs.set", call).map_err(|e| e.to_string())
+}
+
+/// Writes the Toolbar tab's hidden tools when they changed (the layout the drawer arranges stays as it is otherwise).
+fn save_toolbar(app: &mut PhotocraftApp, hidden: &[String]) -> Result<Value, String> {
+    if app.session.prefs().toolbar.hidden == hidden {
+        return Ok(Value::Null);
+    }
+    app.run("edit.toolbar", json!({"hidden": hidden})).map_err(|e| e.to_string())
 }
 
 /// The Menus tab: a row per menu item with a Visible check and a colour.
