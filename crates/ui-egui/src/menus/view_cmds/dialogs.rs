@@ -828,6 +828,7 @@ pub(super) fn front(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, para
     match id {
         "file.openAs" => Some(app.open_dialog_file()),
         "file.openAsSmartObject" => Some(app.open_dialog_as_smart_object()),
+        "file.openAsLayers" => Some(crate::open_as_layers::pick(app)),
         "file.saveACopy" => Some(save_a_copy(app)),
         "file.placeEmbedded" | "file.placeLinked" => {
             if app.ui.transform.is_some() {

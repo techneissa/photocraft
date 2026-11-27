@@ -8,6 +8,7 @@ pub static CATALOG: &[(&[&str], &str, Option<&str>, &str)] = &[
     (&["File"], "Open…", Some("Cmd+O"), "file.open"),
     (&["File"], "Open As…", Some("Cmd+Alt+Shift+O"), "file.openAs"),
     (&["File"], "Open as Smart Object…", None, "file.openAsSmartObject"),
+    (&["File"], "Open as Layers…", None, "file.openAsLayers"),
     (&["File"], "Open EXR Parts…", None, "file.openExrParts"),
     (&["File"], "---", None, "---"),
     (&["File"], "Close", Some("Cmd+W"), "file.close"),

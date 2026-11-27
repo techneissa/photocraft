@@ -25,7 +25,7 @@ The fork's own egui window is gone; the official craft dialog (`ShortcutsDialog`
 
 Brought back after that (the `shortcuts-more` pass), on the craft dialog:
 
-- Remove Shortcut on a row's right-click, and the clashing command in the tooltip of the clash mark in the table row: craft-libs patch 7 (`menu` crate, `shortcuts/rows.rs`, `view/table.rs`; fork/craft-libs.md). Craft already draws the mark and removes a key with ⌫ / Delete.
+- Remove Shortcut on a row's right-click, and the clashing command in the tooltip of the clash mark in the table row: craft-libs patch 8 (`menu` crate, `shortcuts/rows.rs`, `view/table.rs`; fork/craft-libs.md). Craft already draws the mark and removes a key with ⌫ / Delete.
 - The Toolbar tab (`prefs_ui/shortcuts_toolbar.rs`): a check per tool with its key, Restore Defaults; OK writes the unchecked tools through `edit.toolbar {hidden}` only when they changed. Edit › Toolbar still opens the toolbar drawer; `open(app, 2)` opens the dialog on this tab.
 - Search by modifier words (cmd, shift, opt, alt, ctrl): craft's own search already finds them, so nothing was added to the table's search; the Chords and Conditions tab's search now also matches the keys as words.
 

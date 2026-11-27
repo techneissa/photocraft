@@ -364,6 +364,16 @@ impl PhotocraftApp {
         })
     }
 
+    /// Ask for several files on disk; `then` gets their paths in the order the dialog returns them. For File › Open as
+    /// Layers… (fork/open-as-layers.md).
+    pub(crate) fn ask_open_paths(&mut self, then: impl FnOnce(&mut Self, Vec<String>) -> Result<Value, String> + 'static) -> Result<Value, String> {
+        let request = self.open_many_request();
+        self.ask_file(request, move |app, picked| match picked {
+            Picked::Paths(_) => then(app, path_strings(&picked)),
+            _ => Err(UNEXPECTED.into()),
+        })
+    }
+
     /// File › Open as Smart Object…: the File › Open dialog (same filters, several files); each
     /// chosen file opens as its own document holding one embedded smart object, in name order,
     /// reporting each failure as File › Open does.

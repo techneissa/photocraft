@@ -81,6 +81,10 @@ mod double_exposure;
 // fork: context menus (fork/context-menu-editor.md, fork/context-menu-shortcuts.md).
 pub mod menu_custom;
 
+// fork: the open-as-layers and place-photos modules are back (fork/open-as-layers.md, fork/place-photos.md).
+mod open_as_layers;
+mod place_photos;
+
 // fork: awaiting rebuild on craft UI (official merge of 2026-11-27). These fork interface modules stay in
 // the tree, compiled out; each rebuild lane brings its own back, see fork/<slug>.md. The `mod` lines, by the
 // file that held them:

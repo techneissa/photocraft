@@ -671,6 +671,8 @@ fn on_event(app: &mut PhotocraftApp, ctx: &egui::Context, e: JobEvent) {
             app.sync_views();
             crate::file_ui::print_status(app, result);
         }
+        // fork: Open as Layers names its result and the files it left out (fork/open-as-layers.md).
+        JobOutcome::Done(ref result) if e.command == crate::open_as_layers::COMMAND => crate::open_as_layers::finished(app, result),
         JobOutcome::Done(_) if cancelled_batch => {
             app.ui.status = crate::i18n::fmt(tl!("Canceled {label}"), &[("label", &e.label)]);
             app.ui.status_error = false;

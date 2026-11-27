@@ -113,20 +113,31 @@ fn duplicate(app: &mut PhotocraftApp, fields: &DialogFields) -> Result<Value, St
     if let Some(name) = fields.text("name") {
         params.insert("name".into(), json!(name));
     }
-    match destination(app, fields)? {
+    let (result, received) = match destination(app, fields)? {
         Destination::New => {
             if let Some(doc_name) = fields.text("documentName").filter(|n| !n.is_empty()) {
                 params.insert("documentName".into(), json!(doc_name));
             }
             params.insert("document".into(), json!("new"));
-            app.run_command("layer.duplicate", Value::Object(params))
+            (app.run_command("layer.duplicate", Value::Object(params))?, None)
         }
-        Destination::Document(destination) if destination == index => app.run_command("layer.duplicate", Value::Object(params)),
+        Destination::Document(destination) if destination == index => (app.run_command("layer.duplicate", Value::Object(params))?, Some(destination)),
         Destination::Document(destination) => {
             params.insert("document".into(), json!(destination));
-            app.run_command("layer.copyToDocument", Value::Object(params))
+            (app.run_command("layer.copyToDocument", Value::Object(params))?, Some(destination))
         }
+    };
+    // fork: say where the copy went, also when it is the document it came from: a copy that landed in the current
+    // document instead of the other one was easy to miss (fork/duplicate-to-other-doc.md).
+    let name = match received {
+        Some(i) => app.session.documents().get(i).map(|d| d.doc.name.clone()),
+        None => app.session.active().map(|st| st.doc.name.clone()),
+    };
+    if let Some(name) = name {
+        app.ui.status = crate::i18n::fmt(tl!("Duplicated to {document}"), &[("document", &name)]);
+        app.ui.status_error = false;
     }
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -282,6 +293,35 @@ mod tests {
         assert!(app.framework.dialogs.stack().contains(dialog), "the dialog stays open");
         assert_eq!(app.session.documents()[1].doc.layer_count(), 1, "Card, now in Spare's place, is untouched");
         assert_eq!(app.session.documents()[0].doc.layer_count(), 2, "nothing was copied");
+    }
+
+    /// techneissa lost a copy that went into the current document instead of the other one: the status bar names the
+    /// document that received it, in every case.
+    #[test]
+    fn ok_says_which_document_received_the_copy() {
+        let mut app = make_app();
+        let ctx = app.ctx().clone();
+        app.session.execute("file.new", json!({"width":8,"height":8,"name":"Card"})).unwrap();
+        // The current document (the dialog's default).
+        app.session.set_active(0);
+        let dialog = invoke(&mut app);
+        confirm(&mut app, &ctx, dialog).unwrap();
+        assert_eq!(app.ui.status, "Duplicated to Poster");
+        assert!(!app.ui.status_error);
+        // Another document.
+        app.session.set_active(0);
+        let dialog = invoke(&mut app);
+        let pick = key(&app, 1);
+        set(&mut app, dialog, "document", pick).unwrap();
+        confirm(&mut app, &ctx, dialog).unwrap();
+        assert_eq!(app.ui.status, "Duplicated to Card");
+        // A new document, under the name typed.
+        app.session.set_active(0);
+        let dialog = invoke(&mut app);
+        set(&mut app, dialog, "document", json!("new")).unwrap();
+        set(&mut app, dialog, "documentName", json!("Proof")).unwrap();
+        confirm(&mut app, &ctx, dialog).unwrap();
+        assert_eq!(app.ui.status, "Duplicated to Proof");
     }
 }
 

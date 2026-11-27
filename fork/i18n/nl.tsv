@@ -62,3 +62,7 @@
 	Move up	Omhoog
 	Move down	Omlaag
 	Search commands	Opdrachten zoeken
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Openen als lagen…
+	Place Photo	Foto plaatsen
+	Duplicated to {document}	Gedupliceerd naar {document}

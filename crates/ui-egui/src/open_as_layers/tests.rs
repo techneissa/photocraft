@@ -114,7 +114,7 @@ fn a_bad_manifest_or_no_usable_file_is_an_error_notice_and_no_document() {
         app.ui.notices.clear();
         assert_eq!(app.open_paths(std::slice::from_ref(&path)), 0, "{path}");
         let notice = app.ui.notices.last().unwrap_or_else(|| panic!("no notice for {path}"));
-        assert!(notice.error && notice.title.starts_with("Couldn't open"), "{}", notice.title);
+        assert!(notice.tone == craft::theme::variant::Tone::Bad && notice.title.starts_with("Couldn't open"), "{}", notice.title);
         titles.push(notice.title.clone());
     }
     assert!(titles[1].contains("newer PhotoCraft"), "{titles:?}");

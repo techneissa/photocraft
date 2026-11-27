@@ -56,3 +56,7 @@
 	Move up	Naikkan
 	Move down	Turunkan
 	Search commands	Cari perintah
+# Open as Layers, Place Photo, Duplicate Layer note (fork/open-as-layers.md, fork/place-photos.md, fork/duplicate-to-other-doc.md)
+	Open as Layers…	Buka sebagai lapisan…
+	Place Photo	Tempatkan foto
+	Duplicated to {document}	Diduplikasi ke {document}
