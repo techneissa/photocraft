@@ -51,3 +51,14 @@
 	Back	Wstecz
 	Is	Jest
 	Is Not	Nie jest
+
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Przypisz skrót…
+@id	settingsPage.contextMenus	Menu kontekstowe
+	Context Menus	Menu kontekstowe
+	Take out of the menu	Usuń z menu
+	Add to the menu	Dodaj do menu
+	Add Separator	Dodaj separator
+	Move up	Przesuń w górę
+	Move down	Przesuń w dół
+	Search commands	Szukaj poleceń

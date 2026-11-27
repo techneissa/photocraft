@@ -45,3 +45,14 @@
 	Back	Πίσω
 	Is	Είναι
 	Is Not	Δεν είναι
+
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Ανάθεση συντόμευσης…
+@id	settingsPage.contextMenus	Μενού περιβάλλοντος
+	Context Menus	Μενού περιβάλλοντος
+	Take out of the menu	Αφαίρεση από το μενού
+	Add to the menu	Προσθήκη στο μενού
+	Add Separator	Προσθήκη διαχωριστικού
+	Move up	Μετακίνηση πάνω
+	Move down	Μετακίνηση κάτω
+	Search commands	Αναζήτηση εντολών

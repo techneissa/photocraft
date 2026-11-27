@@ -45,3 +45,14 @@
 	Back	Quay lại
 	Is	Là
 	Is Not	Không phải
+
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Gán phím tắt…
+@id	settingsPage.contextMenus	Menu ngữ cảnh
+	Context Menus	Menu ngữ cảnh
+	Take out of the menu	Bỏ khỏi menu
+	Add to the menu	Thêm vào menu
+	Add Separator	Thêm đường phân cách
+	Move up	Di chuyển lên
+	Move down	Di chuyển xuống
+	Search commands	Tìm lệnh

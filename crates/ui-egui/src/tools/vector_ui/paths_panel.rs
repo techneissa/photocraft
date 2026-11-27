@@ -320,7 +320,19 @@ pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .collect();
     let size = kurbo::Size::new(doc.size.width.max(1) as f64, doc.size.height.max(1) as f64);
 
-    let events = PathsPanel::new(&rows, size).can_fill(can_fill).work_name(free_path_name(&doc)).show(ui).events;
+    // fork: the user's keys at the right of the row menu (fork/context-menu-shortcuts.md).
+    let mut panel = PathsPanel::new(&rows, size).can_fill(can_fill).work_name(free_path_name(&doc));
+    for (command, id) in [
+        (PathsCommands::MakeSelection, "path.toSelection"),
+        (PathsCommands::FillPath, "path.fill"),
+        (PathsCommands::StrokePath, "path.stroke"),
+        (PathsCommands::DeletePath, "path.delete"),
+    ] {
+        if let Some(text) = crate::menu_custom::shortcut::text(app, id) {
+            panel = panel.shortcut(command, text);
+        }
+    }
+    let events = panel.show(ui).events;
     for event in events {
         apply(app, event);
     }

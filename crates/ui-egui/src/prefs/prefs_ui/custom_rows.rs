@@ -59,6 +59,8 @@ pub(super) struct PrefsCustom {
     /// The suite's `AI-MCP` flag: the Agents page points to the ArtCraft Launcher's switch.
     #[cfg(not(target_arch = "wasm32"))]
     mcp_flag: bool,
+    /// What the Context Menus page's buttons asked this pass.
+    context_asks: crate::menu_custom::Asks,
 }
 
 impl PrefsCustom {
@@ -78,7 +80,13 @@ impl PrefsCustom {
             agent_status: app.services.agent_link.as_ref().map(|link| link.status().clone()).unwrap_or_default(),
             #[cfg(not(target_arch = "wasm32"))]
             mcp_flag: app.services.agent_switch.as_ref().is_some_and(|switch| switch.mcp_flag()),
+            context_asks: crate::menu_custom::Asks::default(),
         }
+    }
+
+    /// What the Context Menus page's buttons asked since the last call.
+    pub(super) fn context_menu_asks(&self) -> Vec<crate::menu_custom::Ask> {
+        self.context_asks.take()
     }
 }
 
@@ -100,8 +108,18 @@ impl CustomSettings<PrefPages> for PrefsCustom {
         false
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn page(&mut self, ui: &mut egui::Ui, page: &str, draft: &mut SettingsDraft) -> bool {
+        // fork: the Context Menus page (fork/context-menu-editor.md).
+        if page == crate::menu_custom::PAGE {
+            let mut value = crate::menu_custom::from_text(&draft.get::<String>(crate::menu_custom::KEY).unwrap_or_default());
+            let before = value.clone();
+            let height = ui.available_height();
+            crate::menu_custom::editor::page(&self.context_asks, ui, height, &mut value);
+            if value != before {
+                draft.set(crate::menu_custom::KEY, &crate::menu_custom::to_text(&value));
+            }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         if page == AGENTS_PAGE {
             craft::automation::ui::agents::AgentsPage::new(AGENTS_PAGE, draft, &self.agent_status).mcp_flag(self.mcp_flag).show(ui);
         }

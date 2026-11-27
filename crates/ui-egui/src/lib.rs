@@ -76,13 +76,15 @@ pub mod fork_update;
 // fork: chords and When conditions in front of craft's keymap (fork/shortcut-upgrade.md).
 pub mod keybinds;
 
+// fork: context menus (fork/context-menu-editor.md, fork/context-menu-shortcuts.md).
+pub mod menu_custom;
+
 // fork: awaiting rebuild on craft UI (official merge of 2026-11-27). These fork interface modules stay in
 // the tree, compiled out; each rebuild lane brings its own back, see fork/<slug>.md. The `mod` lines, by the
 // file that held them:
 // lib.rs:
 //   mod assign_shortcut;               // fork/assign-shortcut-palette.md
 //   mod double_exposure;               // fork/double-exposure.md
-//   pub mod menu_custom;               // fork/context-menu-editor.md, fork/context-menu-shortcuts.md
 //   mod open_as_layers;                // fork/open-as-layers.md
 //   mod place_photos;                  // fork/place-photos.md
 //   #[cfg(test)] mod mask_clipboard_tests; // fork/upstream-select-mask.md

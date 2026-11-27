@@ -51,3 +51,14 @@
 	Back	Indietro
 	Is	È
 	Is Not	Non è
+
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Assegna scorciatoia…
+@id	settingsPage.contextMenus	Menu contestuali
+	Context Menus	Menu contestuali
+	Take out of the menu	Rimuovi dal menu
+	Add to the menu	Aggiungi al menu
+	Add Separator	Aggiungi separatore
+	Move up	Sposta su
+	Move down	Sposta giù
+	Search commands	Cerca comandi

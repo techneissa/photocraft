@@ -45,3 +45,14 @@
 	Back	Vissza
 	Is	Egyenlő
 	Is Not	Nem egyenlő
+
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Gyorsbillentyű kiosztása…
+@id	settingsPage.contextMenus	Helyi menük
+	Context Menus	Helyi menük
+	Take out of the menu	Eltávolítás a menüből
+	Add to the menu	Hozzáadás a menühöz
+	Add Separator	Elválasztó hozzáadása
+	Move up	Mozgatás felfelé
+	Move down	Mozgatás lefelé
+	Search commands	Parancsok keresése
