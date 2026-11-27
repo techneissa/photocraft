@@ -1,5 +1,7 @@
 //! ⌘F command palette: the framework's `CommandPalette` over every menu command and tool.
 
+mod frecency;
+
 use craft::ui::contract::Bind;
 use craft::ui::menu::{HelpEntry, SearchIndex, SearchWords, Synonyms};
 use craft::ui::patterns::panels::CommandPalette;
@@ -44,12 +46,24 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let env = Env::of(ui);
     let view = env.view();
     let index = SearchIndex::new(&view, &listed, &Synonyms::of(&view.words::<SearchWords>()));
-    let PaletteState { open, recents } = &mut app.ui.palette;
-    CommandPalette::new(tl!("Command Palette"), &listed, &index, Bind::bound(open)).recents(Bind::bound(recents)).show(ui);
+    // fork: what the palette learned (fork/palette-frecency.md): use ranks equally good matches, a command picked for a
+    // typed text goes first for it, an empty search lists the most used first.
+    let (history, now) = (frecency::History::of(app), frecency::now());
+    let uses = |command: &CommandRef| history.uses(&command.key_text(), now);
+    let learned = |text: &str| history.learned(text).map(CommandRef::new);
+    let recents = history.recents(&app.ui.palette.recents, now);
+    let out = CommandPalette::new(tl!("Command Palette"), &listed, &index, Bind::bound(&mut app.ui.palette.open))
+        .uses(&uses)
+        .learned(&learned)
+        .recents(Bind::given(recents))
+        .show(ui);
+    if let Some(command) = out.picked {
+        frecency::note(app, &command.key_text(), &out.query);
+    }
 }
 
-/// Records `id` as the most recently run command. The palette records its own picks; this covers commands run from
-/// a menu or a shortcut.
+/// Records `id` as the most recently run command: a pick runs where a menu's command does, so every way of running one
+/// comes through here.
 pub(crate) fn note_recent(app: &mut PhotocraftApp, id: &str) {
     CommandPalette::remember(&mut app.ui.palette.recents, CommandRef::new(id));
 }

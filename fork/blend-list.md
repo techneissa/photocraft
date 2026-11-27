@@ -6,7 +6,7 @@ Blend mode lists as tall as the window allows (no fixed 14-row cap, upstream iss
 
 ## Branch
 
-`feat/blend-list`
+`feat/blend-list` (before the craft UI merge); `feat/step2-blend-palette` (the rebuild)
 
 ## Own files
 
@@ -14,18 +14,21 @@ Blend mode lists as tall as the window allows (no fixed 14-row cap, upstream iss
 
 ## Hooks in official files
 
-`widgets/dropdown.rs` (`list_height()`, one `let list` per call site), engine-core `prefs.rs` (`interface.scroll_wheel_changes_blend_mode`), ui-egui `lib.rs`, `prefs/prefs_ui/save.rs` (1 line), `panels/layers.rs` (2), `panels/options_bar.rs` (1), `panels/brush_controls.rs` (2): `dropdown_wheel_hovered` → `blend_wheel::dropdown`; official tests `blend_dropdown_wheel_tests.rs`, `options_bar_mode_wheel_tests.rs` (helpers `pub(crate)`, preference on)
-
-## Tests
-
-`blend_wheel`, `blend_dropdown`, `options_bar_mode_wheel`
-
-```bash
-cargo test -p photocraft-ui-egui --lib -- open_as_layers double_exposure blend_wheel blend_dropdown options_bar_mode_wheel dropdown_search type_ahead hold_keys transform_tool:: transform_live puppet_ui perspective_ui transform_undo_tests guides_draw distort_ui vp_ui blend_preview
-```
-
-**Official merge of 2026-11-27 (official code up to 2026-11-17):** the official dropdown (`widgets/dropdown.rs` `combo_list`, #5495) now sizes every list to the room above or below its box, which is what this feature's `list_height` did; `list_height` is gone and the official sizing is used. The wheel preference stays the fork's.
+Before the craft UI merge: `widgets/dropdown.rs` (`list_height()`), `panels/layers.rs`, `panels/options_bar.rs`, `panels/brush_controls.rs` (`dropdown_wheel_hovered` → `blend_wheel::dropdown`). Now: see below.
 
 ## After the craft UI merge (2026-11-27)
 
-Compiled out, awaiting rebuild: the preference `interface.scrollWheelChangesBlendMode` is kept. Rebuild: make craft's blend mode list window-tall and wheel-scrolling (`blend_wheel.rs`).
+Rebuilt on craft's blend lists (`Select` over `blend_entries`), with two patches in the craft-libs fork copy ([craft-libs.md](craft-libs.md)):
+
+- **Height:** craft capped a dropdown list at 40% of the window; patch 1 lets it take the room above or below its box (the larger side). A window about as tall as the list (about 700 px for the 29 modes at this text size, measured in a 1400 px window) shows every mode; in a shorter window the list still scrolls.
+- **Wheel:** patch 2 makes the wheel over a blend mode box step the mode only when the preference is on; `blend_wheel.rs` copies the preference to the window every frame (`app/framework.rs`, one line). Off, the wheel no longer steps the mode (that it then scrolls the panel under it is not tested). Other dropdowns keep stepping with the wheel as craft has it.
+
+Own files now: `crates/ui-egui/src/blend_wheel.rs` and `blend_wheel/tests.rs` (compiled in again). Official-file hooks: `app/framework.rs` (1 line), `lib.rs` (`mod blend_wheel`), and the official test `options_bar_mode_wheel_tests.rs` turns the preference on. The preference (`interface.scrollWheelChangesBlendMode`) stays in engine-core `prefs.rs`.
+
+## Tests
+
+`blend_wheel` (the preference defaults off and rejects bad values; off, the wheel over the options bar's Mode box changes no mode; on, it steps), `options_bar_mode_wheel` (on, the wheel steps the painting mode).
+
+```bash
+cargo test -p photocraft-ui-egui --lib -- blend_wheel options_bar_mode_wheel blend_rows
+```

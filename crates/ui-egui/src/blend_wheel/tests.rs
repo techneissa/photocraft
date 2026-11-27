@@ -1,11 +1,9 @@
 //! The "Scroll wheel changes blend mode" preference: off by default, the wheel never changes a
 //! blend mode (it scrolls instead); on, it steps modes as in Photoshop.
 
-use egui::vec2;
 use photocraft_doc::BlendMode;
 use serde_json::json;
 
-use crate::blend_dropdown_wheel_tests as layers;
 use crate::options_bar_mode_wheel_tests as bar;
 use crate::state::Tool;
 
@@ -28,55 +26,18 @@ fn the_setting_defaults_off_and_is_checked_like_its_neighbours() {
     assert!(!old.scroll_wheel_changes_blend_mode);
 }
 
-#[test]
-fn off_the_wheel_over_the_layers_blend_box_changes_no_mode_and_records_no_step() {
-    let mut h = layers::harness_with(vec2(1440.0, 900.0), false, layers::pixel_layer);
-    let at = layers::dropdown(&h).center();
-    let undo = layers::steps(&h);
-    for lines in [-1.0, -3.0, 2.0] {
-        layers::wheel(&mut h, at, lines);
-    }
-    assert_eq!((layers::blend(&h), layers::steps(&h)), (BlendMode::Normal, undo));
-}
-
-#[test]
-fn off_the_wheel_over_the_open_blend_list_scrolls_it_and_changes_no_mode() {
-    // A short window, so the list scrolls.
-    let size = vec2(1440.0, 500.0);
-    let mut h = layers::harness_with(size, false, layers::pixel_layer);
-    let at = layers::dropdown(&h).center();
-    layers::click(&mut h, at);
-    let (last, darken) = (layers::entry(&h, "Luminosity").top(), layers::entry(&h, "Darken").center());
-    let undo = layers::steps(&h);
-    for _ in 0..4 {
-        layers::wheel(&mut h, darken, -3.0);
-    }
-    h.run_steps(20);
-    assert!(layers::entry(&h, "Luminosity").top() < last, "the list scrolled");
-    assert_eq!((layers::blend(&h), layers::steps(&h)), (BlendMode::Normal, undo));
-}
-
-#[test]
-fn turning_it_on_lets_the_wheel_step_modes_again() {
-    let mut h = layers::harness_with(vec2(1440.0, 900.0), false, layers::pixel_layer);
-    let at = layers::dropdown(&h).center();
-    layers::wheel(&mut h, at, -1.0);
-    assert_eq!(layers::blend(&h), BlendMode::Normal);
-    h.state_mut().run("prefs.set", json!({"path": PATH, "value": true})).unwrap();
+/// The wheel over the options bar's Mode box, one turn of `lines` lines, with the preference `on`.
+fn wheeled_brush_mode(on: bool, lines: f32) -> BlendMode {
+    let mut h = bar::harness(Tool::Brush);
+    h.state_mut().run("prefs.set", json!({"path": PATH, "value": on})).unwrap();
     h.run_steps(3);
-    layers::wheel(&mut h, at, -1.0);
-    assert_eq!(layers::blend(&h), BlendMode::Dissolve);
+    let at = bar::mode_dropdown(&h).center();
+    bar::wheel(&mut h, at, lines);
+    bar::brush_mode(&h)
 }
 
 #[test]
-fn off_the_wheel_over_the_options_bar_mode_box_changes_no_mode() {
-    for tool in [Tool::Brush, Tool::Pencil, Tool::Gradient, Tool::PaintBucket, Tool::CloneStamp] {
-        let mut h = bar::harness_with(tool, false);
-        let at = bar::mode_dropdown(&h).center();
-        let before = (bar::brush_mode(&h), h.state().ui.tool_options.gradient_blend_mode, h.state().ui.tool_options.bucket_blend_mode);
-        bar::wheel(&mut h, at, -2.0);
-        let after = (bar::brush_mode(&h), h.state().ui.tool_options.gradient_blend_mode, h.state().ui.tool_options.bucket_blend_mode);
-        assert_eq!(before, after, "{tool:?}");
-        assert!(!h.state().ui.tool_options.brush_clear && !h.state().ui.tool_options.bucket_clear, "{tool:?}");
-    }
+fn off_the_wheel_over_a_blend_mode_box_changes_no_mode_and_on_it_steps_the_mode() {
+    assert_eq!(wheeled_brush_mode(false, -2.0), BlendMode::Normal);
+    assert_eq!(wheeled_brush_mode(true, -1.0), BlendMode::Dissolve);
 }

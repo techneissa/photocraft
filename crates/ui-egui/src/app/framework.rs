@@ -387,6 +387,8 @@ impl Framework {
         latched: craft::keymap::Mods,
     ) -> FrameInput {
         self.sections.sync(session);
+        // fork: the wheel over a blend mode box steps the mode only when the preference is on (fork/blend-list.md).
+        crate::blend_wheel::sync(session, ctx);
         let lang = i18n::current().code();
         if lang != self.lang {
             self.lang = lang;

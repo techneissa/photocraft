@@ -18,6 +18,8 @@ pub(super) fn harness(tool: Tool) -> Harness<'static, Box<PhotocraftApp>> {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
+        // fork: the wheel steps modes only with its preference on (blend_wheel).
+        app.run("prefs.set", json!({"path": "interface.scrollWheelChangesBlendMode", "value": true})).unwrap();
         app.ui.tool = tool;
         app
     });
