@@ -446,6 +446,8 @@ pub(crate) fn overrides(app: &PhotocraftApp, rows: &[CommandDef]) -> Overrides {
             }
         }
     }
+    // fork: a command with a When condition has its keys in the fork's key layer (`keybinds`), never in craft's keymap.
+    crate::keybinds::unbind_gated(app, &mut overrides);
     overrides
 }
 
@@ -524,7 +526,7 @@ pub fn disabled_reason(app: &PhotocraftApp, id: &str) -> String {
     )
 }
 
-fn label(id: &str) -> String {
+pub(crate) fn label(id: &str) -> String {
     crate::menu_catalog::CATALOG
         .iter()
         .find(|c| c.3 == id)
@@ -651,7 +653,7 @@ fn tool_step(app: &PhotocraftApp, fired: &Fired) -> PickStep {
 /// toolbar layout's order across slots (Edit › Toolbar); the rail's last-used memory is `app.ui.group_tools`, with the group's index among the letters as
 /// the slot. `plain` is a letter press with no Shift step: only those spring (#2672). `at` is the press's input time.
 fn pick_tool(app: &mut PhotocraftApp, letter: char, step: PickStep, plain: bool, at: f64) {
-    let mut group: Vec<Tool> = Tool::ALL.iter().copied().filter(|t| t.key() == letter && crate::tool_shortcuts::uses_default(app, *t)).collect();
+    let mut group: Vec<Tool> = Tool::ALL.iter().copied().filter(|t| t.key() == letter && crate::keybinds::gate::tool_on(app, app.ctx(), *t)).collect();
     let order = crate::panels::toolbar::layout_order(&app.session.prefs().toolbar);
     group.sort_by_key(|t| order.iter().position(|x| x == t).unwrap_or(usize::MAX));
     let tools: Vec<RailTool<Tool>> = group.iter().map(|t| RailTool::new(*t, crate::panels::tool_commands::command_of(*t))).collect();

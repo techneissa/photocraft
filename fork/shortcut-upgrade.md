@@ -10,21 +10,26 @@ Keyboard Shortcuts upgrade in the existing window: chords (⌘K then C) with a k
 
 ## Own files
 
-engine-core `when/`, `prefs/chords.rs`, `prefs/chord_cmds.rs`, `shortcut_backup.rs` (+ tests); ui-egui `keybinds.rs` + `keybinds/`, `prefs/prefs_ui/shortcut_target.rs` (`open_shortcuts_for`, the one entry point Assign Shortcut… uses), `shortcuts_when.rs`, `shortcuts_chord.rs`, `shortcuts_backup.rs`, `shortcuts_upgrade_tests.rs`; `assets/icons/download.svg`, `upload.svg` (Lucide)
+engine-core `when/`, `prefs/chords.rs`, `prefs/chord_cmds.rs`, `shortcut_backup.rs` (+ tests); ui-egui `keybinds.rs` + `keybinds/`, `prefs/prefs_ui/shortcuts_chords.rs` (+ tests); `assets/icons/download.svg`, `upload.svg` (Lucide)
 
 ## Hooks in official files
 
-engine-core `lib.rs`, `prefs.rs` (`chords`, `shortcut_when`), `prefs/validate.rs`, `prefs/customize.rs`, `shortcut_sets.rs`; ui-egui `lib.rs`, `app.rs`, `app/frame.rs`, `input/shortcuts.rs` (chord poll, `tool_on`), `input/shortcut_dispatch.rs` (When-false → no key), `prefs/prefs_ui.rs`, `prefs_ui/dialogs.rs` (width up to 1000), `prefs_ui/shortcuts.rs` (column, chips, icons, clash icon), `file_dialog.rs` (`pick_file_bytes_limited`), `icon_data.rs`, `prefs_ui/tests.rs` + `shortcut_set_tests.rs`, `ATTRIBUTION.md` (Lucide count)
-
-## Tests
-
-engine-core `when chords chord_cmds shortcut_backup shortcut_sets`, ui-egui `keybinds shortcuts_upgrade shortcut_capture shortcut_set`
-
-```bash
-cargo test -p photocraft-engine-core --lib -- when chords chord_cmds shortcut_backup shortcut_sets image_cmds mode_cmds
-cargo test -p photocraft-ui-egui --lib -- close_keys start_screen layer_shortcut native_menu title_bar_items titlebar assign_shortcut dialogs::palette menu_custom canvas_tool_menu layer_menu tab_context keybinds shortcuts_upgrade shortcut_capture shortcut_set
-```
+engine-core `lib.rs`, `prefs.rs` (`chords`, `shortcut_when`), `prefs/validate.rs`, `prefs/customize.rs`, `prefs/store.rs` (a When change is a catalog change), `shortcut_sets.rs`; ui-egui `lib.rs`, `app.rs` (`raw_input_hook` calls the layer), `app/frame.rs` (the chord hint), `input/shortcuts.rs` (`handle` runs what the layer fired), `input/shortcut_dispatch.rs` (`unbind_gated`, `label` visible, `pick_tool` asks `tool_on`), `prefs/prefs_ui/shortcuts.rs` (the tab, `save_keys_with`, `open_shortcuts_for`), `prefs/prefs_ui.rs`, `ATTRIBUTION.md` (Lucide count)
 
 ## After the craft UI merge (2026-11-27)
 
-Partly works: chords and When conditions are stored, exported and imported by the engine; the key dispatch no longer reads them. Rebuild: rebuild the chord and When dispatch (`keybinds/`) and the Keyboard Shortcuts parts (`prefs_ui/shortcuts_*.rs`) on craft's keymap.
+Works again on craft's keymap, as the fork's own key layer in front of it:
+
+- `keybinds/runtime.rs` reads the frame's key presses in `raw_input_hook` (after the clipboard fix), before craft's key stage. It takes only what it owns: the first key of a chord (arms it; the next key finishes it, Esc, a wrong key or 4 s cancel it), and a key of a command whose When condition holds (the command runs). Everything else reaches craft unchanged. The commands it fires run in `shortcuts::handle`.
+- A command with a When condition has no keys in craft's keymap (`keybinds::unbind_gated`, called at the end of `shortcut_dispatch::overrides`; `PrefsStore::edit` counts a When change as a catalog change). When its condition fails, its key goes to whatever else has it (B is the next tool of its group: `gate::tool_on` takes it out of `pick_tool`'s group).
+- The Chords and Conditions tab of Keyboard Shortcuts and Menus (`prefs_ui/shortcuts_chords.rs`): search; per command a chord button (click, press two keys; Esc cancels, ⌫ removes), a clash icon with its note, a When text field (red with the parse error); Export and Import JSON buttons (the backup file of `shortcut_backup`; Import applies at once and reopens the dialog). While it records, the key layer hands it the presses and nothing runs.
+- OK writes the chords and conditions with the keys. The save resets the keys, and a reset clears chords and conditions, so `save_keys` writes them back (also for a `.kys` import).
+
+Not rebuilt: the When builder (autocomplete, `!`, + chips; the field takes the text and shows parse errors), the clash icon beside the key in craft's own table row, the Assign Shortcut entry from right-clicks (fork/assign-shortcut-palette.md). A shortcut set (the dialog's Set menu) still carries keys only.
+
+## Tests
+
+```bash
+cargo test -p photocraft-engine-core --lib -- when chords chord_cmds shortcut_backup shortcut_sets
+cargo test -p photocraft-ui-egui --lib -- keybinds shortcuts_chords shortcut_capture shortcut_set
+```

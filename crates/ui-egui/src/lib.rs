@@ -69,6 +69,8 @@ pub mod updates_ui;
 // fork: techneissa's own update check; the official one never runs (fork/fork-update-check.md).
 #[cfg(not(target_arch = "wasm32"))]
 pub mod fork_update;
+// fork: chords and When conditions in front of craft's keymap (fork/shortcut-upgrade.md).
+pub mod keybinds;
 
 // fork: awaiting rebuild on craft UI (official merge of 2026-11-27). These fork interface modules stay in
 // the tree, compiled out; each rebuild lane brings its own back, see fork/<slug>.md. The `mod` lines, by the
@@ -77,7 +79,6 @@ pub mod fork_update;
 //   mod assign_shortcut;               // fork/assign-shortcut-palette.md
 //   pub mod curves_clipping;           // fork/levels-curves-clipping.md
 //   mod double_exposure;               // fork/double-exposure.md
-//   pub mod keybinds;                  // fork/shortcut-upgrade.md
 //   pub mod menu_custom;               // fork/context-menu-editor.md, fork/context-menu-shortcuts.md
 //   mod open_as_layers;                // fork/open-as-layers.md
 //   mod place_photos;                  // fork/place-photos.md
@@ -91,9 +92,6 @@ pub mod fork_update;
 // prefs/prefs_ui.rs: mod ai_models;                  // fork/select-subject-ai.md, fork/birefnet-full.md
 //                    mod close_keys;                 // fork/settings-close-keys.md
 //                    mod settings_folder; mod settings_sync; // fork/settings-sync.md (settings_folder_web.rs on the web)
-//                    mod shortcut_target; mod shortcuts_backup; mod shortcuts_chord; mod shortcuts_when; // fork/shortcut-upgrade.md
-//                    mod shortcuts_items; mod shortcuts_menus; mod shortcuts_record; mod shortcuts_rows;
-//                    mod shortcuts_search; mod shortcuts_window; // fork/shortcuts-window.md (and their *_tests, *_snapshots)
 // tools.rs:          pub(super) mod sam3_ui;         // fork/sam3-click-select.md, fork/sam3-box-subject.md
 //                    pub(crate) mod transform_live;  // fork/transform-live-blend.md
 // widgets.rs (now gone): mod dropdown_search;        // fork/dropdown-search.md (widgets/dropdown_search.rs)
@@ -365,6 +363,8 @@ pub struct PhotocraftApp {
     info_samplers: Option<panels::SamplerReadouts>,
     /// Display profile readings (#569).
     monitors: monitor_status::State,
+    /// Chords waiting for their second key (`keybinds`).
+    keybinds: keybinds::State,
     pub(crate) thumbnail_cache: std::sync::Arc<std::sync::Mutex<crate::home_recent_ui::ThumbnailCache>>,
     /// The canvas tools' own state: every tool family's gesture, hover and option state
     /// (`canvas::tools`).

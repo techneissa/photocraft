@@ -362,7 +362,7 @@ pub fn menu_rows(app: &PhotocraftApp) -> Vec<Row> {
 }
 
 /// Background tint of an Edit › Menus colour name.
-pub(super) fn menu_tint(name: &str) -> Option<egui::Color32> {
+pub(crate) fn menu_tint(name: &str) -> Option<egui::Color32> {
     Some(match name {
         "red" => egui::Color32::from_rgb(190, 60, 60),
         "orange" => egui::Color32::from_rgb(200, 120, 40),

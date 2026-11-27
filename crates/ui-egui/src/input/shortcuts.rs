@@ -301,6 +301,7 @@ pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context) {
         return;
     }
     crate::shortcut_dispatch::run_fired(app, ctx, &fired);
+    crate::keybinds::runtime::run_fired(app, ctx);
     // A held tool letter released: a temporary tool gives the previous one back (#2672).
     crate::spring_tools::tick(app, ctx);
     // However the tool was picked (toolbar, flyout, shortcut, automation), its group's key and its

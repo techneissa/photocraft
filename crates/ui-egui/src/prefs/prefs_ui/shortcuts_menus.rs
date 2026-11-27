@@ -1,17 +1,12 @@
-//! The Menus tab's two controls, pinned to the right edge of every row in columns of their own:
-//! a Visible check box, and the item's colour as a dot (an empty circle with a red slash for
-//! none) that opens a small popover of colour dots. No text in the row; the names are tooltips
-//! and the column headers.
+//! The Menus tab's colour control: the item's colour as a dot (an empty circle with a red slash for
+//! none) that opens a small popover of colour dots; the names are tooltips.
 
 use egui::{Align, Color32, Layout, PopupCloseBehavior, Pos2, Response, Sense, Stroke, vec2};
 
-use super::Tokens;
+use crate::theme::Tokens;
 
-/// The width of the Visible column and of the Color column (their header text is centred in it).
-pub(super) const VISIBLE_WIDTH: f32 = 52.0;
+/// The width of the Color column.
 pub(super) const COLOR_WIDTH: f32 = 40.0;
-/// What the two columns and the gaps before them take of a row.
-pub(super) const CONTROLS_WIDTH: f32 = VISIBLE_WIDTH + COLOR_WIDTH + 2.0 * 12.0;
 
 /// The colours a menu item can have, in the order of the popover: the id stored in the settings
 /// and the name shown as its tooltip.
@@ -30,37 +25,6 @@ pub(super) fn colors() -> [(&'static str, &'static str); 8] {
 
 fn name_of(color: &str) -> &'static str {
     colors().into_iter().find(|(id, _)| *id == color).map_or(tl!("None"), |(_, name)| name)
-}
-
-/// A column header: dim, small, centred in its column.
-pub(super) fn header(ui: &mut egui::Ui, t: &Tokens, text: &str, width: f32) {
-    ui.allocate_ui_with_layout(vec2(width, 16.0), Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
-        ui.label(egui::RichText::new(text).size(11.0).color(t.text_faint));
-    });
-}
-
-/// The Visible check box of a row, centred in its column; greyed and inert when `enabled` is false.
-pub(super) fn visible_box(ui: &mut egui::Ui, t: &Tokens, on: &mut bool, enabled: bool) -> Response {
-    let mut response = ui
-        .allocate_ui_with_layout(vec2(VISIBLE_WIDTH, 22.0), Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
-            let (rect, r) = ui.allocate_exact_size(vec2(14.0, 14.0), if enabled { Sense::click() } else { Sense::hover() });
-            let r = if enabled { r.on_hover_cursor(egui::CursorIcon::PointingHand) } else { r };
-            crate::widgets::check_box(ui.painter(), rect, *on, enabled && r.hovered(), enabled && r.is_pointer_button_down_on(), t);
-            if !enabled {
-                ui.painter().rect_filled(rect, 2.0, Color32::from_black_alpha(100));
-            }
-            r
-        })
-        .inner;
-    response.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, enabled, *on, tl!("Visible")));
-    if enabled {
-        response = response.on_hover_text(tl!("Visible"));
-        if response.clicked() {
-            *on = !*on;
-            response.mark_changed();
-        }
-    }
-    response
 }
 
 /// Paint a colour dot: a filled circle, or for `None` an empty one with a red diagonal slash.

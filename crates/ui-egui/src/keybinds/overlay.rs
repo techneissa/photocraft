@@ -26,14 +26,14 @@ pub fn show(app: &mut PhotocraftApp, ctx: &egui::Context) {
     damaged_notice(app);
     let Some(p) = app.keybinds.pending else { return };
     let now = ctx.input(|i| i.time);
-    let blocked = !app.ui.dialogs.is_empty() || app.ui.palette_open || app.discard.is_some();
+    let blocked = app.dialog_open() || app.ui.palette.open || app.discard.is_some();
     if blocked || now - p.since > runtime::TIMEOUT {
         app.keybinds.pending = None;
         return;
     }
     let t = Tokens::get(ctx);
     let lead = chord::step_text(&p.first);
-    let next = runtime::continuations(app, crate::shortcut_dispatch::Focus::of(ctx), &p);
+    let next = runtime::continuations(app, super::focus::Focus::of(ctx), &p);
     let label = |id: &str| crate::i18n::tr_id(crate::i18n::current(), id, &crate::shortcut_dispatch::label(id)).to_string();
     egui::Area::new(egui::Id::unique("pc-chord-hint")).order(egui::Order::Tooltip).anchor(Align2::CENTER_BOTTOM, [0.0, -48.0]).interactable(false).show(
         ctx,
