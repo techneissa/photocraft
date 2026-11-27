@@ -3,3 +3,13 @@
 	AI Models	מודלים של בינה מלאכותית
 	subject segmentation (BiRefNet-lite)	פילוח נושא (BiRefNet-lite)
 	inpainting (LaMa)	מילוי אזורים (LaMa)
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	הקצאת קיצור…
+@id	settingsPage.contextMenus	תפריטי הקשר
+	Context Menus	תפריטי הקשר
+	Take out of the menu	הסרה מהתפריט
+	Add to the menu	הוספה לתפריט
+	Add Separator	הוספת מפריד
+	Move up	הזזה למעלה
+	Move down	הזזה למטה
+	Search commands	חיפוש פקודות

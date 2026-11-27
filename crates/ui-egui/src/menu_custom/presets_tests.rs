@@ -12,7 +12,7 @@ fn with(key: &str, a: Arrangement) -> Custom {
     Custom { menus: [(key.to_string(), a)].into(), ..Default::default() }
 }
 
-fn app() -> PhotocraftApp {
+fn app() -> Box<PhotocraftApp> {
     PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
 }
 
@@ -190,32 +190,13 @@ fn unknown_items_are_skipped_and_named() {
     assert!(backup::skipped_note(&parsed.skipped).contains("unknown items skipped"));
 }
 
-/// An app whose open dialog answers `answers` at once.
-fn app_answering(answers: Vec<Option<crate::file_dialog::FileDialogAnswer>>) -> PhotocraftApp {
-    let (show, _) = crate::file_dialog::fake(answers);
-    PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { file_dialog: Some(show), ..Default::default() })
-}
-
+/// A file bigger than a backup can be is refused before it is read as JSON.
 #[test]
-fn the_import_icon_refuses_a_big_file_before_reading_it_and_reads_a_small_one() {
-    use crate::file_dialog::FileDialogAnswer::Paths;
-    let dir = std::env::temp_dir().join(format!("pc-context-menus-big-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    // 2 GiB of nothing: reading it would take seconds and memory, the length alone refuses it
-    let big = dir.join("big.json");
-    std::fs::File::create(&big).unwrap().set_len(1 << 31).unwrap();
-    let small = dir.join("small.json");
-    std::fs::write(&small, backup::render(&with(TAB, arrangement(&[], &["file.closeAll"]))).unwrap()).unwrap();
-    let mut a = app_answering(vec![Some(Paths(vec![big.to_string_lossy().into_owned()])), Some(Paths(vec![small.to_string_lossy().into_owned()]))]);
-    let ctx = egui::Context::default();
-    backup::import(&mut a);
-    a.poll_file_dialog(&ctx, None);
-    assert!(a.ui.status.contains("too big") && a.ui.status_error, "{}", a.ui.status);
-    assert!(load(&a).menus.is_empty());
-    backup::import(&mut a);
-    a.poll_file_dialog(&ctx, None);
-    assert!(load(&a).menus.contains_key(TAB));
-    let _ = std::fs::remove_dir_all(dir);
+fn a_big_file_is_refused_and_changes_nothing() {
+    let mut custom = Custom::default();
+    let big = " ".repeat((1 << 20) + 1);
+    assert!(backup::import_into(&mut custom, &big).unwrap_err().contains("too big"));
+    assert!(custom.menus.is_empty());
 }
 
 #[test]

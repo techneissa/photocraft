@@ -3,3 +3,13 @@
 	AI Models	AI-modeller
 	subject segmentation (BiRefNet-lite)	motivsegmentering (BiRefNet-lite)
 	inpainting (LaMa)	utfylling (LaMa)
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Tildel snarvei…
+@id	settingsPage.contextMenus	Kontekstmenyer
+	Context Menus	Kontekstmenyer
+	Take out of the menu	Fjern fra menyen
+	Add to the menu	Legg til i menyen
+	Add Separator	Legg til skillelinje
+	Move up	Flytt opp
+	Move down	Flytt ned
+	Search commands	Søk i kommandoer

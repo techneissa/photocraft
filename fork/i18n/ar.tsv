@@ -13,3 +13,13 @@
 	Confirm remove	تأكيد الإزالة
 	subject segmentation (BiRefNet-lite)	تجزئة الموضوع (BiRefNet-lite)
 	inpainting (LaMa)	ملء الصورة (LaMa)
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	تعيين اختصار…
+@id	settingsPage.contextMenus	القوائم السياقية
+	Context Menus	القوائم السياقية
+	Take out of the menu	إزالة من القائمة
+	Add to the menu	إضافة إلى القائمة
+	Add Separator	إضافة فاصل
+	Move up	نقل لأعلى
+	Move down	نقل لأسفل
+	Search commands	البحث في الأوامر

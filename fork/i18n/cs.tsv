@@ -14,3 +14,13 @@
 	Confirm remove	Potvrdit odstranění
 	subject segmentation (BiRefNet-lite)	segmentace objektu (BiRefNet-lite)
 	inpainting (LaMa)	doplňování obrazu (LaMa)
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Přiřadit zkratku…
+@id	settingsPage.contextMenus	Kontextové nabídky
+	Context Menus	Kontextové nabídky
+	Take out of the menu	Odebrat z nabídky
+	Add to the menu	Přidat do nabídky
+	Add Separator	Přidat oddělovač
+	Move up	Posunout nahoru
+	Move down	Posunout dolů
+	Search commands	Hledat příkazy

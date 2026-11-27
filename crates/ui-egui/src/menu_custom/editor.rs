@@ -9,20 +9,105 @@
 //!   Backspace takes it out. Opening the page picks nothing.
 //! - The reset button puts the menu back as it came.
 //!
-//! The page edits a draft held by the Preferences dialog ([`super::DRAFT`]): OK and Apply save it,
-//! Cancel drops it. The search text and the picked row live in egui's memory: they are the page's,
-//! not settings.
+//! The page edits the draft of the Preferences window ([`super::KEY`], the arrangement as JSON text
+//! in the window's document): OK and Apply save it, Cancel drops it. The search text and the picked
+//! row live in egui's memory: they are the page's, not settings.
 
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
+use craft::theme::ColorToken;
+use craft::ui::contract::{Bind, Entry, Props as _, Show as _};
+use craft::ui::pickers::Select;
+use craft::ui::runtime::env::Env;
+use craft::ui::text::TextField;
 use egui::{Color32, Key, Modifiers, Rect, Sense, Stroke, pos2, vec2};
 use serde_json::Value;
 
 use super::menus::{self, MENUS};
-use super::{Arrangement, Custom, Slot, catalog, presets_ui};
-use crate::PhotocraftApp;
-use crate::theme::Tokens;
+use super::{Arrangement, Asks, Custom, Slot, catalog, presets_ui};
+
+/// The colours the page paints with, from the framework's theme tokens.
+#[derive(Clone, Copy)]
+pub(super) struct Pal {
+    pub chrome: Color32,
+    pub field: Color32,
+    pub field_border: Color32,
+    pub card_border: Color32,
+    pub hover: Color32,
+    pub pressed: Color32,
+    pub text: Color32,
+    pub text_dim: Color32,
+    pub text_faint: Color32,
+    pub icon: Color32,
+    pub accent: Color32,
+    pub row_selected: Color32,
+    pub radius_sm: f32,
+}
+
+impl Pal {
+    pub(super) fn of(ui: &egui::Ui) -> Pal {
+        let env = Env::of(ui);
+        let t = env.tokens.tokens();
+        let c = |token: ColorToken| {
+            let [r, g, b, a] = t.color(token).0;
+            Color32::from_rgba_unmultiplied(r, g, b, a)
+        };
+        Pal {
+            chrome: c(ColorToken::SurfaceChrome),
+            field: c(ColorToken::SurfaceSunken),
+            field_border: c(ColorToken::LineControlEdge),
+            card_border: c(ColorToken::LineBorder),
+            hover: c(ColorToken::StateHover),
+            pressed: c(ColorToken::StatePressed),
+            text: c(ColorToken::TextNormal),
+            text_dim: c(ColorToken::TextMuted),
+            text_faint: c(ColorToken::TextFaint),
+            icon: c(ColorToken::TextNormal),
+            accent: c(ColorToken::AccentSolid),
+            row_selected: c(ColorToken::StateSelected),
+            radius_sm: t.shape.radius.sm,
+        }
+    }
+}
+
+/// Draw the glyph `name` (`x`, `plus`, `minus`, `check`, `chevron-up`, `chevron-down`, `undo-2`) centred in `rect`,
+/// `size` points wide.
+pub(super) fn paint_icon(ui: &egui::Ui, rect: Rect, name: &str, size: f32, color: Color32) {
+    let c = rect.center();
+    let h = size * 0.3;
+    let stroke = Stroke::new(1.5, color);
+    let p = ui.painter();
+    let line = |pts: &[egui::Pos2]| {
+        p.add(egui::Shape::line(pts.to_vec(), stroke));
+    };
+    match name {
+        "x" => {
+            line(&[pos2(c.x - h, c.y - h), pos2(c.x + h, c.y + h)]);
+            line(&[pos2(c.x - h, c.y + h), pos2(c.x + h, c.y - h)]);
+        }
+        "plus" => {
+            line(&[pos2(c.x - h, c.y), pos2(c.x + h, c.y)]);
+            line(&[pos2(c.x, c.y - h), pos2(c.x, c.y + h)]);
+        }
+        "minus" => line(&[pos2(c.x - h, c.y), pos2(c.x + h, c.y)]),
+        "check" => line(&[pos2(c.x - h, c.y), pos2(c.x - h * 0.3, c.y + h * 0.8), pos2(c.x + h, c.y - h * 0.7)]),
+        "chevron-up" => line(&[pos2(c.x - h, c.y + h * 0.5), pos2(c.x, c.y - h * 0.5), pos2(c.x + h, c.y + h * 0.5)]),
+        "chevron-down" => line(&[pos2(c.x - h, c.y - h * 0.5), pos2(c.x, c.y + h * 0.5), pos2(c.x + h, c.y - h * 0.5)]),
+        // a bent arrow pointing left: back to how the menu came
+        "undo-2" => {
+            line(&[
+                pos2(c.x + h, c.y + h),
+                pos2(c.x + h, c.y),
+                pos2(c.x + h * 0.6, c.y - h * 0.6),
+                pos2(c.x, c.y - h * 0.8),
+                pos2(c.x - h * 0.8, c.y - h * 0.8),
+            ]);
+            line(&[pos2(c.x - h * 0.2, c.y - h * 1.6), pos2(c.x - h, c.y - h * 0.8), pos2(c.x - h * 0.2, c.y)]);
+        }
+        _ => {}
+    }
+}
 
 const ROW_H: f32 = 26.0;
 /// The least height of the lists; in a window with less room the page scrolls.
@@ -193,7 +278,7 @@ pub fn list_height(height: f32, used: f32) -> f32 {
 }
 
 /// A small icon button for the page's tool row; true when clicked. A disabled one is dimmed.
-fn tool_button(ui: &mut egui::Ui, t: &Tokens, icon: &str, tip: &str, enabled: bool) -> bool {
+fn tool_button(ui: &mut egui::Ui, t: &Pal, icon: &str, tip: &str, enabled: bool) -> bool {
     let (rect, r) = ui.allocate_exact_size(vec2(26.0, 24.0), if enabled { Sense::click() } else { Sense::hover() });
     r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, tip));
     if enabled && r.hovered() {
@@ -206,14 +291,14 @@ fn tool_button(ui: &mut egui::Ui, t: &Tokens, icon: &str, tip: &str, enabled: bo
     } else {
         t.icon
     };
-    crate::icons::paint(ui, rect, icon, 16.0, color);
+    paint_icon(ui, rect, icon, 16.0, color);
     r.on_hover_text(tip).clicked()
 }
 
-/// The page, `height` points tall (what the Preferences dialog gives its content), editing `draft`
-/// (the dialog's copy of the arrangement).
-pub fn page(app: &mut PhotocraftApp, ui: &mut egui::Ui, height: f32, draft: &mut Value) {
-    let t = Tokens::get(ui.ctx());
+/// The page, `height` points tall (what the Preferences window gives its content), editing `draft`
+/// (the window's copy of the arrangement). The Export and Import buttons ask through `asks`.
+pub fn page(asks: &Asks, ui: &mut egui::Ui, height: f32, draft: &mut Value) {
+    let t = Pal::of(ui);
     let origin = ui.cursor().top();
     let view_id = egui::Id::unique("context-menus-page");
     let mut view: View = ui.ctx().data(|d| d.get_temp(view_id)).unwrap_or_default();
@@ -229,7 +314,7 @@ pub fn page(app: &mut PhotocraftApp, ui: &mut egui::Ui, height: f32, draft: &mut
 
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(tl!(super::PAGE_TITLE)).font(crate::theme::semibold(14.0)).color(t.text));
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| presets_ui::show(app, ui, &mut custom, &t));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| presets_ui::show(asks, ui, &mut custom, &t));
     });
     // A preset may have changed this menu.
     if custom != before {
@@ -239,8 +324,10 @@ pub fn page(app: &mut PhotocraftApp, ui: &mut egui::Ui, height: f32, draft: &mut
     ui.add_space(4.0);
     let mut chosen = view.menu;
     ui.horizontal(|ui| {
-        let options: Vec<(usize, &str)> = MENUS.iter().enumerate().map(|(i, (_, title))| (i, *title)).collect();
-        crate::widgets::dropdown(ui, "context-menus-menu", tl!("Menu"), &mut chosen, &options, 170.0);
+        let entries: Vec<Entry<usize>> = MENUS.iter().enumerate().map(|(i, (_, title))| Entry::new(i, tl!(*title))).collect();
+        if let Some(picked) = Select::new(tl!("Menu"), Bind::given(chosen), &entries).id_salt("context-menus-menu").show(ui).value().copied() {
+            chosen = picked;
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if tool_button(ui, &t, "undo-2", tl!("Reset"), custom.menus.contains_key(key)) {
                 menu = default_slots(key);
@@ -343,13 +430,13 @@ fn grip(p: &egui::Painter, centre: egui::Pos2, color: Color32) {
 }
 
 /// A small icon button in a row; true when clicked.
-fn icon_button(ui: &mut egui::Ui, t: &Tokens, rect: Rect, id: egui::Id, icon: &str, tip: &str) -> bool {
+fn icon_button(ui: &mut egui::Ui, t: &Pal, rect: Rect, id: egui::Id, icon: &str, tip: &str) -> bool {
     let r = ui.interact(rect, id, Sense::click());
     r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tip));
     if r.hovered() {
         ui.painter().rect_filled(rect, t.radius_sm, t.pressed);
     }
-    crate::icons::paint(ui, rect, icon, 12.0, if r.hovered() { t.text } else { t.text_dim });
+    paint_icon(ui, rect, icon, 18.0, if r.hovered() { t.text } else { t.text_dim });
     r.on_hover_text(tip).clicked()
 }
 
@@ -359,11 +446,11 @@ fn truncated(ui: &egui::Ui, text: String, font: egui::FontId, color: Color32, ma
     ui.fonts_mut(|f| f.layout_job(job))
 }
 
-fn frame(t: &Tokens) -> egui::Frame {
+fn frame(t: &Pal) -> egui::Frame {
     egui::Frame::new().fill(t.field).stroke(Stroke::new(1.0, t.card_border)).corner_radius(6.0).inner_margin(FRAME_MARGIN)
 }
 
-fn shown_list(ui: &mut egui::Ui, t: &Tokens, key: &str, menu: &mut Vec<Slot>, view: &mut View, width: f32) {
+fn shown_list(ui: &mut egui::Ui, t: &Pal, key: &str, menu: &mut Vec<Slot>, view: &mut View, width: f32) {
     let list = frame(t).show(ui, |ui| {
         ui.set_width(width - 10.0);
         egui::ScrollArea::vertical().id_salt("context-menu-rows").max_height(view.list_h).min_scrolled_height(view.list_h).auto_shrink([false, false]).show(
@@ -483,7 +570,7 @@ fn edge_scroll(ui: &egui::Ui) {
 
 /// While something is dragged over the list: a line where it would go, and the move or insert when
 /// it is let go there. A drag let go anywhere else changes nothing.
-fn drop_into(ui: &mut egui::Ui, t: &Tokens, key: &str, menu: &mut Vec<Slot>, view: &mut View, list_rect: Rect, rects: &[Rect]) {
+fn drop_into(ui: &mut egui::Ui, t: &Pal, key: &str, menu: &mut Vec<Slot>, view: &mut View, list_rect: Rect, rects: &[Rect]) {
     let ctx = ui.ctx().clone();
     let Some(drag) = egui::DragAndDrop::payload::<Drag>(&ctx) else { return };
     let Some(pointer) = ctx.pointer_latest_pos() else { return };
@@ -532,8 +619,11 @@ fn drop_into(ui: &mut egui::Ui, t: &Tokens, key: &str, menu: &mut Vec<Slot>, vie
 }
 
 /// The list to add from, `width` wide, ending where the shown list (which starts at `left_top`) ends.
-fn add_list(ui: &mut egui::Ui, t: &Tokens, key: &'static str, menu: &mut Vec<Slot>, view: &mut View, (width, left_top): (f32, f32)) {
-    crate::widgets::text_field(ui, egui::Id::unique("context-menus-search"), &mut view.query, tl!("Search commands"), width, false);
+fn add_list(ui: &mut egui::Ui, t: &Pal, key: &'static str, menu: &mut Vec<Slot>, view: &mut View, (width, left_top): (f32, f32)) {
+    ui.allocate_ui(vec2(width, 0.0), |ui| {
+        ui.set_width(width);
+        TextField::new(tl!("Search commands"), Bind::bound(&mut view.query)).id_salt("context-menus-search").show(ui);
+    });
     // The offers are built again only when the menu, the search or the shown rows changed.
     let shown = shown_hash(menu);
     let offers = match view.offers.as_ref().filter(|c| c.key == key && c.shown == shown && c.query == view.query) {

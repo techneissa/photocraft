@@ -17,6 +17,7 @@ PhotoCraft takes the craft interface framework from [storytold/craft-libs](https
 | 3 | the command palette reports the typed text of a pick and puts a learned command first | `ui-patterns` `panels/palette.rs`: `PaletteOutput::query`, `CommandPalette::learned` (a command that goes first among the matches) | [palette-frecency.md](palette-frecency.md): the command picked for a typed text |
 | 4 | tone histograms scale to the tallest level between the two ends and draw one column per level | `imaging` `ui/histogram/paint.rs`: `tone_top` takes the interior peak (edge peak only when nothing is between), `tone_mesh` draws a column per bin | [levels-histogram.md](levels-histogram.md) |
 | 5 | Select and Mask: Refine Hair button, Protect Subject box and a Refine Hair edit the app can turn on | `imaging` `ui/select_mask`: `SelectMaskEdit::RefineHair`, `RefineHairControl` and `RefineHairEvent`, `SelectMaskBar::hair` (the button, its Stop while a run waits, the box), `SelectMaskWorkspace::refine_hair`, `SelectMaskEvent::RefineHair`, three words in `words.rs`; without `refine_hair(Some(..))` the bar keeps the official disabled button | [refine-hair.md](refine-hair.md) |
+| 6 | menu rows carry shortcut text and a right-click item; palette rows get the same item; Paths panel menu rows take shortcut text | `ui-contract` `entry.rs` (`Entry::shortcut`, `Entry::row_action`), `ui-widgets` `menu/popup.rs` (`entry_rows` shows both; `take_row_action`), `ui-patterns` `panels/palette.rs` (`CommandPalette::row_action`, `PaletteOutput::row_action`), `draw` `ui/paths/{panel,menu}.rs` (`PathsPanel::shortcut`). Two commits | [context-menu-shortcuts.md](context-menu-shortcuts.md), [assign-shortcut-palette.md](assign-shortcut-palette.md) |
 
 ## Move to a new upstream rev
 
@@ -29,4 +30,4 @@ PhotoCraft takes the craft interface framework from [storytold/craft-libs](https
 
 ## Tests
 
-None of its own: the patches are used by [blend-list.md](blend-list.md), [palette-frecency.md](palette-frecency.md), [levels-histogram.md](levels-histogram.md) and [refine-hair.md](refine-hair.md), whose tests cover them.
+None of its own: the patches are used by [blend-list.md](blend-list.md), [palette-frecency.md](palette-frecency.md), [levels-histogram.md](levels-histogram.md), [refine-hair.md](refine-hair.md) and [context-menu-shortcuts.md](context-menu-shortcuts.md), whose tests cover them.

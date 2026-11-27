@@ -22,6 +22,6 @@ ui-egui `canvas/canvas_tool_menu.rs` (2 lines), `canvas/tabs.rs` (`tab_context_m
 cargo test -p photocraft-ui-egui --lib -- menu_custom::shortcut
 ```
 
-## After the craft UI merge (2026-11-27)
+## On the craft UI (2026-11-27)
 
-Compiled out, awaiting rebuild: nothing. Rebuild: show shortcuts in craft's context menus (`menu_custom/shortcut.rs`).
+Rebuilt with a craft-libs patch ([craft-libs.md](craft-libs.md) patch 6): `Entry::shortcut` shows text at the right end of a menu row. `menu_custom::shortcut::entry` puts the command's current shortcut (the user's own included) on each command row of the Layers row menu, the canvas selection menus and the document tab menu; `PathsPanel::shortcut` does it for the four Paths panel row commands that map to one engine command (Make Selection, Fill Path, Stroke Path, Delete Path; `tools/vector_ui/paths_panel.rs`). Those four have no default key, so the Paths menu shows only a key the user assigned. The Layers panel's mask and effects menus keep their rows without keys.

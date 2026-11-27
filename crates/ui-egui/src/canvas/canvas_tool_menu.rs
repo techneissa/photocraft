@@ -1231,7 +1231,7 @@ pub fn rows(menu: &CanvasToolMenu) -> &'static [Row] {
 /// Is `command` one of the open menu's rows, and enabled?
 pub fn available(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> bool {
     (is_point(menu, command) && point_current(app, menu))
-        || ((rows(menu).iter().flatten().any(|(_, id)| *id == command) || is_spelling(menu, command) || is_crop(app, menu, command))
+        || ((crate::menu_custom::canvas_has(app, menu, command) || is_spelling(menu, command) || is_crop(app, menu, command))
             && entry_enabled(app, menu, command))
 }
 
@@ -1859,7 +1859,7 @@ fn choose_pen(app: &mut PhotocraftApp, ctx: &Context, menu: &CanvasToolMenu, com
 /// text shape, which a Convert or its Undo changes while the menu is open (#12043 review).
 pub fn close_stale(app: &mut PhotocraftApp) {
     let Some(menu) = app.ui.canvas_tool_menu.as_ref() else { return };
-    let stale = app.ui.tool != menu.under.unwrap_or(menu.tool)
+    let stale = crate::menu_custom::closed(app, menu)
         || match &menu.kind {
             MenuKind::TypeEdit { .. } => app.ui.text_edit.is_none(),
             MenuKind::TypeLayer { .. } => app.ui.text_edit.is_some(),
@@ -1916,7 +1916,8 @@ pub fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Entry<String>>
         out.push(Entry::new(command.clone(), point_label(command)).enabled(available(app, menu, command)));
         out.push(Entry::separator());
     }
-    for row in rows(menu) {
+    // fork: the arranged canvas menu (fork/context-menu-editor.md).
+    for row in &crate::menu_custom::canvas_rows(app, menu) {
         let Some((label, command)) = *row else {
             out.push(Entry::separator());
             continue;
@@ -1937,7 +1938,8 @@ pub fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Entry<String>>
             "Rasterize Layers" => tl!("Rasterize Layers"),
             key => tl!(key),
         };
-        out.push(Entry::new(command.to_string(), text.to_string()).enabled(entry_enabled(app, menu, command)).checked(mode_checked(app, menu, command)));
+        let entry = Entry::new(command.to_string(), text.to_string()).enabled(entry_enabled(app, menu, command)).checked(mode_checked(app, menu, command));
+        out.push(crate::menu_custom::shortcut::entry(app, entry, command));
     }
     out
 }

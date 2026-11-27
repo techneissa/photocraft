@@ -56,7 +56,13 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .uses(&uses)
         .learned(&learned)
         .recents(Bind::given(recents))
+        .row_action(tl!("Assign Shortcut…"))
         .show(ui);
+    // fork: Assign Shortcut… on a row (fork/assign-shortcut-palette.md): the palette closes, the shortcuts dialog opens.
+    if let Some(command) = out.row_action {
+        app.ui.palette.open = false;
+        crate::prefs_ui::open_shortcuts_for(app, &command.id);
+    }
     if let Some(command) = out.picked {
         frecency::note(app, &command.key_text(), &out.query);
     }

@@ -55,3 +55,13 @@
 	Refine Hair stopped	Förfina hår stoppades
 	Refine Hair ran without Protect Subject	Förfina hår kördes utan Skydda motivet
 	SAM 3 isn't ready, Refine Hair ran without Protect Subject	SAM 3 är inte redo, Förfina hår kördes utan Skydda motivet
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Tilldela kortkommando…
+@id	settingsPage.contextMenus	Snabbmenyer
+	Context Menus	Snabbmenyer
+	Take out of the menu	Ta bort från menyn
+	Add to the menu	Lägg till i menyn
+	Add Separator	Lägg till avgränsare
+	Move up	Flytta upp
+	Move down	Flytta ned
+	Search commands	Sök kommandon

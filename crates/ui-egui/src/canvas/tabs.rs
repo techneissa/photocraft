@@ -181,13 +181,17 @@ fn tab_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui, cx: &mut BodyCx<'_>, str
     let count = app.session.documents().len();
     let has_path = app.session.documents()[index].path.is_some();
     let items = tab_context_items(id, index, count, has_path);
-    let mut entries = Vec::with_capacity(items.len() + TAB_MENU_SEPARATORS_AFTER.len());
-    for (row, (label, _, _, enabled)) in items.iter().enumerate() {
-        entries.push(Entry::new(row, tl!(*label)).enabled(*enabled));
-        if TAB_MENU_SEPARATORS_AFTER.contains(&row) {
-            entries.push(Entry::separator());
-        }
-    }
+    // fork: the arranged tab menu and the shortcuts at the rows' right (fork/context-menu-editor.md).
+    let entries: Vec<Entry<usize>> = crate::menu_custom::tab_rows(&app.session.prefs().context_menus, &items)
+        .into_iter()
+        .map(|row| match row {
+            None => Entry::separator(),
+            Some(row) => {
+                let (label, command, _, enabled) = &items[row];
+                crate::menu_custom::shortcut::entry(app, Entry::new(row, tl!(*label)).enabled(*enabled), command)
+            }
+        })
+        .collect();
     let mut open = true;
     let picked =
         Menu::new(tl!("Document Tab")).opened_by(strip, Trigger::Manual).anchor(Anchor::Point(at)).open(Bind::bound(&mut open)).pick(ui, &entries).picked;

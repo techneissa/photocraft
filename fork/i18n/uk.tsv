@@ -14,3 +14,13 @@
 	Confirm remove	Підтвердити видалення
 	subject segmentation (BiRefNet-lite)	сегментація об’єктів (BiRefNet-lite)
 	inpainting (LaMa)	відновлення зображення (LaMa)
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Призначити скорочення…
+@id	settingsPage.contextMenus	Контекстні меню
+	Context Menus	Контекстні меню
+	Take out of the menu	Прибрати з меню
+	Add to the menu	Додати до меню
+	Add Separator	Додати роздільник
+	Move up	Вгору
+	Move down	Вниз
+	Search commands	Пошук команд

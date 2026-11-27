@@ -233,7 +233,7 @@ pub fn window_open(app: &PhotocraftApp) -> bool {
 
 /// Opens Edit › Preferences on `section` (`general` for an unknown one). With the window open only its page changes.
 pub fn open_preferences(app: &mut PhotocraftApp, section: &str) {
-    let section = if SECTIONS.iter().any(|(id, _)| *id == section) { section } else { "general" };
+    let section = if SECTIONS.iter().any(|(id, _)| *id == section) || section == crate::menu_custom::PAGE { section } else { "general" };
     if let Some(open) = app.framework.dialogs.get_mut::<PrefsDialog>() {
         open.state.selected = section.to_string();
         return;
@@ -245,8 +245,11 @@ pub fn open_preferences(app: &mut PhotocraftApp, section: &str) {
             return;
         }
     };
-    let pages: Vec<PageInfo> = StandardPage::ALL.into_iter().map(StandardPage::info).collect();
-    let doc = doc.pages(pages).rules(rules(app.ctx()));
+    let mut pages: Vec<PageInfo> = StandardPage::ALL.into_iter().map(StandardPage::info).collect();
+    // fork: the Context Menus page follows Interface.
+    let after = pages.iter().position(|p| p.id == "interface").map_or(pages.len(), |i| i + 1);
+    pages.insert(after, PageInfo::new(crate::menu_custom::PAGE, crate::menu_custom::PAGE_TITLE));
+    let doc = doc.pages(pages).rules(rules(app.ctx())).custom_page(crate::menu_custom::PAGE);
     // Agents reach the desktop app only; the web build shows the settings it had before as rows.
     #[cfg(not(target_arch = "wasm32"))]
     let doc = doc.custom_page(super::custom_rows::AGENTS_PAGE);
@@ -280,8 +283,13 @@ fn language_of(host: &Host, code: &str) -> Lang {
 /// Writes the keys Apply or OK changed through the engine, and returns the `prefs.set` reply. Only these keys go,
 /// so a setting changed elsewhere while the window is open is not overwritten. Keys Reset Section removed go through
 /// `prefs.reset`.
-fn write_edits(app: &mut PhotocraftApp, (values, resets): Edits) -> Result<Value, String> {
+fn write_edits(app: &mut PhotocraftApp, (mut values, resets): Edits) -> Result<Value, String> {
     let mut reply = json!({});
+    // fork: the arranged context menus are one engine value (`contextMenus`), kept as text in the window.
+    if let Some(text) = values.as_object_mut().and_then(|map| map.remove(crate::menu_custom::KEY)) {
+        let custom = crate::menu_custom::Custom::from_value(&crate::menu_custom::from_text(text.as_str().unwrap_or_default()));
+        crate::menu_custom::store(app, &custom);
+    }
     if values.as_object().is_some_and(|map| !map.is_empty()) {
         reply = app.run("prefs.set", json!({"values": values}))?;
     }
@@ -339,6 +347,27 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
     {
         dialog.state.error = Some(error);
     }
+    // fork: the Context Menus page's Export and Import buttons.
+    let asks = app.framework.dialogs.get::<PrefsDialog>().map(|d| d.custom.context_menu_asks()).unwrap_or_default();
+    for ask in asks {
+        match ask {
+            crate::menu_custom::Ask::Export => crate::menu_custom::backup::export(app),
+            crate::menu_custom::Ask::Import => crate::menu_custom::backup::import(app),
+        }
+    }
+}
+
+/// The arrangement the open window's Context Menus page edits (JSON); `None` when the window is closed.
+pub(crate) fn context_menus_draft(app: &PhotocraftApp) -> Option<Value> {
+    let doc = app.framework.dialogs.get::<PrefsDialog>()?.doc.as_ref()?;
+    Some(crate::menu_custom::from_text(&doc.draft().get::<String>(crate::menu_custom::KEY).unwrap_or_default()))
+}
+
+/// Makes `value` the arrangement the open window's page edits; `false` when the window is closed.
+pub(crate) fn set_context_menus_draft(app: &mut PhotocraftApp, value: &Value) -> bool {
+    let Some(doc) = app.framework.dialogs.get_mut::<PrefsDialog>().and_then(|d| d.doc.as_mut()) else { return false };
+    doc.draft_mut().set(crate::menu_custom::KEY, &crate::menu_custom::to_text(value));
+    true
 }
 
 /// Applies the open window's draft as its Apply button does and keeps the window open. `Err` when it is closed, a

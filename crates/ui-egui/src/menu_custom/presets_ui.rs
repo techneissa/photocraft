@@ -6,13 +6,12 @@
 
 use egui::{Rect, Sense, Stroke, pos2, vec2};
 
+use super::editor::{Pal, paint_icon};
 use super::presets::COUNT;
-use super::{Custom, backup};
-use crate::PhotocraftApp;
-use crate::theme::Tokens;
+use super::{Ask, Asks, Custom};
 
 /// A small icon button: a tray with an arrow out of it (`up`, Export) or into it (Import).
-fn tray_button(ui: &mut egui::Ui, t: &Tokens, up: bool, tip: &str) -> bool {
+fn tray_button(ui: &mut egui::Ui, t: &Pal, up: bool, tip: &str) -> bool {
     let (rect, r) = ui.allocate_exact_size(vec2(26.0, 24.0), Sense::click());
     r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tip));
     if r.hovered() {
@@ -41,14 +40,14 @@ fn label(custom: &Custom) -> (String, bool) {
 fn entry(ui: &mut egui::Ui, text: &str, checked: bool, enabled: bool) -> bool {
     let r = ui.add_enabled(enabled, egui::Button::new(text));
     if checked {
-        let t = Tokens::get(ui.ctx());
-        crate::icons::paint(ui, Rect::from_center_size(pos2(r.rect.right() - 12.0, r.rect.center().y), vec2(13.0, 13.0)), "check", 13.0, t.text);
+        let t = Pal::of(ui);
+        paint_icon(ui, Rect::from_center_size(pos2(r.rect.right() - 12.0, r.rect.center().y), vec2(13.0, 13.0)), "check", 13.0, t.text);
     }
     r.clicked()
 }
 
 /// The dropdown: a button showing `text`, and the chevron.
-fn dropdown_button(ui: &mut egui::Ui, t: &Tokens, text: &str) -> egui::Response {
+fn dropdown_button(ui: &mut egui::Ui, t: &Pal, text: &str) -> egui::Response {
     let galley = ui.painter().layout_no_wrap(text.to_string(), egui::FontId::proportional(12.0), t.text);
     let size = vec2(galley.size().x.max(60.0) + 36.0, 24.0);
     let (rect, r) = ui.allocate_exact_size(size, Sense::click());
@@ -56,7 +55,7 @@ fn dropdown_button(ui: &mut egui::Ui, t: &Tokens, text: &str) -> egui::Response 
     let fill = if r.hovered() { t.hover } else { t.field };
     ui.painter().rect(rect, t.radius_sm, fill, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
     ui.painter().galley(pos2(rect.left() + 10.0, rect.center().y - galley.size().y / 2.0), galley, t.text);
-    crate::icons::paint(ui, Rect::from_center_size(pos2(rect.right() - 12.0, rect.center().y), vec2(14.0, 14.0)), "chevron-down", 14.0, t.icon);
+    paint_icon(ui, Rect::from_center_size(pos2(rect.right() - 12.0, rect.center().y), vec2(14.0, 14.0)), "chevron-down", 14.0, t.icon);
     r
 }
 
@@ -84,18 +83,17 @@ fn manage(ui: &mut egui::Ui, custom: &mut Custom) {
 }
 
 /// The presets control, laid out right to left on the heading's line.
-pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, custom: &mut Custom, t: &Tokens) {
+pub fn show(asks: &Asks, ui: &mut egui::Ui, custom: &mut Custom, t: &Pal) {
     if tray_button(ui, t, false, tl!("Import Context Menus…")) {
-        backup::import(app);
+        asks.push(Ask::Import);
     }
     if tray_button(ui, t, true, tl!("Export Context Menus…")) {
-        backup::export(app);
+        asks.push(Ask::Export);
     }
     let (text, edited) = label(custom);
     let r = dropdown_button(ui, t, &text);
     let r = if edited { r.on_hover_text(tl!("Changed since saved")) } else { r };
     egui::Popup::menu(&r).show(|ui| {
-        crate::widgets::style_spectrum_popup_menu(ui);
         ui.set_min_width(150.0);
         let states = custom.states();
         for n in 1..=COUNT {

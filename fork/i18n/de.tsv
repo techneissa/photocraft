@@ -47,3 +47,13 @@
 	{n} min ago	vor {n} Min.
 	{n} h ago	vor {n} Std.
 	Yesterday	Gestern
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Tastenkürzel zuweisen…
+@id	settingsPage.contextMenus	Kontextmenüs
+	Context Menus	Kontextmenüs
+	Take out of the menu	Aus dem Menü entfernen
+	Add to the menu	Zum Menü hinzufügen
+	Add Separator	Trennlinie hinzufügen
+	Move up	Nach oben
+	Move down	Nach unten
+	Search commands	Befehle suchen
