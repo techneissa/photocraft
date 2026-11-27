@@ -705,7 +705,13 @@ pub fn finish_object_selection(app: &mut PhotocraftApp, start: [f64; 2], end: [f
             .active()
             .is_some_and(|st| photocraft_engine::smartselect_cmds::empty_sampled_area(&st.doc, st.active_layer, sample_all, here).is_some());
         if !empty {
-            let _ = app.run("select.object", json!({"point": [end[0], end[1]], "mode": mode, "sampleAllLayers": sample_all, "hardEdge": hard_edge}));
+            let mut p = json!({"point": [end[0], end[1]], "mode": mode, "sampleAllLayers": sample_all, "hardEdge": hard_edge});
+            // With SAM 3, ⇧ and ⌥ add a positive or negative point to the mask the last click made.
+            if mods.shift != mods.alt {
+                p["refine"] = json!(if mods.shift { "add" } else { "subtract" });
+            }
+            let r = app.run("select.object", p);
+            report_smart_note(app, &r);
         }
         crate::object_finder::clear(app);
         return;
@@ -721,6 +727,7 @@ pub fn finish_object_selection(app: &mut PhotocraftApp, start: [f64; 2], end: [f
         "select.object",
         json!({"rect": [x.round(), y.round(), w.round(), h.round()], "mode": mode, "sampleAllLayers": sample_all, "hardEdge": hard_edge, "recordEmptyArea": true}),
     );
+    report_smart_note(app, &r);
     if matches!(r, Ok(ref v) if v.get("changed").and_then(Value::as_bool) == Some(false)) {
         let why = tl!("Couldn't find an object to select. There might not be enough edge contrast, or the object might be too small.");
         let _ = crate::dialogs::alerts::alert_once(app, why, OBJECT_NOT_FOUND_PREF);
@@ -738,6 +745,35 @@ pub fn report_smart_result(app: &mut PhotocraftApp, res: Result<Value, String>, 
     if matches!(res, Ok(ref v) if v.get("changed").and_then(Value::as_bool) == Some(false)) {
         app.ui.status = empty_msg.into();
         app.ui.status_error = false;
+    } else {
+        report_smart_note(app, &res);
+    }
+}
+
+/// A smart selection that fell back (Select Subject from the macOS cutout, a click or rectangle from SAM 3 to Classic)
+/// says why in the status bar: the result's `note`, worded in the user's language.
+pub(crate) fn report_smart_note(app: &mut PhotocraftApp, res: &Result<Value, String>) {
+    if let Ok(v) = res
+        && let Some(note) = v.get("note").and_then(Value::as_str)
+    {
+        app.ui.status = smart_note(note).into();
+        app.ui.status_error = false;
+    }
+}
+
+/// The engine's note for a smart selection (its own English words), in the user's language.
+pub(crate) fn smart_note(note: &str) -> &str {
+    match note {
+        "macOS cutout unavailable, used Classic" => tl!("macOS cutout unavailable, used Classic"),
+        "macOS cutout failed, used Classic" => tl!("macOS cutout failed, used Classic"),
+        photocraft_engine::smartselect_cmds::MODEL_MISSING => tl!("AI model not installed, used Classic (Preferences › AI Models)"),
+        photocraft_engine::smartselect_cmds::MODEL_FAILED => tl!("AI model failed, used Classic"),
+        photocraft_engine::smartselect_cmds::MODEL_NO_MEMORY => tl!("Not enough memory for the AI model, used Classic"),
+        photocraft_engine::sam3_select::NOT_INSTALLED => tl!("SAM 3 not installed, used Classic (Preferences › AI Models)"),
+        photocraft_engine::sam3_select::NO_MEMORY => tl!("Not enough memory for SAM 3, used Classic"),
+        photocraft_engine::sam3_select::FAILED => tl!("SAM 3 failed, used Classic"),
+        photocraft_engine::sam3_select::NOT_READY => tl!("SAM 3 is still preparing, used Classic"),
+        other => tl!(other),
     }
 }
 

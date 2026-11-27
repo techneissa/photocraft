@@ -73,7 +73,7 @@ impl Sam3Backend for Fake {
 
 /// A 200 × 160 document with a red disc (centre 100, 80, radius 45) on blue, the Object Selection
 /// tool picked, and a SAM 3 fake installed.
-fn app_with(fake: &Arc<Fake>) -> PhotocraftApp {
+fn app_with(fake: &Arc<Fake>) -> Box<PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.session.execute("file.new", json!({"width": 200, "height": 160})).unwrap();
     app.session
@@ -204,7 +204,8 @@ fn hovering_shows_the_sam3_object_once_it_is_ready() {
     settle(&mut app);
     let mut t = 100.0;
     let shown = loop {
-        let u = crate::object_finder::update(&mut app, Some([100.0, 80.0]), false, t);
+        let ctx = app.ctx().clone();
+        let u = crate::object_finder::update(&mut app, Some([100.0, 80.0]), false, t, &ctx);
         if !u.busy && u.shown.is_some() || t > 130.0 {
             break u.shown;
         }
@@ -214,7 +215,13 @@ fn hovering_shows_the_sam3_object_once_it_is_ready() {
     let r = shown.expect("a highlighted object");
     // SAM 3's disc (radius 30) and not the Classic finder's (radius 45)
     assert!(r.at(100, 80) > 0.99 && r.at(100 + 25, 80) > 0.99 && r.at(100 + 40, 80) == 0.0, "{:?}", r.bbox);
-    assert!(app.session.object_finder.is_empty(), "Classic's cache is kept for Classic's results");
+    assert!(
+        {
+            use photocraft_engine::smartselect_cmds::SmartSelectExt as _;
+            app.session.object_finder().is_empty()
+        },
+        "Classic's cache is kept for Classic's results"
+    );
 }
 
 #[test]
@@ -275,7 +282,8 @@ fn real_model_timings_in_the_shell() {
     let t = std::time::Instant::now();
     let mut now = 100.0;
     let shown = loop {
-        let u = crate::object_finder::update(&mut app, Some([point[0], point[1]]), false, now);
+        let ctx = app.ctx().clone();
+        let u = crate::object_finder::update(&mut app, Some([point[0], point[1]]), false, now, &ctx);
         if u.shown.is_some() || now > 130.0 {
             break u.shown;
         }

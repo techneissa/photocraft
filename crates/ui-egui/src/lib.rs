@@ -90,14 +90,15 @@ pub mod menu_custom;
 //   #[cfg(test)] mod mask_clipboard_tests; // fork/upstream-select-mask.md
 // dialogs.rs:        mod placement;                  // fork/windows-open-centred.md
 // dialogs/palette.rs: mod list; mod nav;           // fork/assign-shortcut-palette.md (frecency is back: fork/palette-frecency.md)
-// dialogs/select_mask_ui.rs: mod protect;            // fork/refine-hair.md
 // panels.rs:         pub(crate) mod title_bar_items; // fork/topbar-items.md
 //                    #[cfg(test)] mod brush_size_label_tests; // fork/settings-sync.md
 // prefs/prefs_ui.rs: mod ai_models;                  // fork/select-subject-ai.md, fork/birefnet-full.md
 //                    mod close_keys;                 // fork/settings-close-keys.md
 //                    mod settings_folder; mod settings_sync; // fork/settings-sync.md (settings_folder_web.rs on the web)
-// tools.rs:          pub(super) mod sam3_ui;         // fork/sam3-click-select.md, fork/sam3-box-subject.md
-//                    pub(crate) mod transform_live;  // fork/transform-live-blend.md
+//                    mod shortcut_target; mod shortcuts_backup; mod shortcuts_chord; mod shortcuts_when; // fork/shortcut-upgrade.md
+//                    mod shortcuts_items; mod shortcuts_menus; mod shortcuts_record; mod shortcuts_rows;
+//                    mod shortcuts_search; mod shortcuts_window; // fork/shortcuts-window.md (and their *_tests, *_snapshots)
+// tools.rs:          pub(crate) mod transform_live;  // fork/transform-live-blend.md
 // widgets.rs (now gone): mod dropdown_search;        // fork/dropdown-search.md (widgets/dropdown_search.rs)
 // fork_update.rs:    mod ui; mod snapshots;          // fork/fork-update-check.md (the Settings row)
 
@@ -318,6 +319,7 @@ pub use tools::perspective_crop_ui;
 pub use tools::perspective_ui;
 pub use tools::puppet_ui;
 pub use tools::retouch_ui;
+pub(crate) use tools::sam3_ui;
 pub use tools::shape_controls;
 use tools::shape_gradient_ui;
 use tools::shape_options;
@@ -412,6 +414,8 @@ pub struct PhotocraftApp {
     pub(crate) move_distance: Option<move_distance::Cache>,
     /// Object Selection › Object Finder: the hover preview (`object_finder`).
     pub(crate) object_finder: Option<object_finder::Finder>,
+    /// SAM 3 for Object Selection and Quick Selection: what the status bar was told (`sam3_ui`).
+    pub(crate) sam3_ui: sam3_ui::Sam3Ui,
     /// A blend mode hovered in the Layers panel, shown live (`blend_preview`).
     pub(crate) blend_preview: Option<blend_preview::BlendPreview>,
     /// Layers panel drag: temporary reordered document displayed until mouse release.
@@ -524,6 +528,8 @@ pub struct PhotocraftApp {
     /// keyed by the dialog.
     pub(crate) layer_style_target: Option<(craft::ui::dialog::DialogId, DocId, photocraft_doc::LayerId)>,
     pub(crate) select_mask_target: Option<(craft::ui::dialog::DialogId, DocId, photocraft_doc::LayerId, std::sync::Arc<select_mask_ui::PcSelectMaskSource>)>,
+    /// Select and Mask's Refine Hair: the Protect Subject box and the wait for SAM 3 (`select_mask_ui::protect`).
+    pub(crate) select_mask_protect: select_mask_ui::ProtectUi,
     /// The Guide Layout dialog's document.
     pub(crate) guide_layout_doc: Option<(craft::ui::dialog::DialogId, DocId)>,
     /// The Export As dialog that is open.
