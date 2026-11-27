@@ -96,7 +96,6 @@ pub mod fork_update;
 //                    mod shortcuts_search; mod shortcuts_window; // fork/shortcuts-window.md (and their *_tests, *_snapshots)
 // tools.rs:          pub(super) mod sam3_ui;         // fork/sam3-click-select.md, fork/sam3-box-subject.md
 //                    pub(crate) mod transform_live;  // fork/transform-live-blend.md
-// tools/brush_resize.rs: mod look; mod press; #[cfg(test)] mod drag_tests; // fork/brush-resize-drag.md
 // widgets.rs (now gone): mod dropdown_search;        // fork/dropdown-search.md (widgets/dropdown_search.rs)
 // fork_update.rs:    mod ui; mod snapshots;          // fork/fork-update-check.md (the Settings row)
 
