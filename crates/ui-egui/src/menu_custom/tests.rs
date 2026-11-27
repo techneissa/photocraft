@@ -243,7 +243,8 @@ fn every_layer_row_the_menu_builds_is_known_to_the_editor() {
 #[test]
 fn every_tab_row_the_menu_builds_is_known_to_the_editor() {
     // what the tab menu builds (`tab_context_items`, the one `tab_context_menu` draws) against the editor's list
-    let built: Vec<(&str, &str)> = crate::canvas::tabs::tab_context_items(photocraft_doc::DocId(0), 0, 2, true).iter().map(|(label, id, ..)| (*label, *id)).collect();
+    let built: Vec<(&str, &str)> =
+        crate::canvas::tabs::tab_context_items(photocraft_doc::DocId(0), 0, 2, true).iter().map(|(label, id, ..)| (*label, *id)).collect();
     let known: Vec<(&str, &str)> = menus::rows(TAB).into_iter().flatten().collect();
     assert_eq!(built, known, "a tab menu row changed: update menu_custom::menus::TAB_ROWS");
 }
@@ -345,14 +346,12 @@ fn a_hidden_and_a_reordered_row_show_up_that_way_in_the_layers_menu() {
 /// The document tab menu follows the arrangement the same way.
 #[test]
 fn a_hidden_row_is_gone_from_the_tab_menu() {
-    let app = app();
     let items = crate::canvas::tabs::tab_context_items(photocraft_doc::DocId(0), 0, 2, true);
     let all = tab_rows(&Value::Null, &items);
     assert_eq!(all.len(), 10, "eight rows and two separators");
     let saved = json!({"menus": {TAB: {"items": [], "hidden": ["file.closeAll"]}}});
     let shown = tab_rows(&saved, &items);
     assert!(!shown.iter().flatten().any(|i| items[*i].1 == "file.closeAll") && shown.iter().flatten().count() == 7);
-    let _ = app;
 }
 
 #[test]

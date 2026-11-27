@@ -20,3 +20,13 @@
 	{n} min ago	{n} min geleden
 	{n} h ago	{n} u geleden
 	Yesterday	Gisteren
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Sneltoets toewijzen…
+@id	settingsPage.contextMenus	Contextmenu's
+	Context Menus	Contextmenu's
+	Take out of the menu	Uit het menu halen
+	Add to the menu	Aan het menu toevoegen
+	Add Separator	Scheidingslijn toevoegen
+	Move up	Omhoog
+	Move down	Omlaag
+	Search commands	Opdrachten zoeken

@@ -233,7 +233,7 @@ pub fn window_open(app: &PhotocraftApp) -> bool {
 
 /// Opens Edit › Preferences on `section` (`general` for an unknown one). With the window open only its page changes.
 pub fn open_preferences(app: &mut PhotocraftApp, section: &str) {
-    let section = if SECTIONS.iter().any(|(id, _)| *id == section) { section } else { "general" };
+    let section = if SECTIONS.iter().any(|(id, _)| *id == section) || section == crate::menu_custom::PAGE { section } else { "general" };
     if let Some(open) = app.framework.dialogs.get_mut::<PrefsDialog>() {
         open.state.selected = section.to_string();
         return;

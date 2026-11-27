@@ -14,3 +14,13 @@
 	Confirm remove	Potvrdi uklanjanje
 	subject segmentation (BiRefNet-lite)	segmentacija subjekta (BiRefNet-lite)
 	inpainting (LaMa)	popunjavanje slike (LaMa)
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	Dodeli prečicu…
+@id	settingsPage.contextMenus	Kontekstualni meniji
+	Context Menus	Kontekstualni meniji
+	Take out of the menu	Ukloni iz menija
+	Add to the menu	Dodaj u meni
+	Add Separator	Dodaj razdelnik
+	Move up	Pomeri gore
+	Move down	Pomeri dole
+	Search commands	Pretraži komande

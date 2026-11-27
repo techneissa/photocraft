@@ -20,3 +20,13 @@
 	{n} min ago	{n}分前
 	{n} h ago	{n}時間前
 	Yesterday	昨日
+# Context menus (fork/context-menu-editor.md, fork/assign-shortcut-palette.md)
+	Assign Shortcut…	ショートカットを割り当て…
+@id	settingsPage.contextMenus	コンテキストメニュー
+	Context Menus	コンテキストメニュー
+	Take out of the menu	メニューから外す
+	Add to the menu	メニューに追加
+	Add Separator	区切り線を追加
+	Move up	上へ移動
+	Move down	下へ移動
+	Search commands	コマンドを検索

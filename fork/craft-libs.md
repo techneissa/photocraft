@@ -17,6 +17,8 @@ PhotoCraft takes the craft interface framework from [storytold/craft-libs](https
 | 3 | the command palette reports the typed text of a pick and puts a learned command first | `ui-patterns` `panels/palette.rs`: `PaletteOutput::query`, `CommandPalette::learned` (a command that goes first among the matches) | [palette-frecency.md](palette-frecency.md): the command picked for a typed text |
 | 4 | tone histograms scale to the tallest level between the two ends and draw one column per level | `imaging` `ui/histogram/paint.rs`: `tone_top` takes the interior peak (edge peak only when nothing is between), `tone_mesh` draws a column per bin | [levels-histogram.md](levels-histogram.md) |
 
+| 5 | menu rows carry shortcut text and a right-click item; palette rows get the same item; Paths panel menu rows take shortcut text | `ui-contract` `entry.rs` (`Entry::shortcut`, `Entry::row_action`), `ui-widgets` `menu/popup.rs` (`entry_rows` shows both; `take_row_action`), `ui-patterns` `panels/palette.rs` (`CommandPalette::row_action`, `PaletteOutput::row_action`), `draw` `ui/paths/{panel,menu}.rs` (`PathsPanel::shortcut`). Two commits | [context-menu-shortcuts.md](context-menu-shortcuts.md), [assign-shortcut-palette.md](assign-shortcut-palette.md) |
+
 The Refine Hair button adds its patch to the same branch when they are rebuilt; add a row here for each.
 
 ## Move to a new upstream rev
@@ -30,4 +32,4 @@ The Refine Hair button adds its patch to the same branch when they are rebuilt; 
 
 ## Tests
 
-None of its own: the patches are used by [blend-list.md](blend-list.md), [palette-frecency.md](palette-frecency.md) and [levels-histogram.md](levels-histogram.md), whose tests cover them.
+None of its own: the patches are used by [blend-list.md](blend-list.md), [palette-frecency.md](palette-frecency.md) and [levels-histogram.md](levels-histogram.md), whose tests cover them (patch 5: [context-menu-shortcuts.md](context-menu-shortcuts.md)).

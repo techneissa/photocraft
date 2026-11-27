@@ -96,7 +96,13 @@ pub(super) fn paint_icon(ui: &egui::Ui, rect: Rect, name: &str, size: f32, color
         "chevron-down" => line(&[pos2(c.x - h, c.y - h * 0.5), pos2(c.x, c.y + h * 0.5), pos2(c.x + h, c.y - h * 0.5)]),
         // a bent arrow pointing left: back to how the menu came
         "undo-2" => {
-            line(&[pos2(c.x + h, c.y + h), pos2(c.x + h, c.y), pos2(c.x + h * 0.6, c.y - h * 0.6), pos2(c.x, c.y - h * 0.8), pos2(c.x - h * 0.8, c.y - h * 0.8)]);
+            line(&[
+                pos2(c.x + h, c.y + h),
+                pos2(c.x + h, c.y),
+                pos2(c.x + h * 0.6, c.y - h * 0.6),
+                pos2(c.x, c.y - h * 0.8),
+                pos2(c.x - h * 0.8, c.y - h * 0.8),
+            ]);
             line(&[pos2(c.x - h * 0.2, c.y - h * 1.6), pos2(c.x - h, c.y - h * 0.8), pos2(c.x - h * 0.2, c.y)]);
         }
         _ => {}
