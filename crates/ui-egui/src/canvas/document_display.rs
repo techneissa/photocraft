@@ -480,10 +480,20 @@ fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, id
     let ants = ants_shown(app, idx);
     if let Some(state) = app.session.documents().get(idx) {
         let doc = state.doc.clone();
-        if let Some(selection) = doc.selection.as_ref() {
-            let mask = super::outline::SurfaceMask::new(selection, selection.generation(), [doc.size.width, doc.size.height]);
+        // Select › Modify outlines the selection its preview made (on the proxy, reduced by `k`; #8414), until OK commits it.
+        let modified = app
+            .filter_preview
+            .as_ref()
+            .filter(|f| f.key.doc == doc.id && f.key.command.starts_with("select.modify."))
+            .and_then(|f| Some((f.result.clone()?, f.key.k.max(1))));
+        let (outlined, shown_doc, k) = match &modified {
+            Some((preview, k)) => (preview.selection.as_ref(), &**preview, *k),
+            None => (doc.selection.as_ref(), &*doc, 1),
+        };
+        if let Some(selection) = outlined {
+            let mask = super::outline::SurfaceMask::new(selection, selection.generation(), [shown_doc.size.width, shown_doc.size.height]);
             // The map is `transform_tool::selection_map` while a Free Transform carries the selection.
-            let mut overlay = SelectionOverlay::new(label.to_owned(), &mask).visible(ants.is_some()).offset(ants.map_or([0, 0], |(x, y)| [x, y]));
+            let mut overlay = SelectionOverlay::new(label.to_owned(), &mask).visible(ants.is_some()).offset(ants.map_or([0, 0], |(x, y)| [x, y])).reduction(k);
             if let Some(map) = crate::transform_tool::selection_map(app, doc.id) {
                 overlay = overlay.mapped(map);
             }

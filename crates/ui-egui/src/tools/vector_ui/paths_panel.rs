@@ -331,6 +331,8 @@ pub fn paths_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         if let Some(text) = crate::menu_custom::shortcut::text(app, id) {
             panel = panel.shortcut(command, text);
         }
+        // fork: Assign Shortcut… on a right click of the row (fork/assign-shortcut-palette.md).
+        panel = panel.assign(command, id);
     }
     let events = panel.show(ui).events;
     for event in events {

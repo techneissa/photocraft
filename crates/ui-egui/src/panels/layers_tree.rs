@@ -553,6 +553,22 @@ impl LayerTree for PhotoLayers {
         footer.more.push(self.place_photo.clone());
         footer.adjustment_menu = adjustments;
         footer.style_menu = styles;
+        // fork: Assign Shortcut… on a right click of a footer button (fork/assign-shortcut-palette.md): the button's
+        // command, in button order; the two menu buttons stand for no single command.
+        let delete = if self.vector_mask_target && active.is_some_and(|l| l.vector_mask.is_some()) {
+            "layer.vectorMask.delete"
+        } else if self.mask_target && active.is_some_and(|l| l.mask.is_some()) {
+            "layer.layerMask.delete"
+        } else {
+            "layer.delete"
+        };
+        let mask = crate::layer_menu_ui::mask_button_command(active, self.doc().selection.is_some(), false).unwrap_or_default();
+        footer.commands = [delete, "layer.new.layer", "layer.new.group", "", mask, "", "layer.linkLayers"].map(String::from).to_vec();
+        // The buttons after Link Layers: Double Exposure while shown, then Place Photo (as [`more_commands`]).
+        if self.double_exposure.is_some() {
+            footer.commands.push(crate::double_exposure::COMMAND.to_string());
+        }
+        footer.commands.push(crate::place_photos::COMMAND.to_string());
         footer
     }
 
@@ -717,7 +733,12 @@ pub(crate) fn row_menu(app: &PhotocraftApp, tree: &PhotoLayers, target: &MenuTar
                 out.push(Entry::new(format!("{LOAD_MASK}{op}"), label.to_string()));
             }
             out.push(Entry::separator());
-            out.push(Entry::new(MASK_REFINE.to_string(), tl!("Select and Mask…").to_string()).enabled(crate::menus::is_enabled(app, "select.selectAndMask")));
+            // fork: shortcut and Assign Shortcut… on the row (fork/context-menu-shortcuts.md).
+            out.push(crate::menu_custom::shortcut::entry(
+                app,
+                Entry::new(MASK_REFINE.to_string(), tl!("Select and Mask…").to_string()).enabled(crate::menus::is_enabled(app, "select.selectAndMask")),
+                "select.selectAndMask",
+            ));
             out.push(Entry::new(MASK_OPTIONS.to_string(), tl!("Mask Options…").to_string()));
             out
         }

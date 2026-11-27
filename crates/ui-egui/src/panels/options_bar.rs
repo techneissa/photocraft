@@ -31,6 +31,8 @@ enum Reset {
     Tool,
     /// Reset All Tools.
     All,
+    /// fork: Assign Shortcut… for the tool (fork/assign-shortcut-palette.md); no engine command.
+    Shortcut,
 }
 
 impl Reset {
@@ -39,6 +41,7 @@ impl Reset {
         match self {
             Reset::Tool => "tool.reset",
             Reset::All => "tool.resetAll",
+            Reset::Shortcut => "",
         }
     }
 }
@@ -228,6 +231,9 @@ fn lead(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     for event in sent {
         match event {
             LeadEvent::Home => app.ui.chrome.home = if on { None } else { Some(documents) },
+            LeadEvent::Reset(Reset::Shortcut) => {
+                crate::prefs_ui::open_shortcuts_for(app, &crate::input::tool_shortcuts::id(app.ui.tool));
+            }
             LeadEvent::Reset(reset) => {
                 if let Err(e) = crate::menus::invoke(app, ui.ctx(), reset.command(), json!({})) {
                     app.ui.status = e;
@@ -245,7 +251,12 @@ fn lead_view(props: &mut LeadProps<'_>, ui: &mut egui::Ui) {
     }
     let tool = BarTool::new(icons::tool_icon(props.tool), tl!(props.tool.label()).to_owned()).enabled(!props.warping).show(ui);
     // Photoshop: right-click the tool icon for Reset Tool / Reset All Tools.
-    let rows = [Entry::new(Reset::Tool, tl!("Reset Tool").to_owned()), Entry::new(Reset::All, tl!("Reset All Tools").to_owned())];
+    let rows = [
+        Entry::new(Reset::Tool, tl!("Reset Tool").to_owned()),
+        Entry::new(Reset::All, tl!("Reset All Tools").to_owned()),
+        Entry::separator(),
+        Entry::new(Reset::Shortcut, tl!("Assign Shortcut…").to_owned()),
+    ];
     if let Some(reset) = Menu::context(tl!("Tool").to_owned(), &tool.response).pick(ui, &rows).picked {
         props.out.send(LeadEvent::Reset(reset));
     }

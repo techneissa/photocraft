@@ -18,7 +18,7 @@ pub fn text(app: &PhotocraftApp, id: &str) -> Option<String> {
 /// `entry`, the row of command `id` in a right-click menu, with the command's shortcut at its right and an Assign
 /// Shortcut… item on its own right-click. A row that is no command stays as it is.
 pub fn entry<T>(app: &PhotocraftApp, entry: Entry<T>, id: &str) -> Entry<T> {
-    if photocraft_engine::commands::find(id).is_none() {
+    if photocraft_engine::commands::find(id).is_none() && !crate::menu_catalog::CATALOG.iter().any(|m| m.3 == id) {
         return entry;
     }
     let entry = match text(app, id) {
@@ -28,10 +28,26 @@ pub fn entry<T>(app: &PhotocraftApp, entry: Entry<T>, id: &str) -> Entry<T> {
     entry.row_action(tl!("Assign Shortcut…"), id)
 }
 
+/// Per-frame upkeep (`app::framework`): the word of the Assign Shortcut… item that the tool rail, the Layers footer and
+/// the Paths panel's row menu offer on a right click (craft-libs patch 12, `fork/craft-libs.md`).
+pub fn sync(ctx: &egui::Context) {
+    craft::ui::menu::set_row_action_label(ctx, Some(tl!("Assign Shortcut…").to_string()));
+}
+
 /// Runs the Assign Shortcut… item a menu or the palette reported: opens Keyboard Shortcuts on its command.
 pub fn assign(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if let Some(command) = craft::ui::menu::take_row_action(ctx) {
-        crate::prefs_ui::open_shortcuts_for(app, &command);
+        crate::prefs_ui::open_shortcuts_for(app, &dialog_id(&command));
+    }
+}
+
+/// The id Keyboard Shortcuts lists for `command`: a rail tool's `toolSelect.<tool>` is listed as `tools.select.<tool>`.
+pub(crate) fn dialog_id(command: &str) -> String {
+    use craft::ui::contract::CommandSet as _;
+    use craft::ui::runtime::commands::CommandRef;
+    match crate::panels::tool_commands::ToolCommand::from_ref(&CommandRef::new(command)) {
+        Some(tool) => crate::input::tool_shortcuts::id(crate::panels::tool_commands::tool_of(tool)),
+        None => command.to_string(),
     }
 }
 

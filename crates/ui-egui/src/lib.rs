@@ -64,6 +64,8 @@ pub mod render_path;
 pub(crate) mod scratch_reads;
 // fork: the wheel preference for blend mode boxes (fork/blend-list.md).
 mod blend_wheel;
+// fork: a long dropdown list narrows as you type (fork/dropdown-search.md).
+mod dropdown_search;
 pub mod state;
 pub mod texel_guard;
 pub mod theme;
@@ -92,7 +94,6 @@ mod place_photos;
 //   mod assign_shortcut;               // fork/assign-shortcut-palette.md
 //   mod open_as_layers;                // fork/open-as-layers.md
 //   mod place_photos;                  // fork/place-photos.md
-//   #[cfg(test)] mod mask_clipboard_tests; // fork/upstream-select-mask.md
 // dialogs.rs:        mod placement;                  // fork/windows-open-centred.md
 // dialogs/palette.rs: mod list; mod nav;           // fork/assign-shortcut-palette.md (frecency is back: fork/palette-frecency.md)
 // panels.rs:         pub(crate) mod title_bar_items; // fork/topbar-items.md
@@ -100,7 +101,7 @@ mod place_photos;
 // prefs/prefs_ui.rs: mod shortcut_target; mod shortcuts_backup; mod shortcuts_chord; mod shortcuts_when; // fork/shortcut-upgrade.md
 //                    mod shortcuts_items; mod shortcuts_menus; mod shortcuts_record; mod shortcuts_rows;
 //                    mod shortcuts_search; mod shortcuts_window; // fork/shortcuts-window.md (and their *_tests, *_snapshots)
-// widgets.rs (now gone): mod dropdown_search;        // fork/dropdown-search.md (widgets/dropdown_search.rs)
+// widgets/dropdown_search.rs (the old widget; replaced by dropdown_search.rs on craft's Select: fork/dropdown-search.md)
 // fork_update.rs:    mod ui; mod snapshots;          // fork/fork-update-check.md (the Settings row)
 
 use std::collections::HashMap;
@@ -927,6 +928,8 @@ mod tool_shift_cycle_order_tests;
 #[cfg(test)]
 mod tool_shortcut_tests;
 #[cfg(test)]
+mod toolbar_assign_shortcut_tests;
+#[cfg(test)]
 mod toolbar_custom_group_layout_tests;
 #[cfg(test)]
 mod toolbar_group_order_tests;
@@ -1149,6 +1152,8 @@ mod view_guides_submenu_tests;
 
 #[cfg(test)]
 mod lasso_click_tests;
+#[cfg(test)]
+mod mask_clipboard_tests;
 #[cfg(test)]
 mod reset_tip_tests;
 #[cfg(test)]
