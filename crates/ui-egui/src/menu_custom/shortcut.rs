@@ -1,5 +1,7 @@
 //! The shortcut a right-click menu row shows at its right, as the menu bar does.
 
+use craft::ui::contract::Entry;
+
 use crate::PhotocraftApp;
 
 /// The pretty shortcut now in effect for `id`: the user's own assignment when there is one (an
@@ -13,28 +15,24 @@ pub fn text(app: &PhotocraftApp, id: &str) -> Option<String> {
     sc.filter(|s| !s.is_empty()).map(|s| crate::shortcuts::pretty(&s))
 }
 
-/// `button` with the shortcut of `id` at its right, when it has one.
-pub fn show<'a>(app: &PhotocraftApp, id: &str, button: egui::Button<'a>) -> egui::Button<'a> {
-    match text(app, id) {
-        Some(t) => button.shortcut_text(t),
-        None => button,
+/// `entry`, the row of command `id` in a right-click menu, with the command's shortcut at its right and an Assign
+/// Shortcut… item on its own right-click. A row that is no command stays as it is.
+pub fn entry<T>(app: &PhotocraftApp, entry: Entry<T>, id: &str) -> Entry<T> {
+    if photocraft_engine::commands::find(id).is_none() {
+        return entry;
     }
+    let entry = match text(app, id) {
+        Some(shortcut) => entry.shortcut(shortcut),
+        None => entry,
+    };
+    entry.row_action(tl!("Assign Shortcut…"), id)
 }
 
-/// Add a menu row made by [`show`], named `label` alone: egui names a button by all its text, the
-/// shortcut too, so screen readers (and lookups by label) would read "Reselect ⇧⌘D".
-/// `selected` is the row's check state, for a selectable row.
-pub fn add(ui: &mut egui::Ui, enabled: bool, app: &PhotocraftApp, id: &str, label: &str, selected: Option<bool>, button: egui::Button<'_>) -> egui::Response {
-    let has = text(app, id).is_some();
-    let response = ui.add_enabled(enabled, show(app, id, button));
-    if has {
-        let on = response.enabled();
-        response.widget_info(|| match selected {
-            Some(s) => egui::WidgetInfo::selected(egui::Role::Button, on, s, label),
-            None => egui::WidgetInfo::labeled(egui::Role::Button, on, label),
-        });
+/// Runs the Assign Shortcut… item a menu or the palette reported: opens Keyboard Shortcuts on its command.
+pub fn assign(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    if let Some(command) = craft::ui::menu::take_row_action(ctx) {
+        crate::prefs_ui::open_shortcuts_for(app, &command);
     }
-    response
 }
 
 #[cfg(test)]
@@ -42,7 +40,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn app() -> PhotocraftApp {
+    fn app() -> Box<PhotocraftApp> {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
         app
